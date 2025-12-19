@@ -1,0 +1,8 @@
+{
+  "driver": "sqlite",
+  "server": "localhost",         
+  "port": 0,                     
+  "user": "",                   
+  "password": "",               
+  "database": "./data.db"       
+}
