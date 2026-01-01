@@ -69,25 +69,30 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				log.Printf("[REGISTER][DB] Erreur insertion agent: %v", err)
 			}
-			// Insertion des noms de configuration
-			if configNames, ok := req["ConfigurationNames"]; ok {
-				switch vv := configNames.(type) {
-				case []interface{}:
-					for _, n := range vv {
-						if s, ok := n.(string); ok {
-							_, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, s)
-							if err != nil {
-								log.Printf("[REGISTER][DB] Erreur insertion config: %v", err)
-							}
-						}
-					}
-				case string:
-					_, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, vv)
-					if err != nil {
-						log.Printf("[REGISTER][DB] Erreur insertion config: %v", err)
-					}
-				}
-			}
+			   // Supprimer toutes les configurations existantes pour cet agent
+			   _, err := database.Exec(`DELETE FROM agent_configurations WHERE agent_id = ?`, agentId)
+			   if err != nil {
+				   log.Printf("[REGISTER][DB] Erreur suppression configs existantes: %v", err)
+			   }
+			   // Insertion des nouveaux noms de configuration
+			   if configNames, ok := req["ConfigurationNames"]; ok {
+				   switch vv := configNames.(type) {
+				   case []interface{}:
+					   for _, n := range vv {
+						   if s, ok := n.(string); ok {
+							   _, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, s)
+							   if err != nil {
+								   log.Printf("[REGISTER][DB] Erreur insertion config: %v", err)
+							   }
+						   }
+					   }
+				   case string:
+					   _, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, vv)
+					   if err != nil {
+						   log.Printf("[REGISTER][DB] Erreur insertion config: %v", err)
+					   }
+				   }
+			   }
 		}
 	}
 

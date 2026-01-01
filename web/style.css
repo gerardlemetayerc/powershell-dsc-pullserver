@@ -1,0 +1,9 @@
+body { font-family: Arial, sans-serif;  background: #f7f7f7; }
+h1 { color: #2c3e50; }
+table { border-collapse: collapse; width: 100%; background: #fff; }
+th, td { border: 1px solid #ccc; padding: 0.5em; text-align: left; }
+th { background: #eaeaea; }
+button { margin: 0.2em; }
+#configs-section { margin-top: 2em; }
+form { margin-top: 1em; }
+input[type=text] { padding: 0.3em; margin-right: 0.5em; }

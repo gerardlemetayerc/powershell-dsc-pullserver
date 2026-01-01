@@ -28,7 +28,7 @@ func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
-	rows, err := database.Query(`SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at FROM agents`)
+	rows, err := database.Query(`SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report FROM agents`)
 	if err != nil {
 		http.Error(w, "DB query error", http.StatusInternalServerError)
 		return
@@ -36,12 +36,14 @@ func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	agents := []schema.Agent{}
-	for rows.Next() {
-		var a schema.Agent
-		if err := rows.Scan(&a.AgentId, &a.NodeName, &a.LCMVersion, &a.RegistrationType, &a.CertificateThumbprint, &a.CertificateSubject, &a.CertificateIssuer, &a.CertificateNotBefore, &a.CertificateNotAfter, &a.RegisteredAt); err == nil {
-			agents = append(agents, a)
-		}
-	}
+	  for rows.Next() {
+		  var a schema.Agent
+		  var hasErrorInt int
+		  if err := rows.Scan(&a.AgentId, &a.NodeName, &a.LCMVersion, &a.RegistrationType, &a.CertificateThumbprint, &a.CertificateSubject, &a.CertificateIssuer, &a.CertificateNotBefore, &a.CertificateNotAfter, &a.RegisteredAt, &a.LastCommunication, &hasErrorInt); err == nil {
+			  a.HasErrorLastReport = hasErrorInt != 0
+			  agents = append(agents, a)
+		  }
+	  }
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(agents)
 }

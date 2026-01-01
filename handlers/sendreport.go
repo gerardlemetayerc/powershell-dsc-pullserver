@@ -60,10 +60,14 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				log.Printf("[SENDREPORT] Erreur insertion rapport en base: %v", err)
 			}
-			// Met à jour last_communication
-			_, err = database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP WHERE agent_id = ?", agentId)
+			// Met à jour last_communication et has_error_last_report
+			hasError := 0
+			if (len(report.Errors) > 0) {
+				hasError = 1
+			}
+			_, err = database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP, has_error_last_report = ? WHERE agent_id = ?", hasError, agentId)
 			if err != nil {
-				log.Printf("[SENDREPORT] Erreur update last_communication: %v", err)
+				log.Printf("[SENDREPORT] Erreur update last_communication/has_error_last_report: %v", err)
 			}
 			database.Close()
 		}
@@ -72,7 +76,6 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 	
 	w.Header().Set("ProtocolVersion", "2.0")
 	w.Header().Set("Content-Type", "application/json")
-
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("{}"))
 }

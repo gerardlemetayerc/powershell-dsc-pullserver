@@ -33,9 +33,11 @@ func AgentByIdAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
-	row := database.QueryRow(`SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at FROM agents WHERE agent_id = ?`, agentId)
+	row := database.QueryRow(`SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report FROM agents WHERE agent_id = ?`, agentId)
 	var a schema.Agent
-	err = row.Scan(&a.AgentId, &a.NodeName, &a.LCMVersion, &a.RegistrationType, &a.CertificateThumbprint, &a.CertificateSubject, &a.CertificateIssuer, &a.CertificateNotBefore, &a.CertificateNotAfter, &a.RegisteredAt)
+	var hasErrorInt int
+	err = row.Scan(&a.AgentId, &a.NodeName, &a.LCMVersion, &a.RegistrationType, &a.CertificateThumbprint, &a.CertificateSubject, &a.CertificateIssuer, &a.CertificateNotBefore, &a.CertificateNotAfter, &a.RegisteredAt, &a.LastCommunication, &hasErrorInt)
+	a.HasErrorLastReport = hasErrorInt != 0
 	if err != nil {
 		http.Error(w, "Agent non trouvé", http.StatusNotFound)
 		return

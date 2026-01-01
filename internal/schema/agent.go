@@ -11,4 +11,6 @@ type Agent struct {
 	CertificateNotBefore   string `json:"certificate_notbefore"`
 	CertificateNotAfter    string `json:"certificate_notafter"`
 	RegisteredAt           string `json:"registered_at"`
+	LastCommunication      string `json:"last_communication"`
+	HasErrorLastReport     bool   `json:"has_error_last_report"`
 }
