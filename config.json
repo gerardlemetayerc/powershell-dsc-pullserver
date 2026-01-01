@@ -4,5 +4,7 @@
   "port": 0,                     
   "user": "",                   
   "password": "",               
-  "database": "./data.db"       
+  "database": "./data.db",
+  "dsc_port": 8080,
+  "web_port": 80   
 }
