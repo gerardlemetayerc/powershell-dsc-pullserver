@@ -23,7 +23,7 @@
     </nav>
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
         <a href="/web/reports.html" class="brand-link">
-            <span class="brand-text font-weight-light">DSC Admin</span>
+            <span class="brand-text font-weight-light">DSC Admin Console</span>
         </a>
         <div class="sidebar">
             <nav class="mt-2">
@@ -52,7 +52,7 @@
                         <h1>Modules DSC</h1>
                     </div>
                     <div class="col-sm-6 text-right">
-                        <button class="btn btn-success" id="btn-upload-module"><i class="fas fa-plus"></i> Ajouter un module</button>
+                        <button class="btn btn-success" id="btn-upload-module"><i class="fas fa-plus"></i> Upload new module</button>
                     </div>
                 </div>
             </div>
@@ -64,10 +64,10 @@
                         <table id="modules-table" class="table table-bordered table-striped" style="width:100%">
                             <thead>
                                 <tr>
-                                    <th>Nom</th>
+                                    <th>Name</th>
                                     <th>Version</th>
                                     <th>Checksum</th>
-                                    <th>Date d'upload</th>
+                                    <th>Upload Date</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -86,7 +86,7 @@
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="modalLabel">Ajouter un module DSC (.nupkg)</h5>
+        <h5 class="modal-title" id="modalLabel">Add a DSC module (.nupkg, .zip)</h5>
         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>
@@ -96,8 +96,8 @@
         <input type="file" name="nupkg" accept=".nupkg,.zip" class="form-control" required />
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
-        <button type="submit" class="btn btn-primary">Uploader</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Upload</button>
       </div>
       </form>
     </div>

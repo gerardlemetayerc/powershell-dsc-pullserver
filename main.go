@@ -1,4 +1,3 @@
-
 package main
 
 import(
@@ -127,7 +126,10 @@ func main() {
 	webMux.HandleFunc("POST /api/v1/agents/{id}/configs", handlers.AgentConfigsAPIHandlerPostDelete)
 	webMux.HandleFunc("DELETE /api/v1/agents/{id}/configs", handlers.AgentConfigsAPIHandlerPostDelete)
 	// API REST: rapports d'un agent
-	webMux.HandleFunc("GET /api/v1/agents/{id}/reports", handlers.AgentReportsListHandler)
+	webMux.HandleFunc("GET /api/v1/agents/{id}/reports", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[API] /api/v1/agents/%s/reports?%s", r.PathValue("id"), r.URL.RawQuery)
+		handlers.AgentReportsListHandler(w, r)
+	})
 	webMux.HandleFunc("GET /api/v1/agents/{id}/reports/latest", handlers.AgentReportsLatestHandler)
 	webMux.HandleFunc("GET /api/v1/agents/{id}/reports/{jobid}", handlers.AgentReportsByJobIdHandler)
 	// API REST: infos d'un agent
