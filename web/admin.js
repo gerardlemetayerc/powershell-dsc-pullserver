@@ -6,14 +6,15 @@ $(document).ready(function() {
             dataSrc: ''
         },
         columns: [
-            { data: 'node_name', title: 'Nom' },
-            { data: 'last_communication', title: 'Dernière communication' },
+            { data: 'node_name', title: 'Name' },
+            { data: 'last_communication', title: 'Last Communication' },
             { data: 'thumbprint', title: 'Thumbprint' },
+            { data: 'has_error_last_report', title: 'Status' },
             {
                 data: 'agent_id',
-                title: 'Détail',
+                title: 'Detail',
                 render: function(data, type, row) {
-                    return `<button onclick="viewAgentDetail('${data}')">Voir</button>`;
+                    return `<button onclick="viewAgentDetail('${data}')">View</button>`;
                 }
             }
         ],

@@ -3,6 +3,7 @@ package main
 
 import(
 	"log"
+	"strings"
 	"os"
 	"fmt"
 	"encoding/json"
@@ -43,13 +44,18 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
-	
 	// Initialisation automatique de la base (CREATE IF NOT EXISTS)
 	dbCfg, err := db.LoadDBConfig("config.json")
 	if err != nil {
 		log.Fatalf("[INITDB] Erreur chargement config DB: %v", err)
 	}
 	db.InitDB(dbCfg)
+	dbConn, err := db.OpenDB(dbCfg)
+	if err != nil {
+		log.Fatalf("Erreur ouverture DB: %v", err)
+	}
+
+
 
 	// Lecture des ports depuis config.json
 	type portConfig struct {
@@ -81,7 +87,37 @@ func main() {
 		agentId := utils.ExtractAgentId(raw)
 		handlers.GetDscActionNodeHandlerWithId(w, r, agentId)
 	})
-
+	dscMux.HandleFunc("GET /PSDSCPullServer.svc/{module}/ModuleContent", func(w http.ResponseWriter, r *http.Request) {
+		// Exemple de segment: Modules(ModuleName='FileContentDsc',ModuleVersion='1.3.0.151')
+		moduleSeg := r.PathValue("module")
+		var name, version string
+		// Extraction robuste avec regex
+		// Format attendu: Modules(ModuleName='...',ModuleVersion='...')
+		if strings.HasPrefix(moduleSeg, "Modules(") && strings.HasSuffix(moduleSeg, ")") {
+			inner := moduleSeg[len("Modules(") : len(moduleSeg)-1]
+			parts := strings.Split(inner, ",")
+			for _, part := range parts {
+				kv := strings.SplitN(part, "=", 2)
+				if len(kv) == 2 {
+					k := strings.TrimSpace(kv[0])
+					v := strings.Trim(kv[1], "'\"")
+					if k == "ModuleName" {
+						name = v
+					} else if k == "ModuleVersion" {
+						version = v
+					}
+				}
+			}
+		}
+		log.Printf("[MODULECONTENT] Agent request ModuleName=%s, ModuleVersion=%s", name, version)
+		checksum := r.URL.Query().Get("Checksum")
+		q := r.URL.Query()
+		q.Set("ModuleName", name)
+		q.Set("ModuleVersion", version)
+		if checksum != "" { q.Set("Checksum", checksum) }
+		r.URL.RawQuery = q.Encode()
+		handlers.ModuleDownloadHandler(dbConn)(w, r)
+	})
 	// --- Mux IHM/API ---
 	webMux := http.NewServeMux()
 	// API REST: liste des agents
@@ -96,11 +132,20 @@ func main() {
 	webMux.HandleFunc("GET /api/v1/agents/{id}/reports/{jobid}", handlers.AgentReportsByJobIdHandler)
 	// API REST: infos d'un agent
 	webMux.HandleFunc("GET /api/v1/agents/{id}", handlers.AgentByIdAPIHandler)
+	// API REST: modules DSC
+	webMux.HandleFunc("POST /api/v1/modules/upload", handlers.ModuleUploadHandler(dbConn))
+	webMux.HandleFunc("GET /api/v1/modules", handlers.ModuleListHandler(dbConn))
+	webMux.HandleFunc("DELETE /api/v1/modules/delete", handlers.ModuleDeleteHandler(dbConn))
+
 	// Servir l'IHM web statique sur /web/
 	webMux.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("web"))))
 	// Special handler for /web/node/{id} to always serve node.html (SPA style)
 	webMux.HandleFunc("/web/node/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "web/node.html")
+	})
+	// Handler pour /web/modules pour servir modules.html
+	webMux.HandleFunc("/web/modules", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/modules.html")
 	})
 
 	// Wrap mux with logging middleware

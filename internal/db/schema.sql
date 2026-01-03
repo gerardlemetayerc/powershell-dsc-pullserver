@@ -1,3 +1,12 @@
+-- Table pour les modules DSC uploadés
+CREATE TABLE IF NOT EXISTS modules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    version TEXT NOT NULL,
+    checksum TEXT NOT NULL,
+    zip_blob BLOB NOT NULL,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 -- Table pour l'historique des rapports DSC
 CREATE TABLE IF NOT EXISTS reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,10 +30,10 @@ CREATE INDEX IF NOT EXISTS idx_reports_agent_id ON reports(agent_id);
 CREATE TABLE IF NOT EXISTS dsc_infra_info (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     web_version TEXT DEFAULT '0.0.1',
-    db_version TEXT DEFAULT '0.0.2',
+    db_version TEXT DEFAULT '0.0.3',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-UPDATE dsc_infra_info SET db_version = '0.0.2', updated_at = CURRENT_TIMESTAMP WHERE id = 1;
+UPDATE dsc_infra_info SET db_version = '0.0.3', updated_at = CURRENT_TIMESTAMP WHERE id = 1;
 -- Schéma pour la table agents
 
 CREATE TABLE IF NOT EXISTS agents (
@@ -42,7 +51,11 @@ CREATE TABLE IF NOT EXISTS agents (
     has_error_last_report BOOLEAN DEFAULT 0
 );
 -- Migration : ajout de la colonne has_error_last_report si besoin
-ALTER TABLE agents ADD COLUMN has_error_last_report BOOLEAN DEFAULT 0;
+-- N'exécuter que si la version de la db est antérieure à 0.0.3
+-- Si la version était < 0.0.3, alors on ajoute la colonne
+-- (Attention : SQLite ne supporte pas IF NOT EXISTS sur ALTER TABLE, donc il faut gérer l'erreur côté code ou script)
+-- À exécuter manuellement ou via un script Go de migration :
+-- ALTER TABLE agents ADD COLUMN has_error_last_report BOOLEAN DEFAULT 0;
 
 
 -- Table de relation 1-n pour les noms de configuration

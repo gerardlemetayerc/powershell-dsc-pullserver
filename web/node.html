@@ -29,22 +29,25 @@
             <li class="nav-item" role="none">
                 <a class="nav-link" data-widget="pushmenu" href="#" role="menuitem" title="Ouvrir le menu"><i class="fas fa-bars"></i></a>
             </li>
-            <li class="nav-item d-none d-sm-inline-block" role="none">
-                <a href="/web/reports.html" class="nav-link" role="menuitem" title="Accueil">Accueil</a>
-            </li>
         </ul>
     </nav>
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
-        <a href="/web/reports.html" class="brand-link">
+        <a href="/web/" class="brand-link">
             <span class="brand-text font-weight-light">DSC Admin</span>
         </a>
         <div class="sidebar">
             <nav class="mt-2">
                 <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" aria-label="Navigation agents">
-                    <li class="nav-item" role="none">
-                        <a href="/web/reports.html" class="nav-link" role="menuitem" title="Liste des agents">
+                    <li class="nav-item">
+                        <a href="/web" class="nav-link">
                             <i class="nav-icon fas fa-table"></i>
-                            <span>Agents</span>
+                            <p>Dashboard</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/web/modules" class="nav-link active">
+                            <i class="nav-icon fas fa-cubes"></i>
+                            <p>Modules</p>
                         </a>
                     </li>
                 </ul>
@@ -66,18 +69,18 @@
                 <div class="card">
                     <div class="card-body">
                         <h3>Informations de l'agent</h3>
-                        <p><strong>Nom d'hôte:</strong> <span id="agent-name"></span></p>
+                        <p><strong>Hostname:</strong> <span id="agent-name"></span></p>
                         <p><strong>Thumbprint:</strong> <span id="agent-thumbprint"></span></p>
-                        <p><strong>Dernière communication:</strong> <span id="agent-lastcomm"></span></p>
+                        <p><strong>Last Communication:</strong> <span id="agent-lastcomm"></span></p>
                         <hr>
-                        <h3>Dernier rapport DSC</h3>
+                        <h3>Last report</h3>
                         <p><strong>Status:</strong> <span id="report-status"></span></p>
                         <div><strong>StartTime:</strong> <span id="report-starttime"></span></div>
                         <div><strong>OperationType:</strong> <span id="report-operationtype"></span></div>
-                        <p><strong>Erreurs:</strong> <span id="report-errors"></span></p>
+                        <p><strong>Errors:</strong> <span id="report-errors"></span></p>
                         <pre id="report-json" class="report-json"></pre>
                         <hr>
-                        <h3>Historique des rapports</h3>
+                        <h3>Report History</h3>
                         <div id="reports-list"></div>
                     </div>
                 </div>
