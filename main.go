@@ -139,16 +139,13 @@ func main() {
 	webMux.HandleFunc("GET /api/v1/modules", handlers.ModuleListHandler(dbConn))
 	webMux.HandleFunc("DELETE /api/v1/modules/delete", handlers.ModuleDeleteHandler(dbConn))
 
-	// Servir l'IHM web statique sur /web/
+	// Servir la page index via le template Go
+	webMux.HandleFunc("/web", handlers.WebIndexHandler)
 	webMux.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("web"))))
-	// Special handler for /web/node/{id} to always serve node.html (SPA style)
-	webMux.HandleFunc("/web/node/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "web/node.html")
-	})
-	// Handler pour /web/modules pour servir modules.html
-	webMux.HandleFunc("/web/modules", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "web/modules.html")
-	})
+	// Handler Go pour /web/node/{id}
+	webMux.HandleFunc("/web/node/", handlers.WebNodeHandler)
+	// Handler Go pour /web/modules
+	webMux.HandleFunc("/web/modules", handlers.WebModulesHandler)
 
 	// Wrap mux with logging middleware
 	dscHandler := loggingMiddleware(dscMux)

@@ -17,13 +17,49 @@ const state = {
 
 function renderAgentInfo() {
     if (!state.agent) {
-        return `<p><strong>Name:</strong> <span id="agent-name">Error loading</span></p>
-                <p><strong>Thumbprint:</strong> <span id="agent-thumbprint"></span></p>
-                <p><strong>Last Communication:</strong> <span id="agent-lastcomm"></span></p>`;
+        return `<p><strong>Name:</strong> <span id="agent-name">Error loading</span>
+                <div><strong>Thumbprint:</strong> <span id="agent-thumbprint"></span></div>
+                <div><strong>Last Communication:</strong> <span id="agent-lastcomm"></span></div>`;
     }
-    return `<p><strong>Name:</strong> <span id="agent-name">${state.agent.node_name || ''}</span></p>
-            <p><strong>Thumbprint:</strong> <span id="agent-thumbprint">${state.agent.thumbprint || state.agent.certificate_thumbprint || ''}</span></p>
-            <p><strong>Last Communication:</strong> <span id="agent-lastcomm">${state.agent.last_communication || ''}</span></p>`;
+    let certExpRaw = state.agent.certificate_notafter || '';
+    let certExp = certExpRaw;
+    let daysLeft = '';
+    if (certExpRaw) {
+        let expDate = new Date(certExpRaw);
+        if (!isNaN(expDate.getTime())) {
+            // Format: YYYY-MM-DD HH:mm:ss
+            let y = expDate.getFullYear();
+            let m = (expDate.getMonth()+1).toString().padStart(2,'0');
+            let d = expDate.getDate().toString().padStart(2,'0');
+            let h = expDate.getHours().toString().padStart(2,'0');
+            let min = expDate.getMinutes().toString().padStart(2,'0');
+            let s = expDate.getSeconds().toString().padStart(2,'0');
+            certExp = `${y}-${m}-${d} ${h}:${min}:${s}`;
+            let now = new Date();
+            let diffMs = expDate - now;
+            let diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            daysLeft = ` (${diffDays} day${diffDays === 1 ? '' : 's'} remaining)`;
+        }
+    }
+    let lastCommRaw = state.agent.last_communication || '';
+    let lastComm = lastCommRaw;
+    if (lastCommRaw) {
+        let dt = new Date(lastCommRaw);
+        if (!isNaN(dt.getTime())) {
+            let y = dt.getFullYear();
+            let m = (dt.getMonth()+1).toString().padStart(2,'0');
+            let d = dt.getDate().toString().padStart(2,'0');
+            let h = dt.getHours().toString().padStart(2,'0');
+            let min = dt.getMinutes().toString().padStart(2,'0');
+            let s = dt.getSeconds().toString().padStart(2,'0');
+            lastComm = `${y}-${m}-${d} ${h}:${min}:${s}`;
+        }
+    }
+    return `<p>
+                <div><strong>Name:</strong> <span id="agent-name">${state.agent.node_name || ''}</span></div>
+                <div><strong>Certificate expiration:</strong> <span id="agent-thumbprint">${certExp}${daysLeft}</span></div>
+                <div><strong>Last Communication:</strong> <span id="agent-lastcomm">${lastComm}</span></div>
+            </p>`;
 }
 
 function renderSelectedReport() {
@@ -59,7 +95,8 @@ function renderSelectedReport() {
         let html = `<p><strong>${title}</strong></p><table style="width:100%" class="table table-bordered table-sm"><thead><tr>`;
         html += cols.map(c => `<th>${c}</th>`).join('');
         html += '</tr></thead><tbody>';
-        for(const res of resources) {
+        const isNotDesired = title.toLowerCase().includes('not in desired');
+        for(const [rowIdx, res] of resources.entries()) {
             html += '<tr>' + cols.map(c => {
                 if (c === 'ModuleName') {
                     let mod = res[c] || '';
@@ -69,6 +106,11 @@ function renderSelectedReport() {
                     } else {
                         return `<td></td>`;
                     }
+                } else if (c.toLowerCase() === 'error' && isNotDesired) {
+                    let err = res[c] || '';
+                    let shortErr = err.length > 60 ? err.substring(0, 60) + '…' : err;
+                    let btn = err ? `<a href="#" class="show-error-modal" data-error="${encodeURIComponent(err)}" data-row="${rowIdx}">${shortErr}</a>` : '';
+                    return `<td>${btn}</td>`;
                 } else {
                     return `<td>${res[c] || ''}</td>`;
                 }
@@ -143,20 +185,49 @@ function renderSelectedReport() {
                 <pre id="report-json" style="background:#eee; padding:10px;">${JSON.stringify(report, null, 2)}</pre>
             </div>
         </div>
-        <script>
-            $(function(){
-                $('#toggle-raw-json').off('click').on('click', function() {
-                    const block = $('#raw-json-block');
-                    if(block.is(':visible')) {
-                        block.slideUp(150);
-                        $(this).text('Afficher les données brutes');
-                    } else {
-                        block.slideDown(150);
-                        $(this).text('Masquer les données brutes');
-                    }
-                });
-            });
-        </script>
+                <script>
+                        $(function(){
+                                $('#toggle-raw-json').off('click').on('click', function() {
+                                        const block = $('#raw-json-block');
+                                        if(block.is(':visible')) {
+                                                block.slideUp(150);
+                                                $(this).text('Afficher les données brutes');
+                                        } else {
+                                                block.slideDown(150);
+                                                $(this).text('Masquer les données brutes');
+                                        }
+                                });
+                                // Gestion modale erreur détaillée
+                                $(document).off('click', '.show-error-modal').on('click', '.show-error-modal', function(e) {
+                                        e.preventDefault();
+                                        var err = decodeURIComponent($(this).data('error'));
+                                        if($('#errorDetailModal').length === 0) {
+                                                var modalHtml = '<div class="modal fade" id="errorDetailModal" tabindex="-1" role="dialog" aria-labelledby="errorDetailModalLabel" aria-hidden="true">'+
+                                                    '<div class="modal-dialog modal-lg" role="document">'+
+                                                        '<div class="modal-content">'+
+                                                            '<div class="modal-header bg-danger text-white">'+
+                                                                '<h5 class="modal-title" id="errorDetailModalLabel">Erreur complète</h5>'+ 
+                                                                '<button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">'+
+                                                                    '<span aria-hidden="true">&times;</span>'+ 
+                                                                '</button>'+ 
+                                                            '</div>'+ 
+                                                            '<div class="modal-body" id="errorDetailModalBody" style="background:#222;color:#fff;white-space:pre-wrap;font-family:monospace;font-size:1em;max-height:70vh;overflow:auto;border-radius:6px;padding:18px 16px;"></div>'+ 
+                                                        '</div>'+ 
+                                                    '</div>'+ 
+                                                '</div>';
+                                                $('body').append(modalHtml);
+                                        }
+                                        // Formatage JSON si possible
+                                        let formatted = err;
+                                        try {
+                                                let obj = JSON.parse(err);
+                                                formatted = JSON.stringify(obj, null, 2);
+                                        } catch(e) {}
+                                        $('#errorDetailModalBody').text(formatted);
+                                        $('#errorDetailModal').modal('show');
+                                });
+                        });
+                </script>
     `;
 }
 

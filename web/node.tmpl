@@ -1,0 +1,26 @@
+{{define "content"}}
+<section class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1>Node details</h1>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="content">
+    <div class="container-fluid">
+        <div class="card">
+            <div class="card-body">
+                <h3>LCM Agent information</h3>
+                <div id="agent-info-block"></div>
+                <hr>
+                <h3>DSC Report</h3>
+                <div id="reports-dropdown-block" style="margin-bottom:1em;"></div>
+                <div id="last-report-block"></div>
+            </div>
+        </div>
+    </div>
+</section>
+<script src="/web/node.js"></script>
+{{end}}

@@ -1,0 +1,15 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="fr">
+{{template "head" .}}
+<body class="hold-transition sidebar-mini">
+<div class="wrapper">
+    {{template "menu" .}}
+    <div class="content-wrapper">
+        {{block "content" .}}{{end}}
+    </div>
+    {{template "footer" .}}
+</div>
+</body>
+</html>
+{{end}}

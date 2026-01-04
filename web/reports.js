@@ -90,5 +90,3 @@ $(document).ready(function() {
         }
     });
 });
-
-// La fonction viewAgentDetail n'est plus utilisée, la redirection se fait via le lien.
