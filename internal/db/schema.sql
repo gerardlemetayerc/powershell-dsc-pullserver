@@ -30,10 +30,10 @@ CREATE INDEX IF NOT EXISTS idx_reports_agent_id ON reports(agent_id);
 CREATE TABLE IF NOT EXISTS dsc_infra_info (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     web_version TEXT DEFAULT '0.0.1',
-    db_version TEXT DEFAULT '0.0.3',
+    db_version TEXT DEFAULT '0.0.4',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-UPDATE dsc_infra_info SET db_version = '0.0.3', updated_at = CURRENT_TIMESTAMP WHERE id = 1;
+UPDATE dsc_infra_info SET db_version = '0.0.4', updated_at = CURRENT_TIMESTAMP WHERE id = 1;
 -- Schéma pour la table agents
 
 CREATE TABLE IF NOT EXISTS agents (
@@ -71,4 +71,21 @@ CREATE TABLE IF NOT EXISTS agent_ips (
     ip_address TEXT,
     PRIMARY KEY (agent_id, ip_address),
     FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
+);
+
+-- Table for customizable properties
+CREATE TABLE IF NOT EXISTS properties (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    priority INTEGER DEFAULT 0
+);
+
+-- Associative table: node_name, property id, value
+CREATE TABLE IF NOT EXISTS node_properties (
+    node_id TEXT NOT NULL,
+    property_id INTEGER NOT NULL,
+    value TEXT,
+    PRIMARY KEY (node_id, property_id),
+    FOREIGN KEY (property_id) REFERENCES properties(id)
 );

@@ -266,6 +266,11 @@ $(document).ready(function() {
     $('.card-body').html(`
         <h3>Agent Information</h3>
         <div id="agent-info-block"></div>
+       <div class="mb-3">
+           <a id="node-properties-link" class="btn btn-outline-primary btn-sm" href="#">
+               <i class="fas fa-list-alt"></i> Gérer les propriétés de ce nœud
+           </a>
+       </div>
         <hr>
         <h3>DSC Report</h3>
         <div id="reports-dropdown-block" style="margin-bottom:1em;"></div>
@@ -330,4 +335,12 @@ $(document).ready(function() {
             renderAll();
         }
     });
+
+       // Bouton gestion propriétés du nœud
+       $(document).on('click', '#node-properties-link', function(e) {
+           e.preventDefault();
+           if(agentId) {
+               window.location.href = '/web/node/' + encodeURIComponent(agentId) + '/properties';
+           }
+       });
 });

@@ -139,13 +139,37 @@ func main() {
 	webMux.HandleFunc("GET /api/v1/modules", handlers.ModuleListHandler(dbConn))
 	webMux.HandleFunc("DELETE /api/v1/modules/delete", handlers.ModuleDeleteHandler(dbConn))
 
+	// API REST: properties
+	webMux.HandleFunc("GET /api/v1/properties", handlers.PropertiesListHandler)
+	webMux.HandleFunc("POST /api/v1/properties", handlers.PropertiesCreateHandler)
+	webMux.HandleFunc("GET /api/v1/properties/{id}", handlers.PropertiesGetHandler)
+	webMux.HandleFunc("PUT /api/v1/properties/{id}", handlers.PropertiesUpdateHandler)
+	webMux.HandleFunc("DELETE /api/v1/properties/{id}", handlers.PropertiesDeleteHandler)
+
+	// API REST: node_properties
+	webMux.HandleFunc("GET /api/v1/agents/{nodename}/properties", handlers.NodePropertiesListHandler)
+	webMux.HandleFunc("POST /api/v1/agents/{nodename}/properties", handlers.NodePropertiesCreateHandler)
+	webMux.HandleFunc("GET /api/v1/agents/{nodename}/properties/{property_id}", handlers.NodePropertyGetHandler)
+	webMux.HandleFunc("PUT /api/v1/agents/{nodename}/properties/{property_id}", handlers.NodePropertyUpdateHandler)
+	webMux.HandleFunc("DELETE /api/v1/agents/{nodename}/properties/{property_id}", handlers.NodePropertyDeleteHandler)
+
 	// Servir la page index via le template Go
 	webMux.HandleFunc("/web", handlers.WebIndexHandler)
 	webMux.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("web"))))
-	// Handler Go pour /web/node/{id}
-	webMux.HandleFunc("/web/node/", handlers.WebNodeHandler)
+	// Handler Go pour /web/node/{id} et /web/node/{nodename}/properties
+	webMux.HandleFunc("/web/node/", func(w http.ResponseWriter, r *http.Request) {
+	   if strings.HasSuffix(r.URL.Path, "/properties") {
+		   handlers.WebNodePropertiesHandler(w, r)
+		   return
+	   }
+	   handlers.WebNodeHandler(w, r)
+	})
 	// Handler Go pour /web/modules
 	webMux.HandleFunc("/web/modules", handlers.WebModulesHandler)
+
+	// Handler Go pour /web/properties.html
+	webMux.HandleFunc("/web/properties.html", handlers.WebPropertiesHandler)
+
 
 	// Wrap mux with logging middleware
 	dscHandler := loggingMiddleware(dscMux)
