@@ -5,7 +5,56 @@
             <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
         </li>
     </ul>
+    <ul class="navbar-nav ml-auto">
+        <li class="nav-item dropdown">
+            <a class="nav-link" data-toggle="dropdown" href="#" id="userDropdown">
+                <i class="fas fa-user-circle"></i> <span id="userName">Utilisateur</span>
+            </a>
+            <div class="dropdown-menu dropdown-menu-right">
+                <a class="dropdown-item" href="#" id="logoutBtn"><i class="fas fa-sign-out-alt mr-2"></i>Déconnexion</a>
+            </div>
+        </li>
+    </ul>
 </nav>
+<script>
+// Affiche le nom d'utilisateur extrait du JWT (claim sub)
+function parseJwt (token) {
+    try {
+        return JSON.parse(atob(token.split('.')[1]));
+    } catch(e) { return {}; }
+}
+const token = localStorage.getItem('jwt_token');
+if (token) {
+    const payload = parseJwt(token);
+    if (payload && payload.sub) {
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('userName').textContent = payload.sub;
+        });
+    }
+}
+// Déconnexion
+document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('logoutBtn');
+    if (btn) {
+        btn.onclick = function() {
+            localStorage.removeItem('jwt_token');
+            window.location.href = '/web/login';
+        };
+    }
+});
+// Active dynamiquement le menu selon l'URL
+document.addEventListener('DOMContentLoaded', function() {
+    var path = window.location.pathname;
+    document.querySelectorAll('.main-sidebar .nav-link').forEach(function(link) {
+        // Retire la classe active de tous
+        link.classList.remove('active');
+        // Active si correspond à l'URL courante
+        if (link.getAttribute('href') === path) {
+            link.classList.add('active');
+        }
+    });
+});
+</script>
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
     <a href="/web/reports.html" class="brand-link">
         <span class="brand-text font-weight-light">DSC Admin Console</span>
@@ -31,6 +80,12 @@
                            <p>Propriétés</p>
                        </a>
                    </li>
+                  <li class="nav-item">
+                      <a href="/web/configuration_model" class="nav-link">
+                          <i class="nav-icon fas fa-file-alt"></i>
+                          <p>Configuration Models</p>
+                      </a>
+                  </li>
             </ul>
         </nav>
     </div>

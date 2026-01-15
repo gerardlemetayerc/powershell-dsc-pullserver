@@ -81,11 +81,19 @@ CREATE TABLE IF NOT EXISTS properties (
     priority INTEGER DEFAULT 0
 );
 
--- Associative table: node_name, property id, value
 CREATE TABLE IF NOT EXISTS node_properties (
     node_id TEXT NOT NULL,
     property_id INTEGER NOT NULL,
     value TEXT,
     PRIMARY KEY (node_id, property_id),
     FOREIGN KEY (property_id) REFERENCES properties(id)
+);
+
+-- Table pour les modèles de configuration MOF
+CREATE TABLE IF NOT EXISTS configuration_model (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    property TEXT NOT NULL,
+    value TEXT NOT NULL,
+    mof_file BLOB NOT NULL,
+    upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

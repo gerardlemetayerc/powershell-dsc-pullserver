@@ -1,3 +1,4 @@
+
 package main
 
 import(
@@ -10,6 +11,8 @@ import(
 	"go-dsc-pull/handlers"
 	"go-dsc-pull/utils"
 	"go-dsc-pull/internal/db"
+    "time"
+    "github.com/golang-jwt/jwt/v5"
 )
 
 type RegisterRequest struct {
@@ -120,38 +123,85 @@ func main() {
 	// --- Mux IHM/API ---
 	webMux := http.NewServeMux()
 	// API REST: liste des agents
-	webMux.HandleFunc("GET /api/v1/agents", handlers.AgentAPIHandler)
+	webMux.Handle("GET /api/v1/agents", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentAPIHandler)))
 	// API REST: configurations d'un agent
-	webMux.HandleFunc("GET /api/v1/agents/{id}/configs", handlers.AgentConfigsAPIHandler)
-	webMux.HandleFunc("POST /api/v1/agents/{id}/configs", handlers.AgentConfigsAPIHandlerPostDelete)
-	webMux.HandleFunc("DELETE /api/v1/agents/{id}/configs", handlers.AgentConfigsAPIHandlerPostDelete)
+	webMux.Handle("GET /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandler)))
+	webMux.Handle("POST /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete)))
+	webMux.Handle("DELETE /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete)))
 	// API REST: rapports d'un agent
-	webMux.HandleFunc("GET /api/v1/agents/{id}/reports", func(w http.ResponseWriter, r *http.Request) {
+	webMux.Handle("GET /api/v1/agents/{id}/reports", jwtAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[API] /api/v1/agents/%s/reports?%s", r.PathValue("id"), r.URL.RawQuery)
 		handlers.AgentReportsListHandler(w, r)
-	})
-	webMux.HandleFunc("GET /api/v1/agents/{id}/reports/latest", handlers.AgentReportsLatestHandler)
-	webMux.HandleFunc("GET /api/v1/agents/{id}/reports/{jobid}", handlers.AgentReportsByJobIdHandler)
+	})))
+	webMux.Handle("GET /api/v1/agents/{id}/reports/latest", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentReportsLatestHandler)))
+	webMux.Handle("GET /api/v1/agents/{id}/reports/{jobid}", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentReportsByJobIdHandler)))
 	// API REST: infos d'un agent
-	webMux.HandleFunc("GET /api/v1/agents/{id}", handlers.AgentByIdAPIHandler)
+	webMux.Handle("GET /api/v1/agents/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentByIdAPIHandler)))
 	// API REST: modules DSC
-	webMux.HandleFunc("POST /api/v1/modules/upload", handlers.ModuleUploadHandler(dbConn))
-	webMux.HandleFunc("GET /api/v1/modules", handlers.ModuleListHandler(dbConn))
-	webMux.HandleFunc("DELETE /api/v1/modules/delete", handlers.ModuleDeleteHandler(dbConn))
+	webMux.Handle("POST /api/v1/modules/upload", jwtAuthMiddleware(http.HandlerFunc(handlers.ModuleUploadHandler(dbConn))))
+	webMux.Handle("GET /api/v1/modules", jwtAuthMiddleware(http.HandlerFunc(handlers.ModuleListHandler(dbConn))))
+	webMux.Handle("DELETE /api/v1/modules/delete", jwtAuthMiddleware(http.HandlerFunc(handlers.ModuleDeleteHandler(dbConn))))
 
 	// API REST: properties
-	webMux.HandleFunc("GET /api/v1/properties", handlers.PropertiesListHandler)
-	webMux.HandleFunc("POST /api/v1/properties", handlers.PropertiesCreateHandler)
-	webMux.HandleFunc("GET /api/v1/properties/{id}", handlers.PropertiesGetHandler)
-	webMux.HandleFunc("PUT /api/v1/properties/{id}", handlers.PropertiesUpdateHandler)
-	webMux.HandleFunc("DELETE /api/v1/properties/{id}", handlers.PropertiesDeleteHandler)
+	webMux.Handle("GET /api/v1/properties", jwtAuthMiddleware(http.HandlerFunc(handlers.PropertiesListHandler)))
+	webMux.Handle("POST /api/v1/properties", jwtAuthMiddleware(http.HandlerFunc(handlers.PropertiesCreateHandler)))
+	webMux.Handle("GET /api/v1/properties/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.PropertiesGetHandler)))
+	webMux.Handle("PUT /api/v1/properties/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.PropertiesUpdateHandler)))
+	webMux.Handle("DELETE /api/v1/properties/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.PropertiesDeleteHandler)))
 
-	// API REST: node_properties
-	webMux.HandleFunc("GET /api/v1/agents/{nodename}/properties", handlers.NodePropertiesListHandler)
-	webMux.HandleFunc("POST /api/v1/agents/{nodename}/properties", handlers.NodePropertiesCreateHandler)
-	webMux.HandleFunc("GET /api/v1/agents/{nodename}/properties/{property_id}", handlers.NodePropertyGetHandler)
-	webMux.HandleFunc("PUT /api/v1/agents/{nodename}/properties/{property_id}", handlers.NodePropertyUpdateHandler)
-	webMux.HandleFunc("DELETE /api/v1/agents/{nodename}/properties/{property_id}", handlers.NodePropertyDeleteHandler)
+
+	// API REST: configuration_model CRUD
+	webMux.Handle("POST /api/v1/configuration_models", jwtAuthMiddleware(http.HandlerFunc(handlers.CreateConfigurationModelHandler)))
+	webMux.Handle("GET /api/v1/configuration_models", jwtAuthMiddleware(http.HandlerFunc(handlers.ListConfigurationModelsHandler)))
+	webMux.Handle("GET /api/v1/configuration_models/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.GetConfigurationModelHandler)))
+	webMux.Handle("PUT /api/v1/configuration_models/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateConfigurationModelHandler)))
+	webMux.Handle("DELETE /api/v1/configuration_models", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteConfigurationModelHandler)))
+
+	// Endpoint de login pour JWT
+	webMux.HandleFunc("POST /api/v1/login", func(w http.ResponseWriter, r *http.Request) {
+		type LoginRequest struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}
+		type LoginResponse struct {
+			Token string `json:"token"`
+			ExpiresAt int64 `json:"expires_at"`
+		}
+		var req LoginRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+		// Auth simplifiée : à remplacer par vérif DB/LDAP
+		if req.Username != "admin" || req.Password != "password" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		// Générer JWT
+		secret := []byte("supersecretkey") // À stocker ailleurs en prod
+		expiresAt := time.Now().Add(60 * time.Minute).Unix()
+		claims := jwt.MapClaims{
+			"sub": req.Username,
+			"exp": expiresAt,
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		signed, err := token.SignedString(secret)
+		if err != nil {
+			http.Error(w, "Token error", http.StatusInternalServerError)
+			return
+		}
+		resp := LoginResponse{Token: signed, ExpiresAt: expiresAt}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	})
+
+
+	// Handler pour /web/login
+	webMux.HandleFunc("/web/login", func(w http.ResponseWriter, r *http.Request) {
+		// Vérifie la présence d'un token JWT dans le cookie (optionnel, car le JS stocke dans localStorage)
+		// Ici, on laisse toujours afficher la page login, la redirection sera gérée côté JS après login
+		http.ServeFile(w, r, "web/login.tmpl")
+	})
 
 	// Servir la page index via le template Go
 	webMux.HandleFunc("/web", handlers.WebIndexHandler)
@@ -164,8 +214,12 @@ func main() {
 	   }
 	   handlers.WebNodeHandler(w, r)
 	})
+
 	// Handler Go pour /web/modules
 	webMux.HandleFunc("/web/modules", handlers.WebModulesHandler)
+
+	// Handler Go pour /web/configuration_model
+	webMux.HandleFunc("/web/configuration_model", handlers.WebConfigurationModelHandler)
 
 	// Handler Go pour /web/properties.html
 	webMux.HandleFunc("/web/properties.html", handlers.WebPropertiesHandler)
@@ -182,4 +236,29 @@ func main() {
 	}()
 	log.Printf("Serveur IHM/API sur :%d ... (IHM sur /web/)", ports.WebPort)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", ports.WebPort), webHandler))
+}
+
+
+// Middleware de vérification JWT Bearer
+func jwtAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, "Bearer ") {
+			http.Error(w, "Missing Bearer token", http.StatusUnauthorized)
+			return
+		}
+		tokenStr := strings.TrimPrefix(auth, "Bearer ")
+		secret := []byte("supersecretkey")
+		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("Unexpected signing method")
+			}
+			return secret, nil
+		})
+		if err != nil || !token.Valid {
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

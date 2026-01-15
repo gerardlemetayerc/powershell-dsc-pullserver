@@ -282,36 +282,40 @@ $(document).ready(function() {
         renderAll();
         return;
     }
-    // Load agent info
-    fetch(`/api/v1/agents/${agentId}`)
-        .then(r => r.json())
-        .then(agent => {
+    // Load agent info (utilise $.ajax pour profiter de la config globale JWT)
+    $.ajax({
+        url: `/api/v1/agents/${agentId}`,
+        method: 'GET',
+        dataType: 'json',
+        success: function(agent) {
             state.agent = agent;
             renderAll();
-        })
-        .catch(() => {
+        },
+        error: function() {
             state.agent = null;
             renderAll();
-        });
+        }
+    });
     // Charger la liste des rapports
-    fetch(`/api/v1/agents/${agentId}/reports?operationtype=Initial`)
-        .then(r => r.json())
-        .then(reports => {
+    $.ajax({
+        url: `/api/v1/agents/${agentId}/reports?operationtype=Initial`,
+        method: 'GET',
+        dataType: 'json',
+        success: function(reports) {
             state.reports = reports;
-            // Par défaut, sélectionne le plus récent (premier)
             state.selectedReportIdx = 0;
             renderAll();
-            // Déclenche le onchange pour charger le rapport sélectionné
             setTimeout(() => {
                 $('#report-select').trigger('change');
             }, 0);
-        })
-        .catch(() => {
+        },
+        error: function() {
             state.reports = [];
             state.selectedReportIdx = null;
             state.selectedReport = null;
             renderAll();
-        });
+        }
+    });
 
     // Gestion du changement de sélection de rapport (delegation)
     $(document).on('change', '#report-select', function() {
@@ -320,16 +324,19 @@ $(document).ready(function() {
         const rep = state.reports[idx];
         if (rep && rep.job_id) {
             // Aller chercher le rapport détaillé
-            fetch(`/api/v1/agents/${agentId}/reports/${rep.job_id}`)
-                .then(r => r.json())
-                .then(report => {
+            $.ajax({
+                url: `/api/v1/agents/${agentId}/reports/${rep.job_id}`,
+                method: 'GET',
+                dataType: 'json',
+                success: function(report) {
                     state.selectedReport = report;
                     renderAll();
-                })
-                .catch(() => {
+                },
+                error: function() {
                     state.selectedReport = null;
                     renderAll();
-                });
+                }
+            });
         } else {
             state.selectedReport = rep || null;
             renderAll();
