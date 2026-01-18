@@ -1,5 +1,11 @@
 
 $(document).ready(function() {
+        // Affiche le nombre total de configurations
+        $.getJSON('/api/v1/configuration_models?count=1', function(data) {
+            if (data && typeof data.count !== 'undefined') {
+                $('#total-configurations').text(data.count);
+            }
+        });
     $('#agents-table').DataTable({
         ajax: {
             url: '/api/v1/agents',

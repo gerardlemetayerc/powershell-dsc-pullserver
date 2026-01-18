@@ -267,9 +267,6 @@ $(document).ready(function() {
         <h3>Agent Information</h3>
         <div id="agent-info-block"></div>
        <div class="mb-3">
-           <a id="node-properties-link" class="btn btn-outline-primary btn-sm" href="#">
-               <i class="fas fa-list-alt"></i> Gérer les propriétés de ce nœud
-           </a>
        </div>
         <hr>
         <h3>DSC Report</h3>

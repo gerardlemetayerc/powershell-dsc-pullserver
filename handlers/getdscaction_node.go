@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"crypto/sha256"
 	"io"
 	"strings"
@@ -51,6 +49,7 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 				for rows.Next() {
 					var name string
 					if err := rows.Scan(&name); err == nil {
+						log.Printf("[GETDSCACTION-NODE] Nom de configuration trouvé pour agent %s : %s", agentId, name)
 						configNames = append(configNames, name)
 					}
 				}
@@ -59,10 +58,27 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 		}
 	}
 
-	mofPath := filepath.Join("configs", agentId+".mof")
-	if _, err := os.Stat(mofPath); os.IsNotExist(err) {
+	// Vérifie qu'il existe au moins une configuration en base pour cet agent
+	dbCfgCheck, errCheck := db.LoadDBConfig("config.json")
+	if errCheck != nil {
+		http.Error(w, "DB config error", http.StatusInternalServerError)
+		return
+	}
+	dbConnCheck, errCheck := db.OpenDB(dbCfgCheck)
+	if errCheck != nil {
+		http.Error(w, "DB open error", http.StatusInternalServerError)
+		return
+	}
+	defer dbConnCheck.Close()
+	row := dbConnCheck.QueryRow("SELECT COUNT(*) FROM agent_configurations WHERE agent_id = ?", agentId)
+	var count int
+	if err := row.Scan(&count); err != nil {
 		http.Error(w, "Configuration not found", http.StatusNotFound)
 		return
+	}
+	// S'il n'y a aucune config, on ajoute l'ID de l'agent comme nom de config par défaut
+	if count == 0 {
+		configNames = append(configNames, agentId)
 	}
 
 	// Utiliser les schémas importés
@@ -88,23 +104,32 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 					}
 				}
 				// Calcul du hash sur le bon fichier (lié à configName)
-				if cs.ChecksumAlgorithm == "SHA-256" && cs.Checksum != "" {
-					var hash string
-					mofPath := filepath.Join("configs", configName+".mof")
-					if mofBytes, err := os.ReadFile(mofPath); err == nil {
-						hash = sha256SumHex(mofBytes)
-					} else {
-						allOk = false
-					}
-					log.Printf("[GETDSCACTION-NODE] Config=%s, Fichier=%s, Hash envoyé=%s, Hash calculé=%s", configName, mofPath, cs.Checksum, hash)
-					if hash != "" && strings.EqualFold(hash, cs.Checksum) {
-						status = "OK"
-					} else {
-						allOk = false
-					}
-				} else {
-					allOk = false
-				}
+				   if cs.ChecksumAlgorithm == "SHA-256" && cs.Checksum != "" {
+					   var hash string
+					   // Récupère le MOF depuis la base
+					   log.Printf("[GETDSCACTION-NODE] Recherche MOF en base pour configName='%s'", configName)
+					   row := dbConnCheck.QueryRow("SELECT mof_file FROM configuration_model WHERE name = ? COLLATE NOCASE", configName)
+					   var mofBytes []byte
+					   if err := row.Scan(&mofBytes); err == nil {
+						   hash = sha256SumHex(mofBytes)
+					   } else {
+						   allOk = false
+					   }
+					   log.Printf("[GETDSCACTION-NODE] Config=%s, Hash envoyé=%s, Hash calculé=%s", configName, cs.Checksum, hash)
+						_, err := dbConnCheck.Exec("UPDATE configuration_model SET last_usage = CURRENT_TIMESTAMP WHERE name = ? COLLATE NOCASE", configName)
+					    log.Printf("[GETDSCACTION-NODE] Mise à jour last_usage pour configName='%s', err=%v", configName, err)
+						if hash != "" && strings.EqualFold(hash, cs.Checksum) {
+						   status = "OK"
+						   // Met à jour last_usage à CURRENT_TIMESTAMP pour cette configuration
+						   if err != nil {
+							   log.Printf("[GETDSCACTION-NODE] Erreur lors de la mise à jour de last_usage: %v", err)
+						   }
+					   } else {
+						   allOk = false
+					   }
+				   } else {
+					   allOk = false
+				   }
 				details = append(details, schema.DscActionDetail{
 					ConfigurationName: configName,
 					Status:            status,

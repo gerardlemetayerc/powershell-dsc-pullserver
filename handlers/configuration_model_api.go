@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"go-dsc-pull/internal/db"
+	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 // POST /api/v1/configuration_models
@@ -23,23 +24,48 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer dbConn.Close()
-	property := r.FormValue("property")
-	value := r.FormValue("value")
-	file, _, err := r.FormFile("mof_file")
+	file, header, err := r.FormFile("mof_file")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Missing MOF file"))
 		return
 	}
 	defer file.Close()
+	// Vérifie l'extension .mof
+	filename := header.Filename
+	if len(filename) < 5 || filename[len(filename)-4:] != ".mof" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Le fichier doit être au format .mof"))
+		return
+	}
+	// Calcule le nom du modèle (nom du fichier sans .mof)
+	name := filename[:len(filename)-4]
 	mofBytes, err := ioutil.ReadAll(file)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	// Récupère le username depuis le JWT (claim "sub")
+	uploadedBy := "?"
+	if r.Context().Value("user") != nil {
+		if sub, ok := r.Context().Value("user").(string); ok {
+			uploadedBy = sub
+		}
+	} else if auth := r.Header.Get("Authorization"); len(auth) > 7 {
+		// Décodage manuel du JWT si le middleware ne pose pas le contexte
+		tokenStr := auth[7:]
+		// Utilise la même clé que le middleware
+		secret := []byte("supersecretkey")
+		token, _ := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) { return secret, nil })
+		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			if sub, ok := claims["sub"].(string); ok {
+				uploadedBy = sub
+			}
+		}
+	}
 	cm := &db.ConfigurationModel{
-		Property: property,
-		Value: value,
+		Name: name,
+		UploadedBy: uploadedBy,
 		MofFile: mofBytes,
 	}
 	err = db.CreateConfigurationModel(dbConn, cm)
@@ -80,27 +106,41 @@ func GetConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/configuration_models
 func ListConfigurationModelsHandler(w http.ResponseWriter, r *http.Request) {
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	dbConn, err := db.OpenDB(dbCfg)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	defer dbConn.Close()
-	list, err := db.ListConfigurationModels(dbConn)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if list == nil {
-		list = make([]db.ConfigurationModel, 0)
-	}
-	json.NewEncoder(w).Encode(list)
+	       dbCfg, err := db.LoadDBConfig("config.json")
+	       if err != nil {
+		       w.WriteHeader(http.StatusInternalServerError)
+		       return
+	       }
+	       dbConn, err := db.OpenDB(dbCfg)
+	       if err != nil {
+		       w.WriteHeader(http.StatusInternalServerError)
+		       return
+	       }
+	       defer dbConn.Close()
+
+	       // Support de l'option ?count=1
+	       if r.URL.Query().Get("count") == "1" {
+		       row := dbConn.QueryRow("SELECT COUNT(*) FROM configuration_model")
+		       var count int
+		       if err := row.Scan(&count); err != nil {
+			       w.WriteHeader(http.StatusInternalServerError)
+			       return
+		       }
+		       w.Header().Set("Content-Type", "application/json")
+		       json.NewEncoder(w).Encode(map[string]int{"count": count})
+		       return
+	       }
+
+	       list, err := db.ListConfigurationModels(dbConn)
+	       if err != nil {
+		       w.WriteHeader(http.StatusInternalServerError)
+		       return
+	       }
+	       w.Header().Set("Content-Type", "application/json")
+	       if list == nil {
+		       list = make([]db.ConfigurationModel, 0)
+	       }
+	       json.NewEncoder(w).Encode(list)
 }
 
 // PUT /api/v1/configuration_models/{id}
@@ -122,8 +162,8 @@ func UpdateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	property := r.FormValue("property")
-	value := r.FormValue("value")
+	name := r.FormValue("name")
+	uploadedBy := r.FormValue("uploaded_by")
 	file, _, err := r.FormFile("mof_file")
 	var mofBytes []byte
 	if err == nil {
@@ -132,8 +172,8 @@ func UpdateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	cm := &db.ConfigurationModel{
 		ID: id,
-		Property: property,
-		Value: value,
+		Name: name,
+		UploadedBy: uploadedBy,
 		MofFile: mofBytes,
 	}
 	err = db.UpdateConfigurationModel(dbConn, cm)
