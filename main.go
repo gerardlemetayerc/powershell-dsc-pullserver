@@ -298,9 +298,9 @@ func main() {
 
 				// Handler Go pour /web/users
 				webMux.HandleFunc("/web/users", func(w http.ResponseWriter, r *http.Request) {
-					tmpl, err := template.New("layout.html").
+					tmpl, err := template.New("layout.tmpl").
 						ParseFiles(
-							"templates/layout.html",
+							"templates/layout.tmpl",
 							"templates/head.tmpl",
 							"templates/menu.tmpl",
 							"templates/footer.tmpl",
@@ -316,9 +316,9 @@ func main() {
 
 				// Handler Go pour /web/user_edit
 				webMux.HandleFunc("/web/user_edit", func(w http.ResponseWriter, r *http.Request) {
-					tmpl, err := template.New("layout.html").
+					tmpl, err := template.New("layout.tmpl").
 						ParseFiles(
-							"templates/layout.html",
+							"templates/layout.tmpl",
 							"templates/head.tmpl",
 							"templates/menu.tmpl",
 							"templates/footer.tmpl",
@@ -334,9 +334,9 @@ func main() {
 
 				// Handler Go pour /web/user_password
 				webMux.HandleFunc("/web/user_password", func(w http.ResponseWriter, r *http.Request) {
-					tmpl, err := template.New("layout.html").
+					tmpl, err := template.New("layout.tmpl").
 						ParseFiles(
-							"templates/layout.html",
+							"templates/layout.tmpl",
 							"templates/head.tmpl",
 							"templates/menu.tmpl",
 							"templates/footer.tmpl",

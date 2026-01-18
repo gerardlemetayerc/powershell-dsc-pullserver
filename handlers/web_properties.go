@@ -6,9 +6,9 @@ import (
 )
 
 func WebNodePropertiesHandler(w http.ResponseWriter, r *http.Request) {
-		tmpl, err := template.New("layout.html").
+		tmpl, err := template.New("layout.tmpl").
 		ParseFiles(
-			"templates/layout.html",
+			"templates/layout.tmpl",
 			"templates/head.tmpl",
 			"templates/menu.tmpl",
 			"templates/footer.tmpl",
@@ -28,9 +28,9 @@ func WebNodePropertiesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func WebPropertiesHandler(w http.ResponseWriter, r *http.Request) {
-		tmpl, err := template.New("layout.html").
+		tmpl, err := template.New("layout.tmpl").
 		ParseFiles(
-			"templates/layout.html",
+			"templates/layout.tmpl",
 			"templates/head.tmpl",
 			"templates/menu.tmpl",
 			"templates/footer.tmpl",
