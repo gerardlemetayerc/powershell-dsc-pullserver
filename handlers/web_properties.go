@@ -8,10 +8,10 @@ import (
 func WebNodePropertiesHandler(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.New("layout.html").
 		ParseFiles(
-			"web/layout.html",
-			"web/head.tmpl",
-			"web/menu.tmpl",
-			"web/footer.tmpl",
+			"templates/layout.html",
+			"templates/head.tmpl",
+			"templates/menu.tmpl",
+			"templates/footer.tmpl",
 			"web/node_properties.html",
 		)
 	if err != nil {
@@ -30,10 +30,10 @@ func WebNodePropertiesHandler(w http.ResponseWriter, r *http.Request) {
 func WebPropertiesHandler(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.New("layout.html").
 		ParseFiles(
-			"web/layout.html",
-			"web/head.tmpl",
-			"web/menu.tmpl",
-			"web/footer.tmpl",
+			"templates/layout.html",
+			"templates/head.tmpl",
+			"templates/menu.tmpl",
+			"templates/footer.tmpl",
 			"web/properties.html",
 		)
 	if err != nil {
