@@ -15,18 +15,10 @@ import(
 	"go-dsc-pull/internal/routes"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal"
+	"go-dsc-pull/internal/schema"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
-
-type RegisterRequest struct {
-	// À adapter selon la spec, ici minimal
-	NodeName string `json:"NodeName"`
-}
-
-type RegisterResponse struct {
-	AgentId string `json:"AgentId"`
-}
 
 // Helper pour parser une URL ou panic
 func mustParseURL(raw string) *url.URL {
@@ -38,24 +30,15 @@ func mustParseURL(raw string) *url.URL {
 }
 
 
-// statusRecorder wraps http.ResponseWriter to capture status code
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (r *statusRecorder) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
-}
+// StatusRecorder is now in internal/schema
 
 // loggingMiddleware logs all HTTP requests with method, path, remote addr, and status
 func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rec := &statusRecorder{ResponseWriter: w, status: 200}
-		next.ServeHTTP(rec, r)
-		log.Printf("[HTTP] %s %s %s %d", r.Method, r.URL.Path, r.RemoteAddr, rec.status)
-	})
+	   return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		   rec := &schema.StatusRecorder{ResponseWriter: w, Status: 200}
+		   next.ServeHTTP(rec, r)
+		   log.Printf("[HTTP] %s %s %s %d", r.Method, r.URL.Path, r.RemoteAddr, rec.Status)
+	   })
 }
 
 func main() {
@@ -96,19 +79,20 @@ func main() {
 						log.Printf("[SAML] Métadonnées IdP récupérées depuis %s", idpMetadataURL)
 
 					   }
-				       samlMiddleware, err = samlsp.New(samlsp.Options{
-					       URL: *mustParseURL(spURL),
-					       Key: cert.PrivateKey.(crypto.Signer),
-					       Certificate: cert.Leaf,
-					       IDPMetadata:  idpMetadata,
-				       })
-					   // Désactive la vérification de signature SAML pour le dev (ne pas utiliser en prod)
-					   if samlMiddleware != nil {
-						   log.Printf("[SAML] SP middleware: %+v", samlMiddleware)
-						   log.Printf("[SAML] SP EntityID: %s", samlMiddleware.ServiceProvider.EntityID)
-						   log.Printf("[SAML] SP ACS URL: %s", samlMiddleware.ServiceProvider.AcsURL.String())
-						   log.Printf("[SAML] SP Metadata URL: %s", samlMiddleware.ServiceProvider.MetadataURL.String())
-					   }
+					       samlOptions := samlsp.Options{
+						       URL: *mustParseURL(spURL),
+						       Key: cert.PrivateKey.(crypto.Signer),
+						       Certificate: cert.Leaf,
+						       IDPMetadata:  idpMetadata,
+					       }
+					       samlMiddleware, err = samlsp.New(samlOptions)
+					       // Désactive la vérification de signature SAML pour le dev (ne pas utiliser en prod)
+					       if samlMiddleware != nil {
+						       log.Printf("[SAML] SP middleware: %+v", samlMiddleware)
+						       log.Printf("[SAML] SP EntityID: %s", samlMiddleware.ServiceProvider.EntityID)
+						       log.Printf("[SAML] SP ACS URL: %s", samlMiddleware.ServiceProvider.AcsURL.String())
+						       log.Printf("[SAML] SP Metadata URL: %s", samlMiddleware.ServiceProvider.MetadataURL.String())
+					       }
 				       if err != nil {
 					       log.Fatalf("[SAML] Erreur initialisation SAML middleware: %v", err)
 				       }
