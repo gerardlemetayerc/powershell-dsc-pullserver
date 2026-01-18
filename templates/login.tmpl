@@ -19,6 +19,7 @@
             <b>Connexion</b> DSC Pull Server
         </div>
         <div class="card-body">
+            <div id="loginError" class="text-danger mb-2" style="display:none;"></div>
             <form id="loginForm">
                 <div class="form-group">
                     <label for="username">Utilisateur</label>
@@ -28,7 +29,6 @@
                     <label for="password">Mot de passe</label>
                     <input type="password" class="form-control" id="password" name="password" required>
                 </div>
-                <div id="loginError" class="text-danger mb-2" style="display:none;"></div>
                 <button type="submit" class="btn btn-primary btn-block">Se connecter</button>
                 <div id="saml-login-btn"></div>
             </form>
@@ -38,7 +38,22 @@
 </div>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
+// Affichage du message d'erreur selon le paramètre error de l'URL
 $(function() {
+    function getUrlParam(name) {
+        const results = new RegExp('[?&]' + name + '=([^&#]*)').exec(window.location.search);
+        return results ? decodeURIComponent(results[1].replace(/\+/g, ' ')) : null;
+    }
+    var error = getUrlParam('error');
+    if (error) {
+        var msg = '';
+        if (error === 'blocked') {
+            msg = 'Your account is disable. Please contact an administrator.';
+        } else {
+            msg = error;
+        }
+        $('#loginError').text(msg).show();
+    }
     $('#loginForm').on('submit', function(e) {
         e.preventDefault();
         $('#loginError').hide();

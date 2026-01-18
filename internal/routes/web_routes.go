@@ -2,8 +2,9 @@ package routes
 
 import (
 	"net/http"
-	handlers "go-dsc-pull/handlers"
 	"database/sql"
+	"go-dsc-pull/handlers"
+	samlsp "github.com/crewjam/saml/samlsp"
 )
 
 // RegisterWebRoutes sets up all web/API endpoints on the provided mux
@@ -11,9 +12,9 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	// SAML endpoints
 	mux.Handle("GET /api/v1/saml/userinfo", http.HandlerFunc(handlers.SAMLUserInfoHandler))
 	mux.Handle("GET /api/v1/saml/enabled", http.HandlerFunc(handlers.SAMLStatusHandler))
-	if samlMiddleware != nil {
-		mux.Handle("/saml/", samlMiddleware)
-	}
+	   if samlMiddleware != nil {
+		   mux.Handle("/saml/", samlMiddleware)
+	   }
 	// API REST endpoints (agents, configs, reports, modules, properties, configuration_models, users, login)
 	mux.Handle("GET /api/v1/agents", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentAPIHandler)))
 	mux.Handle("GET /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandler)))
@@ -37,8 +38,15 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("PUT /api/v1/configuration_models/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateConfigurationModelHandler)))
 	mux.Handle("DELETE /api/v1/configuration_models", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteConfigurationModelHandler)))
 	mux.Handle("POST /api/v1/login", handlers.LoginHandler(dbConn))
-	// Web GUI endpoints (login, index, static, node, modules, configuration_model, properties, users, user_edit, user_password)
 	mux.HandleFunc("/web/login", WebLoginHandler)
+	if smw, ok := samlMiddleware.(*samlsp.Middleware); ok {
+		mux.Handle("/web/login/saml", smw.RequireAccount(handlers.SAMLLoginHandler(dbConn)))
+		mux.HandleFunc("/saml/login", func(w http.ResponseWriter, r *http.Request) {smw.ServeHTTP(w, r)})
+		mux.HandleFunc("/saml/acs", func(w http.ResponseWriter, r *http.Request) {smw.ServeHTTP(w, r)})
+		mux.HandleFunc("/saml/metadata", func(w http.ResponseWriter, r *http.Request) {smw.ServeHTTP(w, r)})
+	}
+	
+	// Web GUI endpoints (login, index, static, node, modules, configuration_model, properties, users, user_edit, user_password)
 	mux.HandleFunc("/web", handlers.WebIndexHandler)
 	mux.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("web"))))
 	mux.HandleFunc("/web/node/", handlers.WebNodeHandler)
