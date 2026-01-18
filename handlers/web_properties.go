@@ -34,7 +34,7 @@ func WebPropertiesHandler(w http.ResponseWriter, r *http.Request) {
 			"templates/head.tmpl",
 			"templates/menu.tmpl",
 			"templates/footer.tmpl",
-			"web/properties.html",
+			"templates/properties.tmpl",
 		)
 	if err != nil {
 		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)

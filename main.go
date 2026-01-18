@@ -293,8 +293,8 @@ func main() {
 	// Handler Go pour /web/configuration_model
 	webMux.HandleFunc("/web/configuration_model", handlers.WebConfigurationModelHandler)
 
-	// Handler Go pour /web/properties.html
-	webMux.HandleFunc("/web/properties.html", handlers.WebPropertiesHandler)
+	// Handler Go pour /templates/properties.tmpl
+	webMux.HandleFunc("/templates/properties.tmpl", handlers.WebPropertiesHandler)
 
 				// Handler Go pour /web/users
 				webMux.HandleFunc("/web/users", func(w http.ResponseWriter, r *http.Request) {
