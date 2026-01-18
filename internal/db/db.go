@@ -1,12 +1,19 @@
 package db
 
 import (
+	"time"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
 	_ "modernc.org/sqlite"
 )
+
+// Met à jour la date de dernière connexion pour un utilisateur
+func UpdateLastLogon(db *sql.DB, userId interface{}) error {
+	_, err := db.Exec("UPDATE users SET last_logon_date=? WHERE id=?", time.Now().Format("2006-01-02 15:04:05"), userId)
+	return err
+}
 
 type DBConfig struct {
 	Driver   string `json:"driver"`

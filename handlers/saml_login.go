@@ -7,6 +7,7 @@ import (
 	"time"
 	"database/sql"
 	"go-dsc-pull/internal"
+	"go-dsc-pull/internal/db"
 	samlsp "github.com/crewjam/saml/samlsp"
 	jwt "github.com/golang-jwt/jwt/v5"
 )
@@ -44,27 +45,32 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 			http.Error(w, "Email SAML manquant", http.StatusForbidden)
 			return
 		}
-		       var userId int
-		       var isActive int
-		       err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActive)
-		       if err == sql.ErrNoRows {
-			       log.Printf("[SAML] Création nouvel utilisateur: %s %s <%s>", firstName, lastName, email)
-			       _, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, '', 1)", firstName, lastName, email)
-			       if err != nil {
-				       log.Printf("[SAML] Erreur création utilisateur: %v", err)
-				       http.Error(w, "Erreur création utilisateur", http.StatusInternalServerError)
-				       return
-			       }
-		       } else if err != nil && err != sql.ErrNoRows {
-			       log.Printf("[SAML] Erreur DB: %v", err)
-			       http.Error(w, "Erreur DB", http.StatusInternalServerError)
-			       return
-					} else if isActive == 0 {
-						// Compte inactif : refuse l'accès et redirige avec message
-						log.Printf("[SAML] Compte inactif pour %s", email)
-						http.Redirect(w, r, "/web/login?error=blocked", http.StatusFound)
-						return
-					}
+			       var userId int
+			       var isActive int
+			       err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActive)
+				       if err == sql.ErrNoRows {
+					       log.Printf("[SAML] Création nouvel utilisateur: %s %s <%s>", firstName, lastName, email)
+					       _, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active, last_logon_date) VALUES (?, ?, ?, '', 1, ?)", firstName, lastName, email, time.Now().Format("2006-01-02 15:04:05"))
+					       if err != nil {
+						       log.Printf("[SAML] Erreur création utilisateur: %v", err)
+						       http.Error(w, "Erreur création utilisateur", http.StatusInternalServerError)
+						       return
+					       }
+				       } else if err != nil && err != sql.ErrNoRows {
+					       log.Printf("[SAML] Erreur DB: %v", err)
+					       http.Error(w, "Erreur DB", http.StatusInternalServerError)
+					       return
+				       } else if isActive == 0 {
+					       // Compte inactif : refuse l'accès et redirige avec message
+					       log.Printf("[SAML] Compte inactif pour %s", email)
+					       http.Redirect(w, r, "/web/login?error=blocked", http.StatusFound)
+					       return
+				       } else {
+					       // Met à jour la date de dernière connexion
+					       if err := db.UpdateLastLogon(dbConn, userId); err != nil {
+						       log.Printf("[SAML] Erreur update last_logon_date: %v", err)
+					       }
+				       }
 		secret := []byte("supersecretkey")
 		expiresAt := time.Now().Add(60 * time.Minute).Unix()
 		claims := jwt.MapClaims{

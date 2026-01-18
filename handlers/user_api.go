@@ -10,6 +10,7 @@ import (
 	"time"
 	"github.com/golang-jwt/jwt/v5"
 	"go-dsc-pull/internal/schema"
+	internaldb "go-dsc-pull/internal/db"
 )
 
 
@@ -45,9 +46,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		// Met à jour la date de dernière connexion
-		now := time.Now().Format("2006-01-02 15:04:05")
-		_, err = db.Exec("UPDATE users SET last_logon_date=? WHERE id=?", now, id)
-		if err != nil {
+		if err := internaldb.UpdateLastLogon(db, id); err != nil {
 			log.Printf("[LOGIN] Erreur update last_logon_date: %v", err)
 		}
 		secret := []byte("supersecretkey")
@@ -114,19 +113,41 @@ func GetUserHandler(db *sql.DB) http.HandlerFunc {
 // Create user
 func CreateUserHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var u schema.User
-		if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
-			http.Error(w, "Bad request", http.StatusBadRequest)
-			return
-		}
-		res, err := db.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?)", u.FirstName, u.LastName, u.Email, u.PasswordHash, u.IsActive)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		id, _ := res.LastInsertId()
-		u.ID = id
-		json.NewEncoder(w).Encode(u)
+		   var req struct {
+			   FirstName string `json:"first_name"`
+			   LastName string `json:"last_name"`
+			   Email string `json:"email"`
+			   Password string `json:"password"`
+			   IsActive string `json:"is_active"`
+		   }
+		   if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			   http.Error(w, "Bad request", http.StatusBadRequest)
+			   return
+		   }
+		   if req.Password == "" {
+			   http.Error(w, "Le mot de passe est obligatoire", http.StatusBadRequest)
+			   return
+		   }
+		   hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		   if err != nil {
+			   http.Error(w, "Erreur hash mot de passe", http.StatusInternalServerError)
+			   return
+		   }
+		   isActive := req.IsActive == "1" || req.IsActive == "true"
+		   res, err := db.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?)", req.FirstName, req.LastName, req.Email, string(hash), isActive)
+		   if err != nil {
+			   http.Error(w, err.Error(), http.StatusInternalServerError)
+			   return
+		   }
+		   id, _ := res.LastInsertId()
+		   u := schema.User{
+			   ID: id,
+			   FirstName: req.FirstName,
+			   LastName: req.LastName,
+			   Email: req.Email,
+			   IsActive: isActive,
+		   }
+		   json.NewEncoder(w).Encode(u)
 	}
 }
 
