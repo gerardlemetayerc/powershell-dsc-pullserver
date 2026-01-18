@@ -1,18 +1,26 @@
-
 package main
 
 import(
+	"crypto"
+	"crypto/tls"
+	"database/sql"
+	samlsp "github.com/crewjam/saml/samlsp"
 	"log"
 	"strings"
 	"os"
 	"fmt"
+	"time"
 	"encoding/json"
+	"context"
+	"net/url"
 	"net/http"
+	"html/template"
 	"go-dsc-pull/handlers"
 	"go-dsc-pull/utils"
 	"go-dsc-pull/internal/db"
-    "time"
-    "github.com/golang-jwt/jwt/v5"
+	"go-dsc-pull/internal"
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type RegisterRequest struct {
@@ -22,6 +30,15 @@ type RegisterRequest struct {
 
 type RegisterResponse struct {
 	AgentId string `json:"AgentId"`
+}
+
+// Helper pour parser une URL ou panic
+func mustParseURL(raw string) *url.URL {
+       u, err := url.Parse(raw)
+       if err != nil {
+	       panic(err)
+       }
+       return u
 }
 
 
@@ -46,16 +63,99 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
-	// Initialisation automatique de la base (CREATE IF NOT EXISTS)
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		log.Fatalf("[INITDB] Erreur chargement config DB: %v", err)
+		   // --- Mux IHM/API ---
+		   webMux := http.NewServeMux()
+		   // Endpoint pour exposer les infos utilisateur SAML mappées
+		   webMux.Handle("GET /api/v1/saml/userinfo", http.HandlerFunc(handlers.SAMLUserInfoHandler))
+		   // Endpoint pour exposer l'état SAML (pour le bouton login SAML)
+		   webMux.Handle("GET /api/v1/saml/enabled", http.HandlerFunc(handlers.SAMLStatusHandler))
+	       // Chargement de la configuration globale (incluant SAML)
+		       appCfg, err := internal.LoadAppConfig("config.json")
+	       if err != nil {
+		       log.Fatalf("[INIT] Erreur chargement config globale: %v", err)
+	       }
+	       // Initialisation SAML Service Provider si activé
+		       var samlMiddleware *samlsp.Middleware
+			       if appCfg.SAML.Enabled {
+					log.Println("[SAML] Initialisation du Service Provider SAML...")
+				       // Charge la clé privée et le certificat
+				       cert, err := tls.LoadX509KeyPair(appCfg.SAML.SPCertFile, appCfg.SAML.SPKeyFile)
+				       if err != nil {
+					       log.Fatalf("[SAML] Erreur chargement clé/cert SP: %v", err)
+				       }
+				       // Lecture du port web depuis la config
+				       webPort := appCfg.WebPort
+				       if webPort == 0 {
+					       webPort = 80
+				       }
+				       // Construction dynamique de l'URL du SP
+				       spURL := "http://127.0.0.1"
+				       if webPort != 80 {
+					       spURL = fmt.Sprintf("http://127.0.0.1:%d", webPort)
+				       }
+				       // Récupération des métadonnées IdP via FetchMetadata (méthode crewjam/samlsp)
+				       idpMetadataURL := appCfg.SAML.IdpMetadataURL
+					   idpMetadata, err := samlsp.FetchMetadata(context.Background(), http.DefaultClient, *mustParseURL(idpMetadataURL))
+				       if err != nil {
+					       log.Fatalf("[SAML] Erreur récupération metadata IdP: %v", err)
+				       }else{
+						log.Printf("[SAML] Métadonnées IdP récupérées depuis %s", idpMetadataURL)
+
+					   }
+				       samlMiddleware, err = samlsp.New(samlsp.Options{
+					       URL: *mustParseURL(spURL),
+					       Key: cert.PrivateKey.(crypto.Signer),
+					       Certificate: cert.Leaf,
+					       IDPMetadata:  idpMetadata,
+				       })
+					   // Désactive la vérification de signature SAML pour le dev (ne pas utiliser en prod)
+					   if samlMiddleware != nil {
+						   log.Printf("[SAML] SP middleware: %+v", samlMiddleware)
+						   log.Printf("[SAML] SP EntityID: %s", samlMiddleware.ServiceProvider.EntityID)
+						   log.Printf("[SAML] SP ACS URL: %s", samlMiddleware.ServiceProvider.AcsURL.String())
+						   log.Printf("[SAML] SP Metadata URL: %s", samlMiddleware.ServiceProvider.MetadataURL.String())
+					   }
+				       if err != nil {
+					       log.Fatalf("[SAML] Erreur initialisation SAML middleware: %v", err)
+				       }
+			       }
+	       // Initialisation automatique de la base (CREATE IF NOT EXISTS)
+	       dbCfg := &db.DBConfig{
+		       Driver:   appCfg.Driver,
+		       Server:   appCfg.Server,
+		       Port:     appCfg.Port,
+		       User:     appCfg.User,
+		       Password: appCfg.Password,
+		       Database: appCfg.Database,
+	       }
+	       db.InitDB(dbCfg)
+	       dbConn, err := db.OpenDB(dbCfg)
+	       if err != nil {
+		       log.Fatalf("Erreur ouverture DB: %v", err)
+	       }
+	       // Log SAML activé
+	       if appCfg.SAML.Enabled {
+		       log.Printf("[SAML] Authentification SAML activée (EntityID: %s)", appCfg.SAML.EntityID)
+	       } else {
+		       log.Printf("[SAML] Authentification SAML désactivée (auth locale)")
+	       }
+
+	// Vérifie si la table users est vide et insère le compte admin si besoin
+	{
+		var count int
+		err := dbConn.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
+		if err == nil && count == 0 {
+			hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+			_, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?)", "Admin", "User", "admin@localhost", string(hash), 1)
+			if err != nil {
+				log.Printf("[INITDB] Erreur insertion admin: %v", err)
+			} else {
+				log.Printf("[INITDB] Compte admin créé: admin@localhost / password")
+			}
+		}
 	}
-	db.InitDB(dbCfg)
-	dbConn, err := db.OpenDB(dbCfg)
-	if err != nil {
-		log.Fatalf("Erreur ouverture DB: %v", err)
-	}
+
+	// ...existing code...
 
 
 
@@ -120,8 +220,15 @@ func main() {
 		r.URL.RawQuery = q.Encode()
 		handlers.ModuleDownloadHandler(dbConn)(w, r)
 	})
-	// --- Mux IHM/API ---
-	webMux := http.NewServeMux()
+	       // --- Mux IHM/API ---
+	       //webMux := http.NewServeMux()
+	       // --- Endpoints SAML (placeholders) ---
+				       if samlMiddleware != nil {
+					       log.Println("[SAML] Montage du handler /saml/ (middleware actif)")
+					       webMux.Handle("/saml/", samlMiddleware)
+				       } else {
+					       log.Println("[SAML] Middleware SAML non initialisé, /saml/ non monté")
+				       }
 	// API REST: liste des agents
 	webMux.Handle("GET /api/v1/agents", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentAPIHandler)))
 	// API REST: configurations d'un agent
@@ -157,50 +264,15 @@ func main() {
 	webMux.Handle("PUT /api/v1/configuration_models/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateConfigurationModelHandler)))
 	webMux.Handle("DELETE /api/v1/configuration_models", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteConfigurationModelHandler)))
 
-	// Endpoint de login pour JWT
-	webMux.HandleFunc("POST /api/v1/login", func(w http.ResponseWriter, r *http.Request) {
-		type LoginRequest struct {
-			Username string `json:"username"`
-			Password string `json:"password"`
-		}
-		type LoginResponse struct {
-			Token string `json:"token"`
-			ExpiresAt int64 `json:"expires_at"`
-		}
-		var req LoginRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Bad request", http.StatusBadRequest)
-			return
-		}
-		// Auth simplifiée : à remplacer par vérif DB/LDAP
-		if req.Username != "admin" || req.Password != "password" {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		// Générer JWT
-		secret := []byte("supersecretkey") // À stocker ailleurs en prod
-		expiresAt := time.Now().Add(60 * time.Minute).Unix()
-		claims := jwt.MapClaims{
-			"sub": req.Username,
-			"exp": expiresAt,
-		}
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-		signed, err := token.SignedString(secret)
-		if err != nil {
-			http.Error(w, "Token error", http.StatusInternalServerError)
-			return
-		}
-		resp := LoginResponse{Token: signed, ExpiresAt: expiresAt}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
-	})
+	// Endpoint de login pour JWT (validation via DB)
+	webMux.Handle("POST /api/v1/login", handlers.LoginHandler(dbConn))
 
 
 	// Handler pour /web/login
 	webMux.HandleFunc("/web/login", func(w http.ResponseWriter, r *http.Request) {
 		// Vérifie la présence d'un token JWT dans le cookie (optionnel, car le JS stocke dans localStorage)
 		// Ici, on laisse toujours afficher la page login, la redirection sera gérée côté JS après login
-		http.ServeFile(w, r, "web/login.tmpl")
+		http.ServeFile(w, r, "templates/login.tmpl")
 	})
 
 	// Servir la page index via le template Go
@@ -224,8 +296,161 @@ func main() {
 	// Handler Go pour /web/properties.html
 	webMux.HandleFunc("/web/properties.html", handlers.WebPropertiesHandler)
 
+				// Handler Go pour /web/users
+				webMux.HandleFunc("/web/users", func(w http.ResponseWriter, r *http.Request) {
+					tmpl, err := template.New("layout.html").
+						ParseFiles(
+							"templates/layout.html",
+							"templates/head.tmpl",
+							"templates/menu.tmpl",
+							"templates/footer.tmpl",
+							"templates/users.tmpl",
+						)
+					if err != nil {
+						http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+						return
+					}
+					data := map[string]interface{}{ "Title": "Utilisateurs" }
+					tmpl.ExecuteTemplate(w, "layout", data)
+				})
 
-	// Wrap mux with logging middleware
+				// Handler Go pour /web/user_edit
+				webMux.HandleFunc("/web/user_edit", func(w http.ResponseWriter, r *http.Request) {
+					tmpl, err := template.New("layout.html").
+						ParseFiles(
+							"templates/layout.html",
+							"templates/head.tmpl",
+							"templates/menu.tmpl",
+							"templates/footer.tmpl",
+							"templates/user_edit.tmpl",
+						)
+					if err != nil {
+						http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+						return
+					}
+					data := map[string]interface{}{ "Title": "Édition utilisateur" }
+					tmpl.ExecuteTemplate(w, "layout", data)
+				})
+
+				// Handler Go pour /web/user_password
+				webMux.HandleFunc("/web/user_password", func(w http.ResponseWriter, r *http.Request) {
+					tmpl, err := template.New("layout.html").
+						ParseFiles(
+							"templates/layout.html",
+							"templates/head.tmpl",
+							"templates/menu.tmpl",
+							"templates/footer.tmpl",
+							"templates/user_password.tmpl",
+						)
+					if err != nil {
+						http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+						return
+					}
+					data := map[string]interface{}{ "Title": "Mot de passe utilisateur" }
+					tmpl.ExecuteTemplate(w, "layout", data)
+				})
+			webMux.Handle("POST /api/v1/users/{id}/password", jwtAuthMiddleware(http.HandlerFunc(handlers.ChangeUserPasswordHandler(dbConn))))
+			// API REST: utilisateurs
+			webMux.Handle("GET /api/v1/users", jwtAuthMiddleware(http.HandlerFunc(handlers.ListUsersHandler(dbConn))))
+			webMux.Handle("GET /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.GetUserHandler(dbConn))))
+			webMux.Handle("POST /api/v1/users", jwtAuthMiddleware(http.HandlerFunc(handlers.CreateUserHandler(dbConn))))
+			webMux.Handle("PUT /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateUserHandler(dbConn))))
+			webMux.Handle("DELETE /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteUserHandler(dbConn))))
+			webMux.Handle("POST /api/v1/users/{id}/active", jwtAuthMiddleware(http.HandlerFunc(handlers.SetUserActiveHandler(dbConn))))
+	
+		   // Endpoint de test protégé SAML pour valider le flux SSO
+	   if samlMiddleware != nil {
+		   webMux.Handle("/web/login/saml", samlMiddleware.RequireAccount(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			   // Affiche dynamiquement toutes les assertions SAML reçues (clé par clé)
+			   log.Println("[SAML] Assertions reçues (toutes clés) :")
+			   // Liste des claims potentiels (pour debug)
+			   claimKeys := []string{
+				   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+				   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+				   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
+				   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+				   "http://schemas.microsoft.com/identity/claims/displayname",
+			   }
+			   for _, k := range claimKeys {
+				   v := samlsp.AttributeFromContext(r.Context(), k)
+				   log.Printf("[SAML] %s = %s", k, v)
+			   }
+
+			   // Mapping automatique depuis la conf (via internal.GetSAMLUserMapping)
+			   mapping, err := internal.GetSAMLUserMapping()
+			   if err != nil {
+				   log.Printf("[SAML] Erreur lecture mapping SAML: %v", err)
+				   http.Error(w, "Erreur mapping SAML", http.StatusInternalServerError)
+				   return
+			   }
+			   getAttr := func(uri string) string {
+				   return samlsp.AttributeFromContext(r.Context(), uri)
+			   }
+			   email := getAttr(mapping["email"])
+			   firstName := getAttr(mapping["givenName"])
+			   lastName := getAttr(mapping["sn"])
+			   if email == "" {
+				   log.Printf("[SAML] Aucun email trouvé dans les assertions SAML, accès refusé")
+				   http.Error(w, "Email SAML manquant", http.StatusForbidden)
+				   return
+			   }
+			   // Vérifie si l'utilisateur existe déjà
+			   var userId int
+			   err = dbConn.QueryRow("SELECT id FROM users WHERE email = ?", email).Scan(&userId)
+			   if err == sql.ErrNoRows {
+				   // Crée l'utilisateur
+				   log.Printf("[SAML] Création nouvel utilisateur: %s %s <%s>", firstName, lastName, email)
+				   _, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, '', 1)", firstName, lastName, email)
+				   if err != nil {
+					   log.Printf("[SAML] Erreur création utilisateur: %v", err)
+					   http.Error(w, "Erreur création utilisateur", http.StatusInternalServerError)
+					   return
+				   }
+			   } else if err != nil && err != sql.ErrNoRows {
+				   log.Printf("[SAML] Erreur DB: %v", err)
+				   http.Error(w, "Erreur DB", http.StatusInternalServerError)
+				   return
+			   }
+			   // Génère le JWT applicatif comme dans LoginHandler
+			   secret := []byte("supersecretkey")
+			   expiresAt := time.Now().Add(60 * time.Minute).Unix()
+			   claims := jwt.MapClaims{
+				   "sub": email,
+				   "exp": expiresAt,
+			   }
+			   token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+			   signed, err := token.SignedString(secret)
+			   if err != nil {
+				   log.Printf("[SAML] Erreur génération JWT: %v", err)
+				   http.Error(w, "Erreur JWT", http.StatusInternalServerError)
+				   return
+			   }
+			   // Renvoie une page HTML/JS qui stocke le JWT dans localStorage puis redirige
+			   w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			   fmt.Fprintf(w, `<!DOCTYPE html><html lang='fr'><head><meta charset='UTF-8'><title>Connexion SAML...</title></head><body>Connexion en cours...<script>
+try {
+  localStorage.setItem('jwt_token', %q);
+  localStorage.setItem('jwt_exp', %q);
+  window.location.replace('/web');
+} catch(e) {
+  window.location.replace('/web/login');
+}
+</script></body></html>`, signed, fmt.Sprintf("%d", expiresAt))
+		   })))
+			webMux.HandleFunc("/saml/login", func(w http.ResponseWriter, r *http.Request) {
+			   log.Printf("[SAML] /saml/login hit: %s %s", r.Method, r.RemoteAddr)
+			   samlMiddleware.ServeHTTP(w, r)
+		   })
+		   webMux.HandleFunc("/saml/acs", func(w http.ResponseWriter, r *http.Request) {
+			   log.Printf("[SAML] /saml/acs hit: %s %s", r.Method, r.RemoteAddr)
+			   samlMiddleware.ServeHTTP(w, r)
+		   })
+		   webMux.HandleFunc("/saml/metadata", func(w http.ResponseWriter, r *http.Request) {
+			   log.Printf("[SAML] /saml/metadata hit: %s %s", r.Method, r.RemoteAddr)
+			   samlMiddleware.ServeHTTP(w, r)
+		   })
+	   }
+			// Wrap mux with logging middleware
 	dscHandler := loggingMiddleware(dscMux)
 	webHandler := loggingMiddleware(webMux)
 

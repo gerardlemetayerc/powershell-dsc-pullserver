@@ -89,11 +89,24 @@ CREATE TABLE IF NOT EXISTS node_properties (
     FOREIGN KEY (property_id) REFERENCES properties(id)
 );
 
--- Table pour les modèles de configuration MOF
 CREATE TABLE IF NOT EXISTS configuration_model (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    property TEXT NOT NULL,
-    value TEXT NOT NULL,
+    name TEXT NOT NULL,
+    upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    uploaded_by TEXT NOT NULL,
     mof_file BLOB NOT NULL,
-    upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    last_usage TIMESTAMP
+);
+
+
+-- Table pour les utilisateurs
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_logon_date TIMESTAMP
 );
