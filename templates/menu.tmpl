@@ -71,21 +71,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 <li class="nav-item">
                     <a href="/web/modules" class="nav-link">
                         <i class="nav-icon fas fa-cubes"></i>
-                        <p>Modules</p>
+                        <p>Ressources</p>
                     </a>
                 </li>
-                   <li class="nav-item">
-                       <a href="/web/properties.html" class="nav-link">
-                           <i class="nav-icon fas fa-list-alt"></i>
-                           <p>Propriétés</p>
-                       </a>
-                   </li>
-                  <li class="nav-item">
-                      <a href="/web/configuration_model" class="nav-link">
-                          <i class="nav-icon fas fa-file-alt"></i>
-                          <p>Configuration Models</p>
-                      </a>
-                  </li>
+                <li class="nav-item">
+                    <a href="/web/configuration_model" class="nav-link">
+                        <i class="nav-icon fas fa-file-alt"></i>
+                        <p>Configurations</p>
+                    </a>
+                </li>
+                <li class="nav-item has-treeview">
+                    <a href="#" class="nav-link">
+                        <i class="nav-icon fas fa-cogs"></i>
+                        <p>
+                            Administration
+                            <i class="right fas fa-angle-left"></i>
+                        </p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item">
+                            <a href="/web/users" class="nav-link">
+                                <i class="fas fa-users nav-icon"></i>
+                                <p>Utilisateurs</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/web/auth" class="nav-link">
+                                <i class="fas fa-key nav-icon"></i>
+                                <p>Authentification</p>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
             </ul>
         </nav>
     </div>
