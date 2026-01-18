@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Connexion SAML...</title>
+  <script>
+    // Récupère le token JWT et l'expiration depuis l'URL
+    function getParam(name) {
+      const url = new URL(window.location.href);
+      return url.searchParams.get(name);
+    }
+    const token = getParam('jwt_token');
+    const exp = getParam('exp');
+    if(token) {
+      localStorage.setItem('jwt_token', token);
+      if(exp) localStorage.setItem('jwt_exp', exp);
+    }
+    // Redirige vers l'accueil web
+    window.location.replace('/web');
+  </script>
+</head>
+<body>
+  Connexion en cours...
+</body>
+</html>
