@@ -1,9 +1,8 @@
-
-
 package internal
 
 import (
    "encoding/json"
+   "go-dsc-pull/internal/schema"
    "os"
 )
 
@@ -38,25 +37,13 @@ func GetSAMLUserMapping() (map[string]string, error) {
    return mapping, nil
 }
 
-type AppConfig struct {
-	Driver   string      `json:"driver"`
-	Server   string      `json:"server"`
-	Port     int         `json:"port"`
-	User     string      `json:"user"`
-	Password string      `json:"password"`
-	Database string      `json:"database"`
-	DSCPort  int         `json:"dsc_port"`
-	WebPort  int         `json:"web_port"`
-	SAML     SAMLConfig  `json:"saml"`
-}
-
-func LoadAppConfig(path string) (*AppConfig, error) {
+func LoadAppConfig(path string) (*schema.AppConfig, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	var cfg AppConfig
+	var cfg schema.AppConfig
 	dec := json.NewDecoder(f)
 	if err := dec.Decode(&cfg); err != nil {
 		return nil, err
