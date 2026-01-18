@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/schema"
 	jwt "github.com/golang-jwt/jwt/v5"
 )
 
@@ -63,7 +64,7 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	cm := &db.ConfigurationModel{
+	cm := &schema.ConfigurationModel{
 		Name: name,
 		UploadedBy: uploadedBy,
 		MofFile: mofBytes,
@@ -138,7 +139,7 @@ func ListConfigurationModelsHandler(w http.ResponseWriter, r *http.Request) {
 	       }
 	       w.Header().Set("Content-Type", "application/json")
 	       if list == nil {
-		       list = make([]db.ConfigurationModel, 0)
+		       list = make([]schema.ConfigurationModel, 0)
 	       }
 	       json.NewEncoder(w).Encode(list)
 }
@@ -170,7 +171,7 @@ func UpdateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		defer file.Close()
 		mofBytes, _ = ioutil.ReadAll(file)
 	}
-	cm := &db.ConfigurationModel{
+	cm := &schema.ConfigurationModel{
 		ID: id,
 		Name: name,
 		UploadedBy: uploadedBy,

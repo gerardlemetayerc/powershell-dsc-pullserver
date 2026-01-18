@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"time"
+	"go-dsc-pull/internal/schema"
 	"go-dsc-pull/internal/utils"
 )
 
@@ -11,24 +12,14 @@ import (
 // value: valeur de la propriété
 // mofFile: contenu du fichier MOF (BLOB)
 // uploadDate: date d'upload
-
-type ConfigurationModel struct {
-	ID         int64     `json:"id"`
-	Name       string    `json:"name"`
-	UploadDate time.Time `json:"upload_date"`
-	UploadedBy string    `json:"uploaded_by"`
-	MofFile    []byte    `json:"mof_file"`
-	LastUsage  time.Time `json:"last_usage"`
-}
-
-func CreateConfigurationModel(db *sql.DB, cm *ConfigurationModel) error {
+func CreateConfigurationModel(db *sql.DB, cm *schema.ConfigurationModel) error {
 	_, err := db.Exec(`INSERT INTO configuration_model (name, uploaded_by, mof_file) VALUES (?, ?, ?)`, cm.Name, cm.UploadedBy, cm.MofFile)
 	return err
 }
 
-func GetConfigurationModel(db *sql.DB, id int64) (*ConfigurationModel, error) {
+func GetConfigurationModel(db *sql.DB, id int64) (*schema.ConfigurationModel, error) {
 	row := db.QueryRow(`SELECT id, name, uploaded_by, mof_file, upload_date, last_usage FROM configuration_model WHERE id = ?`, id)
-	var cm ConfigurationModel
+	var cm schema.ConfigurationModel
 	var uploadDate string
 	var lastUsage string
 	if err := row.Scan(&cm.ID, &cm.Name, &cm.UploadedBy, &cm.MofFile, &uploadDate, &lastUsage); err != nil {
@@ -40,15 +31,15 @@ func GetConfigurationModel(db *sql.DB, id int64) (*ConfigurationModel, error) {
 	return &cm, nil
 }
 
-func ListConfigurationModels(db *sql.DB) ([]ConfigurationModel, error) {
+func ListConfigurationModels(db *sql.DB) ([]schema.ConfigurationModel, error) {
 	rows, err := db.Query(`SELECT id, name, uploaded_by, mof_file, upload_date, last_usage FROM configuration_model ORDER BY upload_date DESC`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []ConfigurationModel
+	var list []schema.ConfigurationModel
 	for rows.Next() {
-		var cm ConfigurationModel
+		var cm schema.ConfigurationModel
 		var uploadDate string
 		var lastUsage sql.NullString
 		if err := rows.Scan(&cm.ID, &cm.Name, &cm.UploadedBy, &cm.MofFile, &uploadDate, &lastUsage); err != nil {
@@ -65,7 +56,7 @@ func ListConfigurationModels(db *sql.DB) ([]ConfigurationModel, error) {
 	return list, nil
 }
 
-func UpdateConfigurationModel(db *sql.DB, cm *ConfigurationModel) error {
+func UpdateConfigurationModel(db *sql.DB, cm *schema.ConfigurationModel) error {
 	_, err := db.Exec(`UPDATE configuration_model SET name = ?, uploaded_by = ?, mof_file = ? WHERE id = ?`, cm.Name, cm.UploadedBy, cm.MofFile, cm.ID)
 	return err
 }
