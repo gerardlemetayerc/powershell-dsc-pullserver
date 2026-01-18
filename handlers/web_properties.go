@@ -12,7 +12,7 @@ func WebNodePropertiesHandler(w http.ResponseWriter, r *http.Request) {
 			"templates/head.tmpl",
 			"templates/menu.tmpl",
 			"templates/footer.tmpl",
-			"web/node_properties.html",
+			"templates/node_properties.tmpl",
 		)
 	if err != nil {
 		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
