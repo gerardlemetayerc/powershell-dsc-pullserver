@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/schema"
 	"net/http"
 	"database/sql"
 	"strings"
@@ -46,16 +47,10 @@ func AgentReportsListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	type ReportSummary struct {
-		ID        int64  `json:"id"`
-		JobId     string `json:"job_id"`
-		CreatedAt string `json:"created_at"`
-		Status    string `json:"status"`
-	}
-	reports := []ReportSummary{}
+	reports := []schema.ReportSummary{}
 	count := 0
 	for rows.Next() {
-		var rep ReportSummary
+		var rep schema.ReportSummary
 		if err := rows.Scan(&rep.ID, &rep.JobId, &rep.CreatedAt, &rep.Status); err == nil {
 			reports = append(reports, rep)
 			count++

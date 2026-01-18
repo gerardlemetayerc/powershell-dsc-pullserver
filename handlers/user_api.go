@@ -9,6 +9,7 @@ import (
 	"log"
 	"time"
 	"github.com/golang-jwt/jwt/v5"
+	"go-dsc-pull/internal/schema"
 )
 
 
@@ -67,17 +68,6 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-type User struct {
-	ID             int64  `json:"id"`
-	FirstName      string `json:"first_name"`
-	LastName       string `json:"last_name"`
-	Email          string `json:"email"`
-	PasswordHash   string `json:"password_hash,omitempty"`
-	IsActive       bool   `json:"is_active"`
-	CreatedAt      string `json:"created_at"`
-	LastLogonDate  *string `json:"last_logon_date"`
-}
-
 // List users
 func ListUsersHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -87,9 +77,9 @@ func ListUsersHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		defer rows.Close()
-		var users []User
+		var users []schema.User
 		for rows.Next() {
-			var u User
+			var u schema.User
 			rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.IsActive, &u.CreatedAt, &u.LastLogonDate)
 			users = append(users, u)
 		}
@@ -104,7 +94,7 @@ func GetUserHandler(db *sql.DB) http.HandlerFunc {
 		log.Printf("[API] GetUserHandler id=%v", id)
 		row := db.QueryRow("SELECT id, first_name, last_name, email, is_active, created_at, last_logon_date FROM users WHERE id = ?", id)
 		var (
-			u User
+			u schema.User
 			lastLogon sql.NullString
 		)
 		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.IsActive, &u.CreatedAt, &lastLogon); err != nil {
@@ -124,7 +114,7 @@ func GetUserHandler(db *sql.DB) http.HandlerFunc {
 // Create user
 func CreateUserHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var u User
+		var u schema.User
 		if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
@@ -144,7 +134,7 @@ func CreateUserHandler(db *sql.DB) http.HandlerFunc {
 func UpdateUserHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
-		var u User
+		var u schema.User
 		if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return

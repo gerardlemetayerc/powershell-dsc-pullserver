@@ -5,20 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/schema"
 )
-
-type Property struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Priority    int    `json:"priority"`
-}
-
-type NodeProperty struct {
-	NodeName   string `json:"node_id"`
-	PropertyID int    `json:"property_id"`
-	Value      string `json:"value"`
-}
 
 // --- Properties CRUD ---
 func PropertiesListHandler(w http.ResponseWriter, r *http.Request) {
@@ -26,21 +14,21 @@ func PropertiesListHandler(w http.ResponseWriter, r *http.Request) {
 	database, _ := db.OpenDB(dbCfg)
 	defer database.Close()
 	rows, _ := database.Query("SELECT id, name, description, priority FROM properties ORDER BY priority, name")
-	var props []Property
+	var props []schema.Property
 	for rows.Next() {
-		var p Property
+		var p schema.Property
 		_ = rows.Scan(&p.ID, &p.Name, &p.Description, &p.Priority)
 		props = append(props, p)
 	}
 	   w.Header().Set("Content-Type", "application/json")
 	   if props == nil {
-		   props = make([]Property, 0)
+		   props = make([]schema.Property, 0)
 	   }
 	   _ = json.NewEncoder(w).Encode(props)
 }
 
 func PropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
-	var p Property
+	var p schema.Property
 	_ = json.NewDecoder(r.Body).Decode(&p)
 	dbCfg, _ := db.LoadDBConfig("config.json")
 	database, _ := db.OpenDB(dbCfg)
@@ -62,7 +50,7 @@ func PropertiesGetHandler(w http.ResponseWriter, r *http.Request) {
 	database, _ := db.OpenDB(dbCfg)
 	defer database.Close()
 	row := database.QueryRow("SELECT id, name, description, priority FROM properties WHERE id = ?", id)
-	var p Property
+	var p schema.Property
 	if err := row.Scan(&p.ID, &p.Name, &p.Description, &p.Priority); err != nil {
 		http.Error(w, "Not found", 404)
 		return
@@ -73,7 +61,7 @@ func PropertiesGetHandler(w http.ResponseWriter, r *http.Request) {
 
 func PropertiesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(r.PathValue("id"))
-	var p Property
+	var p schema.Property
 	_ = json.NewDecoder(r.Body).Decode(&p)
 	dbCfg, _ := db.LoadDBConfig("config.json")
 	database, _ := db.OpenDB(dbCfg)
@@ -106,22 +94,22 @@ func NodePropertiesListHandler(w http.ResponseWriter, r *http.Request) {
 	database, _ := db.OpenDB(dbCfg)
 	defer database.Close()
 	rows, _ := database.Query("SELECT node_id, property_id, value FROM node_properties WHERE node_id = ?", node)
-	var props []NodeProperty
+	var props []schema.NodeProperty
 	for rows.Next() {
-		var p NodeProperty
+		var p schema.NodeProperty
 		_ = rows.Scan(&p.NodeName, &p.PropertyID, &p.Value)
 		props = append(props, p)
 	}
 	   w.Header().Set("Content-Type", "application/json")
 	   if props == nil {
-		   props = make([]NodeProperty, 0)
+		   props = make([]schema.NodeProperty, 0)
 	   }
 	   _ = json.NewEncoder(w).Encode(props)
 }
 
 func NodePropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
 	node := r.PathValue("nodename")
-	var p NodeProperty
+	var p schema.NodeProperty
 	_ = json.NewDecoder(r.Body).Decode(&p)
 	p.NodeName = node
 	dbCfg, _ := db.LoadDBConfig("config.json")
@@ -142,7 +130,7 @@ func NodePropertyGetHandler(w http.ResponseWriter, r *http.Request) {
 	database, _ := db.OpenDB(dbCfg)
 	defer database.Close()
 	row := database.QueryRow("SELECT node_id, property_id, value FROM node_properties WHERE node_id = ? AND property_id = ?", node, pid)
-	var p NodeProperty
+	var p schema.NodeProperty
 	if err := row.Scan(&p.NodeName, &p.PropertyID, &p.Value); err != nil {
 		http.Error(w, "Not found", 404)
 		return
@@ -154,7 +142,7 @@ func NodePropertyGetHandler(w http.ResponseWriter, r *http.Request) {
 func NodePropertyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	node := r.PathValue("nodename")
 	pid, _ := strconv.Atoi(r.PathValue("property_id"))
-	var p NodeProperty
+	var p schema.NodeProperty
 	_ = json.NewDecoder(r.Body).Decode(&p)
 	dbCfg, _ := db.LoadDBConfig("config.json")
 	database, _ := db.OpenDB(dbCfg)

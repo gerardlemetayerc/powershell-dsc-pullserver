@@ -1,4 +1,3 @@
-
 package handlers
 
 import (
@@ -9,17 +8,10 @@ import (
 	"time"
 	"go-dsc-pull/utils"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/schema"
 	"os"
 	"io"
 )
-
-type RegisterRequest struct {
-	NodeName string `json:"NodeName"`
-}
-
-type RegisterResponse struct {
-	AgentId string `json:"AgentId"`
-}
 
 // RegisterHandler gère l'enregistrement initial (POST /PSDSCPullServer.svc/Nodes)
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +88,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp := RegisterResponse{AgentId: agentId}
+	resp := schema.RegisterResponse{AgentId: agentId}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("ProtocolVersion", "2.0")
 	_ = json.NewEncoder(w).Encode(resp)
