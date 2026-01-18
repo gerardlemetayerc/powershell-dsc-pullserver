@@ -40,7 +40,7 @@ $(function() {
         const id = $(this).data('id');
         const active = !$(this).data('active');
         $.post('/api/v1/users/' + id + '/active?active=' + (active ? '1' : '0'), function() {
-            fetchUsers();
+            usersTable.ajax.reload(null, false);
         });
     });
     $('#users-table').on('click', '.edit-user', function() {
