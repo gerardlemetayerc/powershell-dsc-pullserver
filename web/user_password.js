@@ -8,16 +8,22 @@ $(function() {
     $('#userId').val(userId);
     $('#passwordForm').on('submit', function(e) {
         e.preventDefault();
-        const newPassword = $('#newPassword').val();
-        if (!newPassword) return;
+        var pwd = $('#newPassword').val();
+        var confirm = $('#confirmPassword').val();
+        if (pwd !== confirm) {
+            $('#passwordMsg').text('Les mots de passe ne correspondent pas.').addClass('text-danger').removeClass('text-success');
+            return false;
+        }
+        if (!pwd) return;
         $.ajax({
             url: '/api/v1/users/' + userId + '/password',
             type: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify({ new_password: newPassword }),
+            data: JSON.stringify({ new_password: pwd }),
             success: function() {
                 $('#passwordMsg').text('Mot de passe changé avec succès.').addClass('text-success').removeClass('text-danger');
                 $('#newPassword').val('');
+                $('#confirmPassword').val('');
             },
             error: function() {
                 $('#passwordMsg').text('Erreur lors du changement de mot de passe.').addClass('text-danger').removeClass('text-success');
