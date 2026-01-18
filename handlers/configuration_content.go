@@ -47,12 +47,12 @@ func ConfigurationContentHandler(w http.ResponseWriter, r *http.Request) {
 		       defer dbConn.Close()
 			   // Recherche par nom (sans extension)
 			       log.Printf("[CONFIGURATIONCONTENT] Recherche MOF en base pour configName='%s'", configName)
-			       // Met à jour last_usage à CURRENT_TIMESTAMP pour cette configuration
-			       _, err = dbConn.Exec("UPDATE configuration_model SET last_usage = CURRENT_TIMESTAMP WHERE name = ?", configName)
-			       if err != nil {
-				       log.Printf("[CONFIGURATIONCONTENT] Erreur lors de la mise à jour de last_usage: %v", err)
-			       }
-			       row := dbConn.QueryRow("SELECT mof_file FROM configuration_model WHERE name = ?", configName)
+				       // Met à jour last_usage à CURRENT_TIMESTAMP pour cette configuration (insensible à la casse)
+				       _, err = dbConn.Exec("UPDATE configuration_model SET last_usage = CURRENT_TIMESTAMP WHERE LOWER(name) = LOWER(?)", configName)
+				       if err != nil {
+					       log.Printf("[CONFIGURATIONCONTENT] Erreur lors de la mise à jour de last_usage: %v", err)
+				       }
+				       row := dbConn.QueryRow("SELECT mof_file FROM configuration_model WHERE LOWER(name) = LOWER(?)", configName)
 			       var data []byte
 			       if err := row.Scan(&data); err != nil {
 				       http.Error(w, "Configuration not found", http.StatusNotFound)
