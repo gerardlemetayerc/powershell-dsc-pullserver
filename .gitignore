@@ -3,3 +3,6 @@
 *.exe
 *.log
 *.db
+*.crt
+*.pem
+*.key
