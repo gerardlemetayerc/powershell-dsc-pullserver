@@ -1,15 +1,22 @@
 package schema
 
+type HTTPConfig struct {
+	Port        int    `json:"port"`
+	EnableHTTPS bool   `json:"enable_https"`
+	CertFile    string `json:"cert_file"`
+	KeyFile     string `json:"key_file"`
+}
+
 type AppConfig struct {
-	Driver   string      `json:"driver"`
-	Server   string      `json:"server"`
-	Port     int         `json:"port"`
-	User     string      `json:"user"`
-	Password string      `json:"password"`
-	Database string      `json:"database"`
-	DSCPort  int         `json:"dsc_port"`
-	WebPort  int         `json:"web_port"`
-	SAML     SAMLConfig  `json:"saml"`
+	Driver        string      `json:"driver"`
+	Server        string      `json:"server"`
+	Port          int         `json:"port"`
+	User          string      `json:"user"`
+	Password      string      `json:"password"`
+	Database      string      `json:"database"`
+	DSCPullServer HTTPConfig  `json:"dsc_pullserver"`
+	WebUI         HTTPConfig  `json:"web_ui"`
+	SAML          SAMLConfig  `json:"saml"`
 }
 
 type SAMLConfig struct {

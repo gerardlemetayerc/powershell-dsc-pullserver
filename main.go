@@ -6,9 +6,7 @@ import(
 	samlsp "github.com/crewjam/saml/samlsp"
 	"log"
 	"strings"
-	"os"
 	"fmt"
-	"encoding/json"
 	"context"
 	"net/url"
 	"net/http"
@@ -61,39 +59,31 @@ func main() {
 			log.Fatalf("[SAML] Erreur chargement clé/cert SP: %v", err)
 		}
 
-		// Lecture du port web depuis la config
-		webPort := appCfg.WebPort
-		if webPort == 0 {
-			webPort = 80
+		// Utilise l'entity_id de la config pour l'URL du SP
+		spURL := appCfg.SAML.EntityID
+		idpMetadataURL := appCfg.SAML.IdpMetadataURL
+		idpMetadata, err := samlsp.FetchMetadata(context.Background(), http.DefaultClient, *mustParseURL(idpMetadataURL))
+		if err != nil {
+			log.Fatalf("[SAML] Erreur récupération metadata IdP: %v", err)
 		}
-		// Construction dynamique de l'URL du SP
-		spURL := "http://127.0.0.1"
-		if webPort != 80 {
-			spURL = fmt.Sprintf("http://127.0.0.1:%d", webPort)
+		samlOptions := samlsp.Options{
+			URL: *mustParseURL(spURL),
+			Key: cert.PrivateKey.(crypto.Signer),
+			Certificate: cert.Leaf,
+			IDPMetadata:  idpMetadata,
 		}
-				       // Récupération des métadonnées IdP via FetchMetadata (méthode crewjam/samlsp)
-				       idpMetadataURL := appCfg.SAML.IdpMetadataURL
-					   idpMetadata, err := samlsp.FetchMetadata(context.Background(), http.DefaultClient, *mustParseURL(idpMetadataURL))
-				       if err != nil {
-					       log.Fatalf("[SAML] Erreur récupération metadata IdP: %v", err)
-				       }
-					       samlOptions := samlsp.Options{
-						       URL: *mustParseURL(spURL),
-						       Key: cert.PrivateKey.(crypto.Signer),
-						       Certificate: cert.Leaf,
-						       IDPMetadata:  idpMetadata,
-					       }
-					       samlMiddleware, err = samlsp.New(samlOptions)
-					       // Désactive la vérification de signature SAML pour le dev (ne pas utiliser en prod)
-					       if samlMiddleware != nil {
-						       log.Printf("[SAML] SP EntityID: %s", samlMiddleware.ServiceProvider.EntityID)
-						       log.Printf("[SAML] SP ACS URL: %s", samlMiddleware.ServiceProvider.AcsURL.String())
-						       log.Printf("[SAML] SP Metadata URL: %s", samlMiddleware.ServiceProvider.MetadataURL.String())
-					       }
-				       if err != nil {
-					       log.Fatalf("[SAML] Erreur initialisation SAML middleware: %v", err)
-				       }
-			       }
+		samlMiddleware, err = samlsp.New(samlOptions)
+		if samlMiddleware != nil {
+			// Force explicitement l'EntityID à la valeur de la config
+			samlMiddleware.ServiceProvider.EntityID = appCfg.SAML.EntityID
+			log.Printf("[SAML] SP EntityID: %s", samlMiddleware.ServiceProvider.EntityID)
+			log.Printf("[SAML] SP ACS URL: %s", samlMiddleware.ServiceProvider.AcsURL.String())
+			log.Printf("[SAML] SP Metadata URL: %s", samlMiddleware.ServiceProvider.MetadataURL.String())
+		}
+		if err != nil {
+			log.Fatalf("[SAML] Erreur initialisation SAML middleware: %v", err)
+		}
+	}
 	       // Initialisation automatique de la base (CREATE IF NOT EXISTS)
 	       dbCfg := &db.DBConfig{
 		       Driver:   appCfg.Driver,
@@ -131,25 +121,7 @@ func main() {
 	}
 
 
-	// Lecture des ports depuis config.json
-	type portConfig struct {
-		DscPort int `json:"dsc_port"`
-		WebPort int `json:"web_port"`
-	}
-	var ports portConfig
-	{
-		f, err := os.Open("config.json")
-		if err == nil {
-			defer f.Close()
-			json.NewDecoder(f).Decode(&ports)
-		}
-	}
-	if ports.DscPort == 0 {
-		ports.DscPort = 8081
-	}
-	if ports.WebPort == 0 {
-		ports.WebPort = 8080
-	}
+	// Les ports sont maintenant dans appCfg.DSCPullServer.Port et appCfg.WebUI.Port
 
 	// --- Mux DSC (endpoints MS-DSCPM) ---
 	dscMux := http.NewServeMux()
@@ -160,13 +132,34 @@ func main() {
 	dscHandler := loggingMiddleware(dscMux)
 	webHandler := loggingMiddleware(webMux)
 
-	// Lancer les deux serveurs sur des ports différents
+	// Lancer les deux serveurs sur des ports différents avec HTTPS optionnel
 	go func() {
-		log.Printf("Serveur DSC (endpoints agents) sur :%d ...", ports.DscPort)
-		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", ports.DscPort), dscHandler))
+		if appCfg.DSCPullServer.EnableHTTPS {
+			log.Printf("Serveur DSC (HTTPS) sur :%d ...", appCfg.DSCPullServer.Port)
+			log.Fatal(http.ListenAndServeTLS(
+				fmt.Sprintf(":%d", appCfg.DSCPullServer.Port),
+				appCfg.DSCPullServer.CertFile,
+				appCfg.DSCPullServer.KeyFile,
+				dscHandler,
+			))
+		} else {
+			log.Printf("Serveur DSC (HTTP) sur :%d ...", appCfg.DSCPullServer.Port)
+			log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", appCfg.DSCPullServer.Port), dscHandler))
+		}
 	}()
-	log.Printf("Serveur IHM/API sur :%d ... (IHM sur /web/)", ports.WebPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", ports.WebPort), webHandler))
+
+	if appCfg.WebUI.EnableHTTPS {
+		log.Printf("Serveur IHM/API (HTTPS) sur :%d ... (IHM sur /web/)", appCfg.WebUI.Port)
+		log.Fatal(http.ListenAndServeTLS(
+			fmt.Sprintf(":%d", appCfg.WebUI.Port),
+			appCfg.WebUI.CertFile,
+			appCfg.WebUI.KeyFile,
+			webHandler,
+		))
+	} else {
+		log.Printf("Serveur IHM/API (HTTP) sur :%d ... (IHM sur /web/)", appCfg.WebUI.Port)
+		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", appCfg.WebUI.Port), webHandler))
+	}
 }
 
 

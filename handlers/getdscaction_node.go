@@ -28,10 +28,6 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 		}
 	// Log du body et des headers reçus pour debug
 	body, _ := io.ReadAll(r.Body)
-	log.Printf("[GETDSCACTION-NODE] AgentId=%s Body=%s", agentId, string(body))
-	for k, v := range r.Header {
-		log.Printf("[GETDSCACTION-NODE] Header: %s: %v", k, v)
-	}
 	r.Body = io.NopCloser(strings.NewReader(string(body)))
 
 	// DEBUG : afficher le body dans la réponse HTTP (en plus du log)
