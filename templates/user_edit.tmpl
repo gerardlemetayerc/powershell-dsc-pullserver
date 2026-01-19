@@ -1,37 +1,37 @@
 {{define "content"}}
 <section class="content">
     <div class="container-fluid">
-        <h2>Édition utilisateur</h2>
+        <h2>User modification</h2>
         <div class="card">
             <div class="card-body">
                 <form id="editUserForm">
                     <input type="hidden" id="userId" name="id" />
                     <div class="form-group">
-                        <label for="firstName">Prénom</label>
+                        <label for="firstName">Firstname</label>
                         <input type="text" class="form-control" id="firstName" name="first_name" required />
                     </div>
                     <div class="form-group">
-                        <label for="lastName">Nom</label>
+                        <label for="lastName">Name</label>
                         <input type="text" class="form-control" id="lastName" name="last_name" required />
                     </div>
                     <div class="form-group">
-                        <label for="email">Email</label>
+                        <label for="email">Mail</label>
                         <input type="email" class="form-control" id="email" name="email" required />
                     </div>
                     <div class="form-group">
-                        <label for="isActive">Actif</label>
+                        <label for="isActive">Enable</label>
                         <select class="form-control" id="isActive" name="is_active">
-                            <option value="1">Oui</option>
-                            <option value="0">Non</option>
+                            <option value="1">Yes</option>
+                            <option value="0">No</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="lastLogonDate">Dernière connexion</label>
+                        <label for="lastLogonDate">Last connexion</label>
                         <input type="text" class="form-control" id="lastLogonDate" name="last_logon_date" disabled />
                     </div>
-                    <button type="submit" class="btn btn-primary">Enregistrer</button>
-                    <a href="/web/user_password?id={{.ID}}" class="btn btn-warning">Changer le mot de passe</a>
-                    <a href="/web/users" class="btn btn-secondary">Retour</a>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <a href="/web/user_password?id={{.ID}}" class="btn btn-warning">Change password</a>
+                    <a href="/web/users" class="btn btn-secondary">Back</a>
                 </form>
             </div>
         </div>

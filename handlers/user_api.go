@@ -8,11 +8,124 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"log"
 	"time"
+	"strconv"
 	"github.com/golang-jwt/jwt/v5"
-	"go-dsc-pull/internal/schema"
 	internaldb "go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/schema"
 )
 
+// Retourne les infos de l'utilisateur courant (d'après le JWT)
+func MyUserInfoHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Récupère l'email depuis le JWT (claim sub)
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, "Bearer ") {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		tokenStr := strings.TrimPrefix(auth, "Bearer ")
+		token, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok || claims["sub"] == nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		email := claims["sub"].(string)
+		row := db.QueryRow("SELECT id, first_name, last_name, email, is_active, created_at, last_logon_date FROM users WHERE email = ?", email)
+		var u schema.User
+		var lastLogon sql.NullString
+		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.IsActive, &u.CreatedAt, &lastLogon); err != nil {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		if lastLogon.Valid { u.LastLogonDate = &lastLogon.String } else { u.LastLogonDate = nil }
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(u)
+	}
+}
+
+// Liste les tokens API d'un utilisateur
+func ListUserAPITokensHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userId := r.PathValue("id")
+		rows, err := db.Query("SELECT id, user_id, label, is_active, created_at, revoked_at FROM user_api_tokens WHERE user_id = ?", userId)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		var tokens []schema.APIToken
+		for rows.Next() {
+			var t schema.APIToken
+			var revokedAt sql.NullString
+			rows.Scan(&t.ID, &t.UserID, &t.Label, &t.IsActive, &t.CreatedAt, &revokedAt)
+			if revokedAt.Valid { t.RevokedAt = &revokedAt.String } else { t.RevokedAt = nil }
+			tokens = append(tokens, t)
+		}
+		w.Header().Set("Content-Type", "application/json")
+        // Toujours retourner un tableau (éventuellement vide)
+        if tokens == nil {
+            w.Write([]byte("[]"))
+        } else {
+            json.NewEncoder(w).Encode(tokens)
+        }
+	}
+}
+
+// Crée un nouveau token API pour un utilisateur (retourne le token plain)
+func CreateUserAPITokenHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userId := r.PathValue("id")
+		var req struct{ Label string `json:"label"` }
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+		token, err := internaldb.GenerateAPIToken()
+		if err != nil {
+			http.Error(w, "Token generation error", http.StatusInternalServerError)
+			return
+		}
+		// Stocke le hash
+		id64, _ := strconv.ParseInt(userId, 10, 64)
+		if err := internaldb.StoreAPIToken(db, id64, token, req.Label); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"token": token})
+	}
+}
+
+// Révoque un token API (soft delete)
+func RevokeUserAPITokenHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tokenId := r.PathValue("tokenid")
+		_, err := db.Exec("UPDATE user_api_tokens SET is_active=0, revoked_at=? WHERE id=?", time.Now().Format("2006-01-02 15:04:05"), tokenId)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// Supprime un token API (hard delete)
+func DeleteUserAPITokenHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tokenId := r.PathValue("tokenid")
+		_, err := db.Exec("DELETE FROM user_api_tokens WHERE id=?", tokenId)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
 
 // Handler de login JWT
 func LoginHandler(db *sql.DB) http.HandlerFunc {

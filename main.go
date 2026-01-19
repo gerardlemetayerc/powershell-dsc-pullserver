@@ -18,6 +18,7 @@ import(
 	"go-dsc-pull/internal/schema"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"database/sql"
 )
 
 // Helper pour parser une URL ou panic
@@ -75,10 +76,7 @@ func main() {
 					   idpMetadata, err := samlsp.FetchMetadata(context.Background(), http.DefaultClient, *mustParseURL(idpMetadataURL))
 				       if err != nil {
 					       log.Fatalf("[SAML] Erreur récupération metadata IdP: %v", err)
-				       }else{
-						log.Printf("[SAML] Métadonnées IdP récupérées depuis %s", idpMetadataURL)
-
-					   }
+				       }
 					       samlOptions := samlsp.Options{
 						       URL: *mustParseURL(spURL),
 						       Key: cert.PrivateKey.(crypto.Signer),
@@ -88,7 +86,6 @@ func main() {
 					       samlMiddleware, err = samlsp.New(samlOptions)
 					       // Désactive la vérification de signature SAML pour le dev (ne pas utiliser en prod)
 					       if samlMiddleware != nil {
-						       log.Printf("[SAML] SP middleware: %+v", samlMiddleware)
 						       log.Printf("[SAML] SP EntityID: %s", samlMiddleware.ServiceProvider.EntityID)
 						       log.Printf("[SAML] SP ACS URL: %s", samlMiddleware.ServiceProvider.AcsURL.String())
 						       log.Printf("[SAML] SP Metadata URL: %s", samlMiddleware.ServiceProvider.MetadataURL.String())
@@ -158,7 +155,7 @@ func main() {
 	dscMux := http.NewServeMux()
 	routes.RegisterDSCRoutes(dscMux, dbConn)
 	// Register all web/API/GUI routes
-	routes.RegisterWebRoutes(webMux, dbConn, jwtAuthMiddleware, samlMiddleware)
+	routes.RegisterWebRoutes(webMux, dbConn, jwtOrAPITokenAuthMiddleware(dbConn), samlMiddleware)
 	// Wrap mux with logging middleware
 	dscHandler := loggingMiddleware(dscMux)
 	webHandler := loggingMiddleware(webMux)
@@ -174,25 +171,47 @@ func main() {
 
 
 // Middleware de vérification JWT Bearer
-func jwtAuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if !strings.HasPrefix(auth, "Bearer ") {
-			http.Error(w, "Missing Bearer token", http.StatusUnauthorized)
-			return
-		}
-		tokenStr := strings.TrimPrefix(auth, "Bearer ")
-		secret := []byte("supersecretkey")
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method")
+func jwtOrAPITokenAuthMiddleware(dbConn *sql.DB) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			auth := r.Header.Get("Authorization")
+			if strings.HasPrefix(auth, "Bearer ") {
+				tokenStr := strings.TrimPrefix(auth, "Bearer ")
+				secret := []byte("supersecretkey")
+				jwtToken, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+						return nil, fmt.Errorf("Unexpected signing method")
+					}
+					return secret, nil
+				})
+				if err == nil && jwtToken.Valid {
+					if claims, ok := jwtToken.Claims.(jwt.MapClaims); ok {
+						if sub, ok := claims["sub"].(string); ok {
+							ctx := context.WithValue(r.Context(), "userId", sub)
+							r = r.WithContext(ctx)
+						}
+					}
+					next.ServeHTTP(w, r)
+					return
+				}
+				http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+				return
 			}
-			return secret, nil
-		})
-		if err != nil || !token.Valid {
-			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+			// Si ce n'est pas Bearer, tente API token
+			if strings.HasPrefix(auth, "Token ") {
+				tokenStr := strings.TrimPrefix(auth, "Token ")
+				userId, apiErr := db.CheckAPIToken(dbConn, tokenStr)
+				if apiErr == nil && userId > 0 {
+					ctx := context.WithValue(r.Context(), "userId", userId)
+					r = r.WithContext(ctx)
+					next.ServeHTTP(w, r)
+					return
+				}
+				http.Error(w, "Invalid or expired API token", http.StatusUnauthorized)
+				return
+			}
+			http.Error(w, "Missing or invalid Authorization header", http.StatusUnauthorized)
 			return
-		}
-		next.ServeHTTP(w, r)
-	})
+		})
+	}
 }

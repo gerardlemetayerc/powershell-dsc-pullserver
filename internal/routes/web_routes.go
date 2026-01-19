@@ -9,12 +9,19 @@ import (
 
 // RegisterWebRoutes sets up all web/API endpoints on the provided mux
 func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware func(http.Handler) http.Handler, samlMiddleware http.Handler) {
+		mux.Handle("GET /api/v1/my", jwtAuthMiddleware(http.HandlerFunc(handlers.MyUserInfoHandler(dbConn))))
+	mux.HandleFunc("/web/profile", handlers.ProfileHandler)
+	// API tokens utilisateur
+	mux.Handle("GET /api/v1/users/{id}/tokens", jwtAuthMiddleware(http.HandlerFunc(handlers.ListUserAPITokensHandler(dbConn))))
+	mux.Handle("POST /api/v1/users/{id}/tokens", jwtAuthMiddleware(http.HandlerFunc(handlers.CreateUserAPITokenHandler(dbConn))))
+	mux.Handle("POST /api/v1/users/{id}/tokens/{tokenid}/revoke", jwtAuthMiddleware(http.HandlerFunc(handlers.RevokeUserAPITokenHandler(dbConn))))
+	mux.Handle("DELETE /api/v1/users/{id}/tokens/{tokenid}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteUserAPITokenHandler(dbConn))))
 	// SAML endpoints
 	mux.Handle("GET /api/v1/saml/userinfo", http.HandlerFunc(handlers.SAMLUserInfoHandler))
 	mux.Handle("GET /api/v1/saml/enabled", http.HandlerFunc(handlers.SAMLStatusHandler))
-	   if samlMiddleware != nil {
-		   mux.Handle("/saml/", samlMiddleware)
-	   }
+	if samlMiddleware != nil {
+		mux.Handle("/saml/", samlMiddleware)
+	}
 	// API REST endpoints (agents, configs, reports, modules, properties, configuration_models, users, login)
 	mux.Handle("GET /api/v1/agents", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentAPIHandler)))
 	mux.Handle("GET /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandler)))

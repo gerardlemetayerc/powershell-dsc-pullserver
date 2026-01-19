@@ -1,3 +1,15 @@
+
+-- Table pour les tokens API utilisateurs
+CREATE TABLE IF NOT EXISTS user_api_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL,
+    label TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    revoked_at TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
 -- Table pour les modules DSC uploadés
 CREATE TABLE IF NOT EXISTS modules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
