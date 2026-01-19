@@ -6,7 +6,8 @@ import (
 	"math/rand"
 	"net/http"
 	"time"
-	"go-dsc-pull/utils"
+	utils "go-dsc-pull/utils"
+	internalutils "go-dsc-pull/internal/utils"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
 	"os"
@@ -15,11 +16,25 @@ import (
 
 // RegisterHandler gère l'enregistrement initial (POST /PSDSCPullServer.svc/Nodes)
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+	// --- Contrôle de la signature Authorization DSC ---
+	const registrationKeyPlain = "AnyString" // Stockée en clair
+	authHeader := r.Header.Get("Authorization")
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Unable to read request body", http.StatusInternalServerError)
+		return
+	}
+	xmsDate := r.Header.Get("x-ms-date")
+	valid, logMsg := internalutils.ValidateDSCRegistrationKey(body, xmsDate, authHeader, registrationKeyPlain)
+	if !valid {
+		log.Print(logMsg)
+		http.Error(w, "Unauthorized: invalid signature", http.StatusUnauthorized)
+		return
+	}
 	if r.Method != http.MethodPost && r.Method != http.MethodPut {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	body, _ := io.ReadAll(r.Body)
 	var req map[string]interface{}
 	_ = json.Unmarshal(body, &req) // Body peut être vide en PUT
 	// Extraire l'AgentId du segment d'URL si présent
@@ -92,7 +107,6 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("ProtocolVersion", "2.0")
 	_ = json.NewEncoder(w).Encode(resp)
-	log.Printf("[REGISTER] Infos=%v AgentId=%s", req, agentId)
 }
 
 func generateAgentId() string {
