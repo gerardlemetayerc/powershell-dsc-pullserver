@@ -1,0 +1,67 @@
+
+{{define "content"}}
+<section class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1>Propriétés du nœud <span id="nodeName"></span></h1>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="content">
+    <div class="container-fluid">
+        <div class="card">
+            <div class="card-header">
+                <button class="btn btn-primary" id="btnAddNodeProperty"><i class="fas fa-plus"></i> Associer une propriété</button>
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered table-hover" id="nodePropertiesTable">
+                    <thead>
+                        <tr>
+                            <th>Propriété</th>
+                            <th>Valeur</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+
+<!-- Modal ajout/édition -->
+<div class="modal fade" id="nodePropertyModal" tabindex="-1" role="dialog" aria-labelledby="nodePropertyModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="nodePropertyModalLabel">Associer/Éditer une propriété</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="nodePropertyForm">
+                    <input type="hidden" id="modalPropertyId">
+                    <div class="form-group">
+                        <label for="modalPropertySelect">Propriété</label>
+                        <select class="form-control" id="modalPropertySelect"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modalPropertyValue">Valeur</label>
+                        <input type="text" class="form-control" id="modalPropertyValue">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                <button type="submit" class="btn btn-primary" id="saveNodePropertyBtn">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="/web/node_properties.js"></script>
+{{end}}

@@ -1,0 +1,59 @@
+{{define "content"}}
+<section class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1>Modules DSC</h1>
+            </div>
+            <div class="col-sm-6 text-right">
+                <button class="btn btn-success" id="btn-upload-module"><i class="fas fa-plus"></i> Upload new module</button>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="content">
+    <div class="container-fluid">
+        <div class="card">
+            <div class="card-body">
+                <table id="modules-table" class="table table-bordered table-striped" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Version</th>
+                            <th>Checksum</th>
+                            <th>Upload Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+<!-- Modal upload module -->
+<div class="modal fade" id="modal-upload-module" tabindex="-1" role="dialog" aria-labelledby="modalUploadLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form id="form-upload-module" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalUploadLabel">Upload d'un module DSC</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="moduleFile">Fichier ZIP du module</label>
+                        <input type="file" class="form-control" id="moduleFile" name="nupkg" accept=".zip,.nupkg" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Uploader</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script src="/web/modules.js"></script>
+{{end}}

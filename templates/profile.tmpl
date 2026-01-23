@@ -1,0 +1,51 @@
+{{define "content"}}
+<section class="content">
+    <div class="container-fluid">
+        <h2>Profil utilisateur</h2>
+        <div class="card mb-4">
+            <div class="card-body">
+                <p><b>Mail :</b> <span id="profileEmail"></span></p>
+                <p><b>Name :</b> <span id="profileName"></span></p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <b>Tokens API</b>
+                <button class="btn btn-sm btn-success float-right" id="addTokenBtn">Add token</button>
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered" id="apiTokensTable">
+                    <thead>
+                        <tr><th>Label</th><th>Active</th><th>Creation date</th><th>Revocation date</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div id="tokenPlainDiv" style="display:none;" class="alert alert-info mt-3"></div>
+            </div>
+        </div>
+    </div>
+</section>
+<!-- Modal création token -->
+<div class="modal fade" id="createTokenModal" tabindex="-1" role="dialog" aria-labelledby="createTokenModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="createTokenModalLabel">Create new API token</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="createTokenForm">
+          <div class="form-group">
+            <label for="tokenLabel">Label</label>
+            <input type="text" class="form-control" id="tokenLabel" name="label" required />
+          </div>
+          <button type="submit" class="btn btn-primary">Créer</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/web/profile.js"></script>
+{{end}}

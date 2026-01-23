@@ -1,0 +1,107 @@
+{{define "content"}}
+<section class="content">
+    <div class="container-fluid">
+        <h2>Users</h2>
+                <button class="btn btn-success mb-3" data-toggle="modal" data-target="#createUserModal">Add user</button>
+                <!-- Modal création utilisateur -->
+                <div class="modal fade" id="createUserModal" tabindex="-1" role="dialog" aria-labelledby="createUserModalLabel" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="createUserModalLabel">Add user</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="createUserForm">
+                                    <div class="form-group">
+                                        <label for="firstName">Firstname</label>
+                                        <input type="text" class="form-control" id="firstName" name="first_name" required />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="lastName">Name</label>
+                                        <input type="text" class="form-control" id="lastName" name="last_name" required />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="email">Mail</label>
+                                        <input type="email" class="form-control" id="email" name="email" required />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="password">Password</label>
+                                        <input type="password" class="form-control" id="password" name="password" required />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="isActive">State</label>
+                                        <select class="form-control" id="isActive" name="is_active">
+                                            <option value="1">Active</option>
+                                            <option value="0">Disable</option>
+                                        </select>
+                                    </div>
+                                    <div id="createUserError" class="text-danger mb-2" style="display:none;"></div>
+                                    <button type="submit" class="btn btn-primary">Create</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        <div class="card">
+            <div class="card-body">
+                <table style="width:100%" id="users-table" class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>Firstname</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Active</th>
+                            <th>Creation date</th>
+                            <th>Last logon</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rempli par JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+<script src="/web/users.js"></script>
+<script>
+$(function() {
+    $('#createUserForm').on('submit', function(e) {
+        e.preventDefault();
+        $('#createUserError').hide();
+        var data = {
+            first_name: $('#firstName').val(),
+            last_name: $('#lastName').val(),
+            email: $('#email').val(),
+            password: $('#password').val(),
+            is_active: $('#isActive').val()
+        };
+        $.ajax({
+            url: '/api/v1/users',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function() {
+                $('#createUserModal').modal('hide');
+                $('#createUserForm')[0].reset();
+                $('#users-table').DataTable().ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                let msg = 'Erreur lors de la création.';
+                if(xhr.responseJSON && xhr.responseJSON.error) msg = xhr.responseJSON.error;
+                $('#createUserError').text(msg).show();
+            }
+        });
+    });
+    // Réinitialise le formulaire à chaque ouverture
+    $('#createUserModal').on('show.bs.modal', function() {
+        $('#createUserForm')[0].reset();
+        $('#createUserError').hide();
+    });
+});
+</script>
+{{end}}
