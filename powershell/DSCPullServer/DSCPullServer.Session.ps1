@@ -16,7 +16,6 @@ function Connect-DSCPullServer {
         $resp = Invoke-RestMethod -Uri "$ServerUrl/api/v1/login" -Method POST -ContentType 'application/json' -Body $body
         if ($resp.token) {
             $script:DSCPullServerSession = @{ ServerUrl = $ServerUrl; Token = $resp.token; AuthType = 'Bearer' }
-            Write-Host $resp
             return $true
         } else {
             throw "Échec de l'authentification."
