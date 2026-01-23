@@ -89,10 +89,11 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 try {
   localStorage.setItem('jwt_token', %q);
   localStorage.setItem('jwt_exp', %q);
+  document.cookie = 'jwt_token=' + %q + '; path=/; SameSite=Lax';
   window.location.replace('/web');
 } catch(e) {
   window.location.replace('/web/login');
 }
-</script></body></html>`, signed, fmt.Sprintf("%d", expiresAt))
+</script></body></html>`, signed, fmt.Sprintf("%d", expiresAt), signed)
 	}
 }

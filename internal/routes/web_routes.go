@@ -10,7 +10,7 @@ import (
 // RegisterWebRoutes sets up all web/API endpoints on the provided mux
 func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware func(http.Handler) http.Handler, samlMiddleware http.Handler) {
 		mux.Handle("GET /api/v1/my", jwtAuthMiddleware(http.HandlerFunc(handlers.MyUserInfoHandler(dbConn))))
-	mux.HandleFunc("/web/profile", handlers.ProfileHandler)
+	mux.Handle("/web/profile", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.ProfileHandler)))
 	// API tokens utilisateur
 	mux.Handle("GET /api/v1/users/{id}/tokens", jwtAuthMiddleware(http.HandlerFunc(handlers.ListUserAPITokensHandler(dbConn))))
 	mux.Handle("POST /api/v1/users/{id}/tokens", jwtAuthMiddleware(http.HandlerFunc(handlers.CreateUserAPITokenHandler(dbConn))))
@@ -54,15 +54,29 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	}
 	
 	// Web GUI endpoints (login, index, static, node, modules, configuration_model, properties, users, user_edit, user_password)
-	mux.HandleFunc("/web", handlers.WebIndexHandler)
-	mux.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("web"))))
-	mux.HandleFunc("/web/node/", handlers.WebNodeHandler)
-	mux.HandleFunc("/web/modules", handlers.WebModulesHandler)
-	mux.HandleFunc("/web/configuration_model", handlers.WebConfigurationModelHandler)
-	mux.HandleFunc("/templates/properties.tmpl", handlers.WebPropertiesHandler)
-	mux.HandleFunc("/web/users", WebUsersHandler)
-	mux.HandleFunc("/web/user_edit", WebUserEditHandler)
-	mux.HandleFunc("/web/user_password", WebUserPasswordHandler)
+	mux.Handle("/web", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)))
+	// Custom static file handler to prevent directory listing under /web/
+	mux.Handle("/web/", http.StripPrefix("/web/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if path == "" || path == "/" {
+			handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)).ServeHTTP(w, r)
+			return
+		}
+		fullPath := "web/" + path
+		info, err := handlers.StatFile(fullPath)
+		if err != nil || info.IsDir() {
+			http.NotFound(w, r)
+			return
+		}
+		http.ServeFile(w, r, fullPath)
+	})))
+	mux.Handle("/web/node/", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebNodeHandler)))
+	mux.Handle("/web/modules", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebModulesHandler)))
+	mux.Handle("/web/configuration_model", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebConfigurationModelHandler)))
+	mux.Handle("/templates/properties.tmpl", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebPropertiesHandler)))
+	mux.Handle("/web/users", handlers.WebJWTAuthMiddleware(http.HandlerFunc(WebUsersHandler)))
+	mux.Handle("/web/user_edit", handlers.WebJWTAuthMiddleware(http.HandlerFunc(WebUserEditHandler)))
+	mux.Handle("/web/user_password", handlers.WebJWTAuthMiddleware(http.HandlerFunc(WebUserPasswordHandler)))
 	mux.Handle("POST /api/v1/users/{id}/password", jwtAuthMiddleware(http.HandlerFunc(handlers.ChangeUserPasswordHandler(dbConn))))
 	mux.Handle("GET /api/v1/users", jwtAuthMiddleware(http.HandlerFunc(handlers.ListUsersHandler(dbConn))))
 	mux.Handle("GET /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.GetUserHandler(dbConn))))

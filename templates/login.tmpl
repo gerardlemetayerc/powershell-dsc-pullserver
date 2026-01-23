@@ -68,6 +68,8 @@ $(function() {
             success: function(resp) {
                 // Stocker le token dans localStorage
                 localStorage.setItem('jwt_token', resp.token);
+                // Définir aussi un cookie 'token' pour l'auth web
+                document.cookie = 'jwt_token=' + resp.token + '; path=/; SameSite=Lax';
                 window.location.href = '/web';
             },
             error: function(xhr) {
