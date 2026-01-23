@@ -10,7 +10,6 @@ import (
 	internalutils "go-dsc-pull/internal/utils"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
-	"os"
 	"io"
 )
 
@@ -43,9 +42,6 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if agentId == "" {
 		agentId = generateAgentId()
 	}
-	// Stocker tout le body JSON reçu dans un fichier agents/AgentId.json
-	_ = os.MkdirAll("agents", 0755)
-	_ = os.WriteFile("agents/"+agentId+".json", body, 0644)
 
 	// --- Insertion en base ---
 	// Charger la config DB

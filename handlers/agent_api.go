@@ -41,22 +41,36 @@ func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
 		       return
 	       }
 
-	       rows, err := database.Query(`SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report FROM agents`)
-	       if err != nil {
-		       http.Error(w, "DB query error", http.StatusInternalServerError)
-		       return
-	       }
-	       defer rows.Close()
+		       // Filtrage dynamique
+		       q := `SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report FROM agents WHERE 1=1`
+		       args := []interface{}{}
+		       nodeName := r.URL.Query().Get("node_name")
+		       if nodeName != "" {
+			       q += " AND node_name = ?"
+			       args = append(args, nodeName)
+		       }
+		       hasError := r.URL.Query().Get("has_error_last_report")
+		       if hasError == "true" {
+			       q += " AND has_error_last_report = 1"
+		       } else if hasError == "false" {
+			       q += " AND has_error_last_report = 0"
+		       }
+		       rows, err := database.Query(q, args...)
+		       if err != nil {
+			       http.Error(w, "DB query error", http.StatusInternalServerError)
+			       return
+		       }
+		       defer rows.Close()
 
-	       agents := []schema.Agent{}
-		 for rows.Next() {
-			 var a schema.Agent
-			 var hasErrorInt int
-			 if err := rows.Scan(&a.AgentId, &a.NodeName, &a.LCMVersion, &a.RegistrationType, &a.CertificateThumbprint, &a.CertificateSubject, &a.CertificateIssuer, &a.CertificateNotBefore, &a.CertificateNotAfter, &a.RegisteredAt, &a.LastCommunication, &hasErrorInt); err == nil {
-				 a.HasErrorLastReport = hasErrorInt != 0
-				 agents = append(agents, a)
-			 }
-		 }
-	       w.Header().Set("Content-Type", "application/json")
-	       _ = json.NewEncoder(w).Encode(agents)
+		       agents := []schema.Agent{}
+		       for rows.Next() {
+			       var a schema.Agent
+			       var hasErrorInt int
+			       if err := rows.Scan(&a.AgentId, &a.NodeName, &a.LCMVersion, &a.RegistrationType, &a.CertificateThumbprint, &a.CertificateSubject, &a.CertificateIssuer, &a.CertificateNotBefore, &a.CertificateNotAfter, &a.RegisteredAt, &a.LastCommunication, &hasErrorInt); err == nil {
+				       a.HasErrorLastReport = hasErrorInt != 0
+				       agents = append(agents, a)
+			       }
+		       }
+		       w.Header().Set("Content-Type", "application/json")
+		       _ = json.NewEncoder(w).Encode(agents)
 }
