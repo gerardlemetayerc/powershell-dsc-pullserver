@@ -1,0 +1,9 @@
+*.mof
+*.checksum
+*.exe
+*.log
+*.db
+*.crt
+*.pem
+*.key
+*.cer

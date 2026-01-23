@@ -1,0 +1,33 @@
+{
+  "driver": "sqlite",
+  "server": "localhost",
+  "port": 0,
+  "user": "",
+  "password": "",
+  "database": "./data.db",
+  "dsc_pullserver": {
+    "port": 8484,
+    "enable_https": true,
+    "cert_file": "dsc-dev.local.crt",
+    "key_file": "dsc-dev.local.key"
+  },
+  "web_ui": {
+    "port": 443,
+    "enable_https": true,
+    "cert_file": "dsc-dev.local.crt",
+    "key_file": "dsc-dev.local.key"
+  },
+  "saml": {
+    "enabled": true,
+    "entity_id": "https://dsc-dev.local",
+    "acs_url": "https://dsc-dev.local/saml/acs",
+    "idp_metadata_url": "https://login.microsoftonline.com/acee6c11-4aea-4377-8960-8261756492fd/FederationMetadata/2007-06/FederationMetadata.xml?appid=57a31120-f9fb-468f-b078-8c0adbbcd162",
+    "sp_key_file": "sp.key",
+    "sp_cert_file": "sp.crt.pem",
+    "user_mapping": {
+      "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+      "givenName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+      "sn": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"
+    }
+  }
+}

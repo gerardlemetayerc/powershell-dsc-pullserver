@@ -1,0 +1,64 @@
+{{define "content"}}
+<script src="/web/auth_check.js"></script>
+<section class="content">
+    <div class="container-fluid">
+        <br/>
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-white bg-primary mb-3">
+                    <div class="card-body">
+                        <p class="card-text" style="font-size:2em;"><i class="fas fa-server mr-2"></i><a id="total-agents" ></a></p>
+                        <h5 class="card-title">Managed agents</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-primary mb-3">
+                    <div class="card-body">
+                        <p class="card-text" style="font-size:2em;"><i class="fas fa-cubes mr-2"></i><a id="total-modules" ></a></p>
+                        <h5 class="card-title">Ressources Modules</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-primary mb-3">
+                    <div class="card-body">
+                        <p class="card-text" style="font-size:2em;"><i class="fas fa-project-diagram mr-2"></i><a id="total-configurations" ></a></p>
+                        <h5 class="card-title">Configurations</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <table style="width:100%" id="agents-table" class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Last Communication</th>
+                            <th>Thumbprint</th>
+                            <th>Status</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white text-center p-2" style="font-size:1em;">
+                    Configuration Status Overview
+                </div>
+                <div class="card-body" style="max-width:180px; margin:auto;">
+                    <canvas id="agents-pie" width="120" height="120"></canvas>
+                    <div class="d-flex justify-content-center align-items-center mt-3" id="agents-pie-legend">
+                        <span id="legend-ok" class="legend-selectable active" style="cursor:pointer;display:inline-flex;align-items:center;margin-right:20px;"><span style="display:inline-block;width:22px;height:14px;background:#28a745;margin-right:6px;"></span>Compliant</span>
+                        <span id="legend-err" class="legend-selectable active" style="cursor:pointer;display:inline-flex;align-items:center;"><span style="display:inline-block;width:22px;height:14px;background:#dc3545;margin-right:6px;"></span>Failed</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<script src="/web/reports.js"></script>
+{{end}}
