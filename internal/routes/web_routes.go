@@ -19,6 +19,12 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	// SAML endpoints
 	mux.Handle("GET /api/v1/saml/userinfo", http.HandlerFunc(handlers.SAMLUserInfoHandler))
 	mux.Handle("GET /api/v1/saml/enabled", http.HandlerFunc(handlers.SAMLStatusHandler))
+	// SAML config management (admin only)
+	mux.Handle("GET /api/v1/saml/config", jwtAuthMiddleware(http.HandlerFunc(handlers.SAMLConfigAPIHandler)))
+	mux.Handle("PUT /api/v1/saml/config", jwtAuthMiddleware(http.HandlerFunc(handlers.SAMLConfigAPIHandler)))
+	mux.Handle("POST /api/v1/saml/upload_sp_keycert", jwtAuthMiddleware(http.HandlerFunc(handlers.SAMLUploadSPKeyCertHandler)))
+	// Web UI for SAML config (admin only)
+	mux.Handle("GET /web/saml_config", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebSAMLConfigHandler)))
 	if samlMiddleware != nil {
 		mux.Handle("/saml/", samlMiddleware)
 	}

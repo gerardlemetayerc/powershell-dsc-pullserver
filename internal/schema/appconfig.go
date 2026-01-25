@@ -22,10 +22,16 @@ type AppConfig struct {
 type SAMLConfig struct {
 	Enabled         bool   `json:"enabled"`
 	EntityID        string `json:"entity_id"`
-	ACSURL          string `json:"acs_url"`
 	IdpMetadataURL  string `json:"idp_metadata_url"`
 	SPKeyFile       string `json:"sp_key_file"`
 	SPCertFile      string `json:"sp_cert_file"`
+	UserMapping     SAMLAttributeMapping `json:"user_mapping"`
+}
+
+type SAMLAttributeMapping struct {
+	Email       string `json:"email"`
+	Sn          string `json:"sn"`
+	GivenName   string `json:"givenname"`
 }
 
 type SAMLUserMapping map[string]string
