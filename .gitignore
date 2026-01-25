@@ -7,3 +7,4 @@
 *.pem
 *.key
 *.cer
+saml_keycert_archive/*
