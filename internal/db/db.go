@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"go-dsc-pull/utils"
 	_ "modernc.org/sqlite"
 )
 
@@ -25,7 +27,10 @@ type DBConfig struct {
 }
 
 func LoadDBConfig(path string) (*DBConfig, error) {
-	f, err := os.Open(path)
+	exeDir, err := utils.ExePath()
+	if err != nil { return nil, err }
+	absPath := filepath.Join(filepath.Dir(exeDir), path)
+	f, err := os.Open(absPath)
 	if err != nil { return nil, err }
 	defer f.Close()
 	var cfg DBConfig

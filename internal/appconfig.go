@@ -4,17 +4,24 @@ import (
    "encoding/json"
    "go-dsc-pull/internal/schema"
    "os"
+   "path/filepath"
+   "go-dsc-pull/utils"
 )
 
 // GetSAMLUserMapping lit le mapping user_mapping depuis la config
 func GetSAMLUserMapping() (map[string]string, error) {
    var mapping map[string]string
    // On lit le champ brut du JSON
-   f, err := os.Open("config.json")
-   if err != nil {
-	   return nil, err
-   }
-   defer f.Close()
+      exeDir, err := utils.ExePath()
+      if err != nil {
+         return nil, err
+      }
+      configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+      f, err := os.Open(configPath)
+      if err != nil {
+         return nil, err
+      }
+      defer f.Close()
    dec := json.NewDecoder(f)
    var raw map[string]interface{}
    if err := dec.Decode(&raw); err != nil {
@@ -38,11 +45,16 @@ func GetSAMLUserMapping() (map[string]string, error) {
 }
 
 func LoadAppConfig(path string) (*schema.AppConfig, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+      exeDir, err := utils.ExePath()
+      if err != nil {
+         return nil, err
+      }
+      absPath := filepath.Join(filepath.Dir(exeDir), path)
+      f, err := os.Open(absPath)
+      if err != nil {
+         return nil, err
+      }
+      defer f.Close()
 	var cfg schema.AppConfig
 	dec := json.NewDecoder(f)
 	if err := dec.Decode(&cfg); err != nil {

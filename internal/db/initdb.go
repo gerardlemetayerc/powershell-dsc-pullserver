@@ -4,6 +4,8 @@ package db
 import (
     "log"
     "io/ioutil"
+    "path/filepath"
+    "go-dsc-pull/utils"
 )
 
 
@@ -15,7 +17,12 @@ func InitDB(cfg *DBConfig) {
     }
     defer database.Close()
 
-    schema, err := ioutil.ReadFile("internal\\db\\schema.sql")
+    exeDir, err := utils.ExePath()
+    if err != nil {
+        log.Fatalf("[INITDB] Erreur récupération chemin exécutable: %v", err)
+    }
+    schemaPath := filepath.Join(filepath.Dir(exeDir), "internal", "db", "schema.sql")
+    schema, err := ioutil.ReadFile(schemaPath)
     if err != nil {
         log.Fatalf("[INITDB] Erreur lecture schema.sql: %v", err)
     }

@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"strings"
 	"go-dsc-pull/internal/db"
+	"path/filepath"
+	"go-dsc-pull/utils"
 )
 
 // ConfigurationContentHandler gère GET /PSDSCPullServer.svc/{node}/{config}/ConfigurationContent
@@ -34,11 +36,17 @@ func ConfigurationContentHandler(w http.ResponseWriter, r *http.Request) {
 	}
 		       log.Printf("[CONFIGURATIONCONTENT] AgentId=%s ConfigName=%s", agentId, configName)
 		       // Récupère le fichier MOF depuis la base
-			dbCfg, err := db.LoadDBConfig("config.json")
-		       if err != nil {
-			       http.Error(w, "DB config error", http.StatusInternalServerError)
-			       return
-		       }
+			   exeDir, err := utils.ExePath()
+			   if err != nil {
+				   http.Error(w, "DB config error", http.StatusInternalServerError)
+				   return
+			   }
+			   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+			   dbCfg, err := db.LoadDBConfig(configPath)
+			   if err != nil {
+				   http.Error(w, "DB config error", http.StatusInternalServerError)
+				   return
+			   }
 			dbConn, err := db.OpenDB(dbCfg)
 		       if err != nil {
 			       http.Error(w, "DB open error", http.StatusInternalServerError)

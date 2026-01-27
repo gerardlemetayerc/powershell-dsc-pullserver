@@ -1,17 +1,25 @@
 package handlers
 
+
 import (
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"path/filepath"
+	"go-dsc-pull/utils"
 )
 
 // --- Properties CRUD ---
 func PropertiesListHandler(w http.ResponseWriter, r *http.Request) {
-	dbCfg, _ := db.LoadDBConfig("config.json")
-	database, _ := db.OpenDB(dbCfg)
+	   exeDir, err := utils.ExePath()
+	   var dbCfg *db.DBConfig
+	   if err == nil {
+		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+		   dbCfg, _ = db.LoadDBConfig(configPath)
+	   }
+	   database, _ := db.OpenDB(dbCfg)
 	defer database.Close()
 	rows, _ := database.Query("SELECT id, name, description, priority FROM properties ORDER BY priority, name")
 	var props []schema.Property
@@ -30,8 +38,13 @@ func PropertiesListHandler(w http.ResponseWriter, r *http.Request) {
 func PropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
 	var p schema.Property
 	_ = json.NewDecoder(r.Body).Decode(&p)
-	dbCfg, _ := db.LoadDBConfig("config.json")
-	database, _ := db.OpenDB(dbCfg)
+	   exeDir, err := utils.ExePath()
+	   var dbCfg *db.DBConfig
+	   if err == nil {
+		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+		   dbCfg, _ = db.LoadDBConfig(configPath)
+	   }
+	   database, _ := db.OpenDB(dbCfg)
 	defer database.Close()
 	res, err := database.Exec("INSERT INTO properties (name, description, priority) VALUES (?, ?, ?)", p.Name, p.Description, p.Priority)
 	if err != nil {
@@ -46,8 +59,13 @@ func PropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 func PropertiesGetHandler(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(r.PathValue("id"))
-	dbCfg, _ := db.LoadDBConfig("config.json")
-	database, _ := db.OpenDB(dbCfg)
+	   exeDir, err := utils.ExePath()
+	   var dbCfg *db.DBConfig
+	   if err == nil {
+		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+		   dbCfg, _ = db.LoadDBConfig(configPath)
+	   }
+	   database, _ := db.OpenDB(dbCfg)
 	defer database.Close()
 	row := database.QueryRow("SELECT id, name, description, priority FROM properties WHERE id = ?", id)
 	var p schema.Property

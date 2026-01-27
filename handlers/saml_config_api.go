@@ -5,17 +5,25 @@ import (
 	"net/http"
 	"os"
 	"io/ioutil"
+	"path/filepath"
 	"go-dsc-pull/internal"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/utils"
 )
 
 // SAMLConfigAPIHandler handles GET and PUT for SAML config
 func SAMLConfigAPIHandler(w http.ResponseWriter, r *http.Request) {
-	configPath := "config.json"
+	   exeDir, err := utils.ExePath()
+	   if err != nil {
+		   w.WriteHeader(http.StatusInternalServerError)
+		   json.NewEncoder(w).Encode(map[string]string{"error": "Failed to get exe path"})
+		   return
+	   }
+	   configPath := "config.json"
 	w.Header().Set("Content-Type", "application/json")
 	switch r.Method {
 	case http.MethodGet:
-		cfg, err := internal.LoadAppConfig(configPath)
+		cfg, err := internal.LoadAppConfig("config.json")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to load config"})
@@ -31,13 +39,20 @@ func SAMLConfigAPIHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Load full config
-		file, err := os.Open(configPath)
+		_, err := utils.ExePath()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to open config"})
+			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to get exe path"})
 			return
 		}
-		defer file.Close()
+		absPath := filepath.Join(filepath.Dir(exeDir), configPath)
+		file, err := os.Open(absPath)
+		   if err != nil {
+			   w.WriteHeader(http.StatusInternalServerError)
+			   json.NewEncoder(w).Encode(map[string]string{"error": "Failed to open config"})
+			   return
+		   }
+		   defer file.Close()
 		var fullConfig map[string]interface{}
 		if err := json.NewDecoder(file).Decode(&fullConfig); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

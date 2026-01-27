@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"go-dsc-pull/utils"
 )
 
 // SAMLUploadSPKeyCertHandler handles upload, validation, and archival of SP key/cert
@@ -123,11 +124,16 @@ func fileExists(path string) bool {
 }
 
 func addFileToZip(zipWriter *zip.Writer, filename string) error {
-	file, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+	   exeDir, err := utils.ExePath()
+	   if err != nil {
+		   return err
+	   }
+	   absPath := filepath.Join(filepath.Dir(exeDir), filename)
+	   file, err := os.Open(absPath)
+	   if err != nil {
+		   return err
+	   }
+	   defer file.Close()
 	w, err := zipWriter.Create(filepath.Base(filename))
 	if err != nil {
 		return err

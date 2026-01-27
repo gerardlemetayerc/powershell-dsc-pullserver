@@ -10,22 +10,28 @@ import (
 	"fmt"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"path/filepath"
+	"go-dsc-pull/utils"
 )
 
 // GetDscActionNodeHandlerWithId gère POST /PSDSCPullServer.svc/{id}/GetDscAction avec agentId déjà extrait
 func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agentId string) {
 		// Met à jour last_communication dans la table agents
-		dbCfgUpdate, errUpdate := db.LoadDBConfig("config.json")
-		if errUpdate == nil {
-			database, err := db.OpenDB(dbCfgUpdate)
-			if err == nil {
-				_, err := database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP WHERE agent_id = ?", agentId)
-				if err != nil {
-					log.Printf("[GETDSCACTION-NODE] Erreur update last_communication: %v", err)
-				}
-				database.Close()
-			}
-		}
+		   exeDir, errExe := utils.ExePath()
+		   if errExe == nil {
+			   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+			   dbCfgUpdate, errUpdate := db.LoadDBConfig(configPath)
+			   if errUpdate == nil {
+				   database, err := db.OpenDB(dbCfgUpdate)
+				   if err == nil {
+					   _, err := database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP WHERE agent_id = ?", agentId)
+					   if err != nil {
+						   log.Printf("[GETDSCACTION-NODE] Erreur update last_communication: %v", err)
+					   }
+					   database.Close()
+				   }
+			   }
+		   }
 	// Log du body et des headers reçus pour debug
 	body, _ := io.ReadAll(r.Body)
 	r.Body = io.NopCloser(strings.NewReader(string(body)))
@@ -35,31 +41,41 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 
 	// Charger les noms de configuration depuis la base
 	var configNames []string
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err == nil {
-		database, err := db.OpenDB(dbCfg)
-		if err == nil {
-			rows, err := database.Query(`SELECT configuration_name FROM agent_configurations WHERE agent_id = ?`, agentId)
-			if err == nil {
-				defer rows.Close()
-				for rows.Next() {
-					var name string
-					if err := rows.Scan(&name); err == nil {
-						log.Printf("[GETDSCACTION-NODE] Nom de configuration trouvé pour agent %s : %s", agentId, name)
-						configNames = append(configNames, name)
-					}
-				}
-			}
-			database.Close()
-		}
-	}
+	   dbCfg := (*db.DBConfig)(nil)
+	   if errExe == nil {
+		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+		   dbCfgTmp, err := db.LoadDBConfig(configPath)
+		   if err == nil {
+			   dbCfg = dbCfgTmp
+			   database, err := db.OpenDB(dbCfg)
+			   if err == nil {
+				   rows, err := database.Query(`SELECT configuration_name FROM agent_configurations WHERE agent_id = ?`, agentId)
+				   if err == nil {
+					   defer rows.Close()
+					   for rows.Next() {
+						   var name string
+						   if err := rows.Scan(&name); err == nil {
+							   log.Printf("[GETDSCACTION-NODE] Nom de configuration trouvé pour agent %s : %s", agentId, name)
+							   configNames = append(configNames, name)
+						   }
+					   }
+				   }
+				   database.Close()
+			   }
+		   }
+	   }
 
 	// Vérifie qu'il existe au moins une configuration en base pour cet agent
-	dbCfgCheck, errCheck := db.LoadDBConfig("config.json")
-	if errCheck != nil {
-		http.Error(w, "DB config error", http.StatusInternalServerError)
-		return
-	}
+	   dbCfgCheck := (*db.DBConfig)(nil)
+	   if errExe == nil {
+		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+		   dbCfgTmp, errCheck := db.LoadDBConfig(configPath)
+		   if errCheck != nil {
+			   http.Error(w, "DB config error", http.StatusInternalServerError)
+			   return
+		   }
+		   dbCfgCheck = dbCfgTmp
+	   }
 	dbConnCheck, errCheck := db.OpenDB(dbCfgCheck)
 	if errCheck != nil {
 		http.Error(w, "DB open error", http.StatusInternalServerError)

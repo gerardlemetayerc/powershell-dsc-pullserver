@@ -1,6 +1,6 @@
 package main
 
-import(
+import (
 	"crypto"
 	"crypto/tls"
 	samlsp "github.com/crewjam/saml/samlsp"
