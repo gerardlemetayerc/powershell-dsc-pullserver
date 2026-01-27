@@ -4,12 +4,19 @@ import (
 	"net/http"
 	"database/sql"
 	"go-dsc-pull/handlers"
+	"path/filepath"
+	"go-dsc-pull/utils"
 	samlsp "github.com/crewjam/saml/samlsp"
 )
 
 // RegisterWebRoutes sets up all web/API endpoints on the provided mux
 func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware func(http.Handler) http.Handler, samlMiddleware http.Handler) {
-		mux.Handle("GET /api/v1/my", jwtAuthMiddleware(http.HandlerFunc(handlers.MyUserInfoHandler(dbConn))))
+	exeDir, err := utils.ExePath()
+	if err != nil {
+		panic("Failed to get executable path: " + err.Error())
+	}
+	baseDir := filepath.Dir(exeDir)
+	mux.Handle("GET /api/v1/my", jwtAuthMiddleware(http.HandlerFunc(handlers.MyUserInfoHandler(dbConn))))
 	mux.Handle("/web/profile", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.ProfileHandler)))
 	// API tokens utilisateur
 	mux.Handle("GET /api/v1/users/{id}/tokens", jwtAuthMiddleware(http.HandlerFunc(handlers.ListUserAPITokensHandler(dbConn))))
@@ -68,7 +75,7 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 			handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)).ServeHTTP(w, r)
 			return
 		}
-		fullPath := "web/" + path
+		fullPath := filepath.Join(baseDir, "web", path)
 		info, err := handlers.StatFile(fullPath)
 		if err != nil || info.IsDir() {
 			http.NotFound(w, r)

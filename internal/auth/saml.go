@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"path/filepath"
+	"go-dsc-pull/utils"
 	"net/http"
 	"net/url"
 	"crypto"
@@ -16,11 +18,27 @@ func InitSamlMiddleware(appCfg *schema.AppConfig) (*samlsp.Middleware, error) {
 	if appCfg == nil || !appCfg.SAML.Enabled {
 		return nil, nil
 	}
-	// Charge la clé privée et le certificat
-	cert, err := tls.LoadX509KeyPair(appCfg.SAML.SPCertFile, appCfg.SAML.SPKeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("Erreur chargement clé/cert SP: %v", err)
-	}
+	   // Résout dynamiquement le chemin des fichiers clé/cert si nécessaire
+	   spKeyPath := appCfg.SAML.SPKeyFile
+	   spCertPath := appCfg.SAML.SPCertFile
+	   if !filepath.IsAbs(spKeyPath) || !filepath.IsAbs(spCertPath) {
+		   exePath, err := utils.ExePath()
+		   if err != nil {
+			   return nil, fmt.Errorf("Erreur localisation exécutable: %v", err)
+		   }
+		   baseDir := filepath.Dir(exePath)
+		   if !filepath.IsAbs(spKeyPath) {
+			   spKeyPath = filepath.Join(baseDir, spKeyPath)
+		   }
+		   if !filepath.IsAbs(spCertPath) {
+			   spCertPath = filepath.Join(baseDir, spCertPath)
+		   }
+	   }
+	   // Charge la clé privée et le certificat
+	   cert, err := tls.LoadX509KeyPair(spCertPath, spKeyPath)
+	   if err != nil {
+		   return nil, fmt.Errorf("Erreur chargement clé/cert SP: %v", err)
+	   }
 	// Utilise l'entity_id de la config pour l'URL du SP
 	spURL := appCfg.SAML.EntityID
 	idpMetadataURL := appCfg.SAML.IdpMetadataURL

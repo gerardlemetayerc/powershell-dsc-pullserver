@@ -1,5 +1,5 @@
 {
-  "database": "./data.db",
+  "database": "data.db",
   "driver": "sqlite",
   "dsc_pullserver": {
     "cert_file": "dsc-dev.local.crt",

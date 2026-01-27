@@ -34,10 +34,7 @@ $(document).ready(function() {
                     return `<a class='btn btn-info btn-sm' href="/web/node/${data}">View</a>`;
                 }
             }
-        ],
-        language: {
-            url: '/web/fr-FR.json'
-        }
+        ]
     });
     $(window).on('resize', function() {
         $('#agents-table').DataTable().columns.adjust().responsive.recalc();

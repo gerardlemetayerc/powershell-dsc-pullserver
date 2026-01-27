@@ -24,10 +24,7 @@ $(document).ready(function() {
                     return `<button onclick="showReports('${data}')">Rapports</button>`;
                 }
             }
-        ],
-        language: {
-            url: '/web/fr-FR.json'
-        }
+        ]
     });
 });
 

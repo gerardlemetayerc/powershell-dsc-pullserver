@@ -39,11 +39,18 @@ func LoadDBConfig(path string) (*DBConfig, error) {
 }
 
 func OpenDB(cfg *DBConfig) (*sql.DB, error) {
-	dsn := cfg.Database
-	if cfg.Driver == "mysql" {
-		dsn = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", cfg.User, cfg.Password, cfg.Server, cfg.Port, cfg.Database)
-	} else if cfg.Driver == "postgres" {
-		dsn = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", cfg.User, cfg.Password, cfg.Server, cfg.Port, cfg.Database)
-	}
-	return sql.Open(cfg.Driver, dsn)
+	   dsn := cfg.Database
+	   if cfg.Driver == "sqlite" && !filepath.IsAbs(dsn) {
+		   exePath, err := utils.ExePath()
+		   if err == nil {
+			   baseDir := filepath.Dir(exePath)
+			   dsn = filepath.Join(baseDir, dsn)
+		   }
+	   }
+	   if cfg.Driver == "mysql" {
+		   dsn = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", cfg.User, cfg.Password, cfg.Server, cfg.Port, cfg.Database)
+	   } else if cfg.Driver == "postgres" {
+		   dsn = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", cfg.User, cfg.Password, cfg.Server, cfg.Port, cfg.Database)
+	   }
+	   return sql.Open(cfg.Driver, dsn)
 }
