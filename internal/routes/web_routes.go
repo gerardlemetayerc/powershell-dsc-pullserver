@@ -4,46 +4,74 @@ import (
 	"net/http"
 	"database/sql"
 	"go-dsc-pull/handlers"
+	"go-dsc-pull/internal"
 	samlsp "github.com/crewjam/saml/samlsp"
 )
 
 // RegisterWebRoutes sets up all web/API endpoints on the provided mux
 func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware func(http.Handler) http.Handler, samlMiddleware http.Handler) {
-		mux.Handle("GET /api/v1/my", jwtAuthMiddleware(http.HandlerFunc(handlers.MyUserInfoHandler(dbConn))))
+	// Create RBAC middleware helpers
+	adminOnly := internal.AdminOnlyMiddleware(dbConn)
+	authenticated := internal.AuthenticatedMiddleware(dbConn)
+	
+	// User info endpoint - available to all authenticated users
+	mux.Handle("GET /api/v1/my", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.MyUserInfoHandler(dbConn)))))
 	mux.Handle("/web/profile", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.ProfileHandler)))
-	// API tokens utilisateur
-	mux.Handle("GET /api/v1/users/{id}/tokens", jwtAuthMiddleware(http.HandlerFunc(handlers.ListUserAPITokensHandler(dbConn))))
-	mux.Handle("POST /api/v1/users/{id}/tokens", jwtAuthMiddleware(http.HandlerFunc(handlers.CreateUserAPITokenHandler(dbConn))))
-	mux.Handle("POST /api/v1/users/{id}/tokens/{tokenid}/revoke", jwtAuthMiddleware(http.HandlerFunc(handlers.RevokeUserAPITokenHandler(dbConn))))
-	mux.Handle("DELETE /api/v1/users/{id}/tokens/{tokenid}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteUserAPITokenHandler(dbConn))))
+	
+	// API tokens - users can manage their own tokens
+	mux.Handle("GET /api/v1/users/{id}/tokens", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.ListUserAPITokensHandler(dbConn)))))
+	mux.Handle("POST /api/v1/users/{id}/tokens", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.CreateUserAPITokenHandler(dbConn)))))
+	mux.Handle("POST /api/v1/users/{id}/tokens/{tokenid}/revoke", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.RevokeUserAPITokenHandler(dbConn)))))
+	mux.Handle("DELETE /api/v1/users/{id}/tokens/{tokenid}", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.DeleteUserAPITokenHandler(dbConn)))))
+	
 	// SAML endpoints
 	mux.Handle("GET /api/v1/saml/userinfo", http.HandlerFunc(handlers.SAMLUserInfoHandler))
 	mux.Handle("GET /api/v1/saml/enabled", http.HandlerFunc(handlers.SAMLStatusHandler))
 	if samlMiddleware != nil {
 		mux.Handle("/saml/", samlMiddleware)
 	}
-	// API REST endpoints (agents, configs, reports, modules, properties, configuration_models, users, login)
-	mux.Handle("GET /api/v1/agents", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentAPIHandler)))
-	mux.Handle("GET /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandler)))
-	mux.Handle("POST /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete)))
-	mux.Handle("DELETE /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete)))
-	mux.Handle("GET /api/v1/agents/{id}/reports", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentReportsListHandler)))
-	mux.Handle("GET /api/v1/agents/{id}/reports/latest", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentReportsLatestHandler)))
-	mux.Handle("GET /api/v1/agents/{id}/reports/{jobid}", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentReportsByJobIdHandler)))
-	mux.Handle("GET /api/v1/agents/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentByIdAPIHandler)))
-	mux.Handle("POST /api/v1/modules/upload", jwtAuthMiddleware(http.HandlerFunc(handlers.ModuleUploadHandler(dbConn))))
-	mux.Handle("GET /api/v1/modules", jwtAuthMiddleware(http.HandlerFunc(handlers.ModuleListHandler(dbConn))))
-	mux.Handle("DELETE /api/v1/modules/delete", jwtAuthMiddleware(http.HandlerFunc(handlers.ModuleDeleteHandler(dbConn))))
-	mux.Handle("GET /api/v1/properties", jwtAuthMiddleware(http.HandlerFunc(handlers.PropertiesListHandler)))
-	mux.Handle("POST /api/v1/properties", jwtAuthMiddleware(http.HandlerFunc(handlers.PropertiesCreateHandler)))
-	mux.Handle("GET /api/v1/properties/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.PropertiesGetHandler)))
-	mux.Handle("PUT /api/v1/properties/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.PropertiesUpdateHandler)))
-	mux.Handle("DELETE /api/v1/properties/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.PropertiesDeleteHandler)))
-	mux.Handle("POST /api/v1/configuration_models", jwtAuthMiddleware(http.HandlerFunc(handlers.CreateConfigurationModelHandler)))
-	mux.Handle("GET /api/v1/configuration_models", jwtAuthMiddleware(http.HandlerFunc(handlers.ListConfigurationModelsHandler)))
-	mux.Handle("GET /api/v1/configuration_models/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.GetConfigurationModelHandler)))
-	mux.Handle("PUT /api/v1/configuration_models/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateConfigurationModelHandler)))
-	mux.Handle("DELETE /api/v1/configuration_models", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteConfigurationModelHandler)))
+	
+	// API REST endpoints - Read operations available to all authenticated users
+	mux.Handle("GET /api/v1/agents", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.AgentAPIHandler))))
+	mux.Handle("GET /api/v1/agents/{id}/configs", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.AgentConfigsAPIHandler))))
+	mux.Handle("GET /api/v1/agents/{id}/reports", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.AgentReportsListHandler))))
+	mux.Handle("GET /api/v1/agents/{id}/reports/latest", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.AgentReportsLatestHandler))))
+	mux.Handle("GET /api/v1/agents/{id}/reports/{jobid}", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.AgentReportsByJobIdHandler))))
+	mux.Handle("GET /api/v1/agents/{id}", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.AgentByIdAPIHandler))))
+	mux.Handle("GET /api/v1/modules", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.ModuleListHandler(dbConn)))))
+	mux.Handle("GET /api/v1/properties", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.PropertiesListHandler))))
+	mux.Handle("GET /api/v1/properties/{id}", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.PropertiesGetHandler))))
+	mux.Handle("GET /api/v1/configuration_models", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.ListConfigurationModelsHandler))))
+	mux.Handle("GET /api/v1/configuration_models/{id}", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.GetConfigurationModelHandler))))
+	
+	// Write/Modify operations - Administrator only
+	mux.Handle("POST /api/v1/agents/{id}/configs", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete))))
+	mux.Handle("DELETE /api/v1/agents/{id}/configs", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete))))
+	mux.Handle("POST /api/v1/modules/upload", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.ModuleUploadHandler(dbConn)))))
+	mux.Handle("DELETE /api/v1/modules/delete", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.ModuleDeleteHandler(dbConn)))))
+	mux.Handle("POST /api/v1/properties", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.PropertiesCreateHandler))))
+	mux.Handle("PUT /api/v1/properties/{id}", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.PropertiesUpdateHandler))))
+	mux.Handle("DELETE /api/v1/properties/{id}", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.PropertiesDeleteHandler))))
+	mux.Handle("POST /api/v1/configuration_models", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.CreateConfigurationModelHandler))))
+	mux.Handle("PUT /api/v1/configuration_models/{id}", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.UpdateConfigurationModelHandler))))
+	mux.Handle("DELETE /api/v1/configuration_models", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.DeleteConfigurationModelHandler))))
+	
+	// Role management endpoints - Administrator only
+	mux.Handle("GET /api/v1/roles", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.ListRolesHandler(dbConn)))))
+	mux.Handle("GET /api/v1/users/{id}/roles", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.GetUserRolesHandler(dbConn)))))
+	mux.Handle("POST /api/v1/users/{id}/roles", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AssignUserRoleHandler(dbConn)))))
+	mux.Handle("DELETE /api/v1/users/{id}/roles", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.RemoveUserRoleHandler(dbConn)))))
+	
+	// User management endpoints - mixed permissions
+	mux.Handle("GET /api/v1/users", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.ListUsersHandler(dbConn)))))
+	mux.Handle("GET /api/v1/users/{id}", jwtAuthMiddleware(authenticated(http.HandlerFunc(handlers.GetUserHandler(dbConn)))))
+	mux.Handle("POST /api/v1/users", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.CreateUserHandler(dbConn)))))
+	mux.Handle("PUT /api/v1/users/{id}", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.UpdateUserHandler(dbConn)))))
+	mux.Handle("DELETE /api/v1/users/{id}", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.DeleteUserHandler(dbConn)))))
+	mux.Handle("POST /api/v1/users/{id}/active", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SetUserActiveHandler(dbConn)))))
+	mux.Handle("POST /api/v1/users/{id}/password", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.ChangeUserPasswordHandler(dbConn)))))
+	
+	// Login endpoint - no authentication required
 	mux.Handle("POST /api/v1/login", handlers.LoginHandler(dbConn))
 	mux.HandleFunc("/web/login", WebLoginHandler)
 	if smw, ok := samlMiddleware.(*samlsp.Middleware); ok {
@@ -77,11 +105,4 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("/web/users", handlers.WebJWTAuthMiddleware(http.HandlerFunc(WebUsersHandler)))
 	mux.Handle("/web/user_edit", handlers.WebJWTAuthMiddleware(http.HandlerFunc(WebUserEditHandler)))
 	mux.Handle("/web/user_password", handlers.WebJWTAuthMiddleware(http.HandlerFunc(WebUserPasswordHandler)))
-	mux.Handle("POST /api/v1/users/{id}/password", jwtAuthMiddleware(http.HandlerFunc(handlers.ChangeUserPasswordHandler(dbConn))))
-	mux.Handle("GET /api/v1/users", jwtAuthMiddleware(http.HandlerFunc(handlers.ListUsersHandler(dbConn))))
-	mux.Handle("GET /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.GetUserHandler(dbConn))))
-	mux.Handle("POST /api/v1/users", jwtAuthMiddleware(http.HandlerFunc(handlers.CreateUserHandler(dbConn))))
-	mux.Handle("PUT /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateUserHandler(dbConn))))
-	mux.Handle("DELETE /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteUserHandler(dbConn))))
-	mux.Handle("POST /api/v1/users/{id}/active", jwtAuthMiddleware(http.HandlerFunc(handlers.SetUserActiveHandler(dbConn))))
 }

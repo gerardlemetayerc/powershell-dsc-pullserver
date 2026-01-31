@@ -43,6 +43,13 @@ func MyUserInfoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		if lastLogon.Valid { u.LastLogonDate = &lastLogon.String } else { u.LastLogonDate = nil }
+		
+		// Get user roles
+		roles, err := internaldb.GetUserRoles(db, u.ID)
+		if err == nil {
+			u.Roles = roles
+		}
+		
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(u)
 	}
@@ -137,6 +144,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 		type LoginResponse struct {
 			Token string `json:"token"`
 			ExpiresAt int64 `json:"expires_at"`
+			Roles []string `json:"roles"`
 		}
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -158,6 +166,12 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
+		// Get user roles
+		roles, err := internaldb.GetUserRoles(db, id)
+		if err != nil {
+			log.Printf("[LOGIN] Erreur récupération rôles: %v", err)
+			roles = []string{} // Default to no roles
+		}
 		// Met à jour la date de dernière connexion
 		if err := internaldb.UpdateLastLogon(db, id); err != nil {
 			log.Printf("[LOGIN] Erreur update last_logon_date: %v", err)
@@ -167,6 +181,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 		claims := jwt.MapClaims{
 			"sub": req.Username,
 			"exp": expiresAt,
+			"roles": roles,
 		}
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		signed, err := token.SignedString(secret)
@@ -174,7 +189,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Token error", http.StatusInternalServerError)
 			return
 		}
-		resp := LoginResponse{Token: signed, ExpiresAt: expiresAt}
+		resp := LoginResponse{Token: signed, ExpiresAt: expiresAt, Roles: roles}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}
@@ -193,6 +208,11 @@ func ListUsersHandler(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var u schema.User
 			rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.IsActive, &u.CreatedAt, &u.LastLogonDate)
+			// Get user roles
+			roles, err := internaldb.GetUserRoles(db, u.ID)
+			if err == nil {
+				u.Roles = roles
+			}
 			users = append(users, u)
 		}
 		json.NewEncoder(w).Encode(users)
@@ -219,6 +239,11 @@ func GetUserHandler(db *sql.DB) http.HandlerFunc {
 		} else {
 			u.LastLogonDate = nil
 		}
+		// Get user roles
+		roles, err := internaldb.GetUserRoles(db, u.ID)
+		if err == nil {
+			u.Roles = roles
+		}
 		json.NewEncoder(w).Encode(u)
 	}
 }
@@ -232,6 +257,7 @@ func CreateUserHandler(db *sql.DB) http.HandlerFunc {
 			   Email string `json:"email"`
 			   Password string `json:"password"`
 			   IsActive string `json:"is_active"`
+			   Role string `json:"role"` // Optional: default to Read-Only
 		   }
 		   if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			   http.Error(w, "Bad request", http.StatusBadRequest)
@@ -253,12 +279,27 @@ func CreateUserHandler(db *sql.DB) http.HandlerFunc {
 			   return
 		   }
 		   id, _ := res.LastInsertId()
+		   
+		   // Assign role (default to Read-Only if not specified)
+		   role := req.Role
+		   if role == "" {
+			   role = internaldb.RoleReadOnly
+		   }
+		   if err := internaldb.AssignRole(db, id, role); err != nil {
+			   log.Printf("[API] Warning: Could not assign role to new user: %v", err)
+		   }
+		   
 		   u := schema.User{
 			   ID: id,
 			   FirstName: req.FirstName,
 			   LastName: req.LastName,
 			   Email: req.Email,
 			   IsActive: isActive,
+		   }
+		   // Get assigned roles
+		   roles, err := internaldb.GetUserRoles(db, id)
+		   if err == nil {
+			   u.Roles = roles
 		   }
 		   json.NewEncoder(w).Encode(u)
 	}

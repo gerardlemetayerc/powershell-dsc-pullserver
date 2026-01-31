@@ -111,11 +111,18 @@ func main() {
 		err := dbConn.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 		if err == nil && count == 0 {
 			hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
-			_, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?)", "Admin", "User", "admin@localhost", string(hash), 1)
+			res, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?)", "Admin", "User", "admin@localhost", string(hash), 1)
 			if err != nil {
 				log.Printf("[INITDB] Erreur insertion admin: %v", err)
 			} else {
-				log.Printf("[INITDB] Compte admin créé: admin@localhost / password")
+				adminID, _ := res.LastInsertId()
+				// Assign Administrator role to default admin user
+				_, err := dbConn.Exec("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", adminID, 1)
+				if err != nil {
+					log.Printf("[INITDB] Erreur assignation rôle admin: %v", err)
+				} else {
+					log.Printf("[INITDB] Compte admin créé: admin@localhost / password (rôle: Administrator)")
+				}
 			}
 		}
 	}

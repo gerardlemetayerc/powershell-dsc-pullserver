@@ -7,6 +7,7 @@ A secure, modular DSC Pull Server written in Go, with a REST API and PowerShell 
 - **Authentication & Security**
   - JWT (Bearer) and API Token authentication
   - SAML (Single Sign-On) support for web authentication
+  - **Role-Based Access Control (RBAC)** with Administrator and Read-Only roles
   - Middleware enforces authentication on all sensitive routes
   - Access control, token management, input validation
 
@@ -20,6 +21,7 @@ A secure, modular DSC Pull Server written in Go, with a REST API and PowerShell 
 - **User & Session Management**
   - User management (API and web)
   - SAML session management
+  - Role assignment and management
 
 - **Web UI & Static Files**
   - Serves static files for the web interface (JS, CSS, HTML)
@@ -69,6 +71,17 @@ All commands require authentication via `Connect-DSCPullServer`.
    Connect-DSCPullServer -ServerUrl 'https://your-server' -Credential (Get-Credential)
    ```
 3. **Use the available commands to manage agents, modules, and configurations.**
+
+---
+
+## Role-Based Access Control (RBAC)
+
+The server implements a comprehensive RBAC system with two predefined roles:
+
+- **Administrator**: Full access to all server features including create, update, and delete operations
+- **Read-Only**: Limited to viewing configurations, nodes, status, and reports
+
+For detailed information about RBAC, including role permissions, assignment procedures, and API endpoints, see the [RBAC Documentation](doc/RBAC.md).
 
 ---
 
