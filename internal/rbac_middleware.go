@@ -65,16 +65,17 @@ func RBACMiddleware(dbConn *sql.DB, requiredRoles ...string) func(http.Handler) 
 				return
 			}
 
+			// Convert user roles to a map for O(1) lookup
+			userRolesMap := make(map[string]bool)
+			for _, role := range userRoles {
+				userRolesMap[role] = true
+			}
+
 			// Check if user has any of the required roles
 			hasRequiredRole := false
 			for _, requiredRole := range requiredRoles {
-				for _, userRole := range userRoles {
-					if userRole == requiredRole {
-						hasRequiredRole = true
-						break
-					}
-				}
-				if hasRequiredRole {
+				if userRolesMap[requiredRole] {
+					hasRequiredRole = true
 					break
 				}
 			}

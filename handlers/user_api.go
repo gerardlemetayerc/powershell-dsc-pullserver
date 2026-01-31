@@ -169,8 +169,14 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 		// Get user roles
 		roles, err := internaldb.GetUserRoles(db, id)
 		if err != nil {
-			log.Printf("[LOGIN] Erreur récupération rôles: %v", err)
-			roles = []string{} // Default to no roles
+			log.Printf("[LOGIN] Error retrieving roles: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		if len(roles) == 0 {
+			log.Printf("[LOGIN] User has no roles assigned: %s", req.Username)
+			http.Error(w, "User has no roles assigned", http.StatusForbidden)
+			return
 		}
 		// Met à jour la date de dernière connexion
 		if err := internaldb.UpdateLastLogon(db, id); err != nil {
