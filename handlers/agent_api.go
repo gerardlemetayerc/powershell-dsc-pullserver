@@ -62,15 +62,34 @@ func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
 		       }
 		       defer rows.Close()
 
-		       agents := []schema.Agent{}
-		       for rows.Next() {
-			       var a schema.Agent
-			       var hasErrorInt int
-			       if err := rows.Scan(&a.AgentId, &a.NodeName, &a.LCMVersion, &a.RegistrationType, &a.CertificateThumbprint, &a.CertificateSubject, &a.CertificateIssuer, &a.CertificateNotBefore, &a.CertificateNotAfter, &a.RegisteredAt, &a.LastCommunication, &hasErrorInt); err == nil {
-				       a.HasErrorLastReport = hasErrorInt != 0
-				       agents = append(agents, a)
-			       }
-		       }
+			   agents := []schema.Agent{}
+			   for rows.Next() {
+				   var a schema.Agent
+				   var lcmVersion, registrationType, certificateThumbprint, certificateSubject, certificateIssuer, certificateNotBefore, certificateNotAfter, registeredAt *string
+				   var hasErrorInt int
+				   if err := rows.Scan(&a.AgentId, &a.NodeName, &lcmVersion, &registrationType, &certificateThumbprint, &certificateSubject, &certificateIssuer, &certificateNotBefore, &certificateNotAfter, &registeredAt, &a.LastCommunication, &hasErrorInt); err == nil {
+					   // Pour DataTables, renvoyer les champs attendus même vides
+					   empty := ""
+					   a.LCMVersion = lcmVersion
+					   if a.LCMVersion == nil { a.LCMVersion = &empty }
+					   a.RegistrationType = registrationType
+					   if a.RegistrationType == nil { a.RegistrationType = &empty }
+					   a.CertificateThumbprint = certificateThumbprint
+					   if a.CertificateThumbprint == nil { a.CertificateThumbprint = &empty }
+					   a.CertificateSubject = certificateSubject
+					   if a.CertificateSubject == nil { a.CertificateSubject = &empty }
+					   a.CertificateIssuer = certificateIssuer
+					   if a.CertificateIssuer == nil { a.CertificateIssuer = &empty }
+					   a.CertificateNotBefore = certificateNotBefore
+					   if a.CertificateNotBefore == nil { a.CertificateNotBefore = &empty }
+					   a.CertificateNotAfter = certificateNotAfter
+					   if a.CertificateNotAfter == nil { a.CertificateNotAfter = &empty }
+					   a.RegisteredAt = registeredAt
+					   if a.RegisteredAt == nil { a.RegisteredAt = &empty }
+					   a.HasErrorLastReport = hasErrorInt != 0
+					   agents = append(agents, a)
+				   }
+			   }
 		       w.Header().Set("Content-Type", "application/json")
 		       _ = json.NewEncoder(w).Encode(agents)
 }

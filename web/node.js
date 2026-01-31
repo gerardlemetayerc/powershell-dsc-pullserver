@@ -12,8 +12,34 @@ const state = {
     agent: null,
     lastReport: null,
     reports: [],
-    error: null
+    error: null,
+    tags: {},
 };
+function renderAgentTags() {
+    let html = '';
+    if (!state.tags || Object.keys(state.tags).length === 0) {
+        html = '<em>Aucun tag</em>';
+    } else {
+        html = '<ul class="list-group mb-2" style="max-width:480px;">';
+        for (const [k, values] of Object.entries(state.tags)) {
+            if (Array.isArray(values)) {
+                for (const v of values) {
+                    html += `<li class="list-group-item py-1 px-2 d-flex justify-content-between align-items-center" style="font-size:0.97em;">
+                        <span><span class="badge badge-secondary mr-2" style="font-size:0.93em;">${k}</span> <span>${v}</span></span>
+                        <button class="btn btn-outline-danger btn-xs delete-tag-btn" data-key="${k}" data-value="${v}" style="padding:2px 8px;font-size:0.92em;">✕</button>
+                    </li>`;
+                }
+            } else {
+                html += `<li class="list-group-item py-1 px-2 d-flex justify-content-between align-items-center" style="font-size:0.97em;">
+                    <span><span class="badge badge-secondary mr-2" style="font-size:0.93em;">${k}</span> <span>${values}</span></span>
+                    <button class="btn btn-outline-danger btn-xs delete-tag-btn" data-key="${k}" data-value="${values}" style="padding:2px 8px;font-size:0.92em;">✕</button>
+                </li>`;
+            }
+        }
+        html += '</ul>';
+    }
+    return html;
+}
 
 function renderAgentInfo() {
     if (!state.agent) {
@@ -55,10 +81,16 @@ function renderAgentInfo() {
             lastComm = `${y}-${m}-${d} ${h}:${min}:${s}`;
         }
     }
+    let configHtml = '';
+    if (Array.isArray(state.agent.configurations) && state.agent.configurations.length > 0) {
+        configHtml = `<div><strong>Configuration${state.agent.configurations.length > 1 ? 's' : ''} associée${state.agent.configurations.length > 1 ? 's' : ''} :</strong> ` +
+            state.agent.configurations.map(c => `<span class="badge badge-info mr-1">${c}</span>`).join(' ') + '</div>';
+    }
     return `<p>
                 <div><strong>Name:</strong> <span id="agent-name">${state.agent.node_name || ''}</span></div>
                 <div><strong>Certificate expiration:</strong> <span id="agent-thumbprint">${certExp}${daysLeft}</span></div>
                 <div><strong>Last Communication:</strong> <span id="agent-lastcomm">${lastComm}</span></div>
+                ${configHtml}
             </p>`;
 }
 
@@ -256,18 +288,25 @@ function renderReportsDropdown() {
 
 function renderAll() {
     $('#agent-info-block').html(renderAgentInfo());
+    $('#agent-tags-block').html(renderAgentTags());
     $('#reports-dropdown-block').html(renderReportsDropdown());
     $('#last-report-block').html(renderSelectedReport());
 }
 
 $(document).ready(function() {
     const agentId = getNodeIdFromUrl();
-    // Ajoute des blocs pour le rendu
+    // Ajoute dynamiquement tous les blocs, y compris tags
     $('.card-body').html(`
         <h3>Agent Information</h3>
         <div id="agent-info-block"></div>
-       <div class="mb-3">
-       </div>
+        <hr>
+        <h3>Tags</h3>
+        <div id="agent-tags-block"></div>
+        <form id="add-tag-form" class="form-inline mb-2">
+            <input type="text" class="form-control mr-2" id="tag-key" placeholder="Clé (ex: environnement)" required style="max-width:180px;">
+            <input type="text" class="form-control mr-2" id="tag-value" placeholder="Valeur (ex: production)" required style="max-width:180px;">
+            <button type="submit" class="btn btn-primary">Ajouter</button>
+        </form>
         <hr>
         <h3>DSC Report</h3>
         <div id="reports-dropdown-block" style="margin-bottom:1em;"></div>
@@ -293,6 +332,69 @@ $(document).ready(function() {
             renderAll();
         }
     });
+    // Load tags
+    $.ajax({
+        url: `/api/v1/agents/${agentId}/tags`,
+        method: 'GET',
+        dataType: 'json',
+        success: function(tags) {
+            state.tags = tags || {};
+            renderAll();
+        },
+        error: function() {
+            state.tags = {};
+            renderAll();
+        }
+    });
+        // Ajout d'un tag
+        $(document).on('submit', '#add-tag-form', function(e) {
+            e.preventDefault();
+            const key = $('#tag-key').val().trim();
+            const value = $('#tag-value').val().trim();
+            if (!key || !value) return;
+            $.ajax({
+                url: `/api/v1/agents/${agentId}/tags`,
+                method: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify({ key, value }),
+                success: function() {
+                    $('#tag-key').val('');
+                    $('#tag-value').val('');
+                    // Reload tags
+                    $.ajax({
+                        url: `/api/v1/agents/${agentId}/tags`,
+                        method: 'GET',
+                        dataType: 'json',
+                        success: function(tags) {
+                            state.tags = tags || {};
+                            renderAll();
+                        }
+                    });
+                }
+            });
+        });
+        // Suppression d'une valeur de tag
+        $(document).on('click', '.delete-tag-btn', function() {
+            const key = $(this).data('key');
+            const value = $(this).data('value');
+            if (!key || !value) return;
+            $.ajax({
+                url: `/api/v1/agents/${agentId}/tags?key=` + encodeURIComponent(key) + `&value=` + encodeURIComponent(value),
+                method: 'DELETE',
+                success: function() {
+                    // Reload tags
+                    $.ajax({
+                        url: `/api/v1/agents/${agentId}/tags`,
+                        method: 'GET',
+                        dataType: 'json',
+                        success: function(tags) {
+                            state.tags = tags || {};
+                            renderAll();
+                        }
+                    });
+                }
+            });
+        });
     // Charger la liste des rapports
     $.ajax({
         url: `/api/v1/agents/${agentId}/reports?operationtype=Initial`,
