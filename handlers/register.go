@@ -55,7 +55,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[REGISTER][DB] Erreur ouverture DB: %v", err)
 		} else {
 			defer database.Close()
-			// Insertion agent principal
+			// Insertion ou mise à jour agent principal
 			agentInfo := req["AgentInformation"].(map[string]interface{})
 			nodeName := agentInfo["NodeName"].(string)
 			lcmVersion := agentInfo["LCMVersion"].(string)
@@ -67,10 +67,29 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			issuer := certInfo["Issuer"].(string)
 			notbefore := certInfo["NotBefore"].(string)
 			notafter := certInfo["NotAfter"].(string)
-			_, err = database.Exec(`INSERT OR REPLACE INTO agents (agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				agentId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter)
-			if err != nil {
-				log.Printf("[REGISTER][DB] Erreur insertion agent: %v", err)
+
+			// Vérifie si NodeName existe avec un AgentId TEMP
+			var tempAgentId string
+			err = database.QueryRow(`SELECT agent_id FROM agents WHERE node_name = ? AND agent_id LIKE 'TEMP-%'`, nodeName).Scan(&tempAgentId)
+			if err == nil && tempAgentId != "" {
+				// Mise à jour : change l'agent_id et les infos
+				_, err = database.Exec(`UPDATE agents SET agent_id = ?, lcm_version = ?, registration_type = ?, certificate_thumbprint = ?, certificate_subject = ?, certificate_issuer = ?, certificate_notbefore = ?, certificate_notafter = ? WHERE agent_id = ?`,
+					agentId, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, tempAgentId)
+				if err != nil {
+					log.Printf("[REGISTER][DB] Erreur update agent TEMP: %v", err)
+				}
+				// Met à jour l'agent_id dans la table agent_tags
+				_, err = database.Exec(`UPDATE agent_tags SET agent_id = ? WHERE agent_id = ?`, agentId, tempAgentId)
+				if err != nil {
+					log.Printf("[REGISTER][DB] Erreur update agent_tags TEMP: %v", err)
+				}
+			} else {
+				// Insertion normale
+				_, err = database.Exec(`INSERT OR REPLACE INTO agents (agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					agentId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter)
+				if err != nil {
+					log.Printf("[REGISTER][DB] Erreur insertion agent: %v", err)
+				}
 			}
 			   // Supprimer toutes les configurations existantes pour cet agent
 			   _, err := database.Exec(`DELETE FROM agent_configurations WHERE agent_id = ?`, agentId)
