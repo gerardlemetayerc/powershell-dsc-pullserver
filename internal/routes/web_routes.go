@@ -37,6 +37,7 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	}
 	// API REST endpoints (agents, configs, reports, modules, properties, configuration_models, users, login)
 	mux.Handle("GET /api/v1/agents", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentAPIHandler)))
+	mux.Handle("POST /api/v1/agents/preenroll", jwtAuthMiddleware(http.HandlerFunc(handlers.PreEnrollAgentHandler)))
 	mux.Handle("GET /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandler)))
 	mux.Handle("POST /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete)))
 	mux.Handle("DELETE /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete)))
@@ -97,4 +98,9 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("PUT /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateUserHandler(dbConn))))
 	mux.Handle("DELETE /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteUserHandler(dbConn))))
 	mux.Handle("POST /api/v1/users/{id}/active", jwtAuthMiddleware(http.HandlerFunc(handlers.SetUserActiveHandler(dbConn))))
+	// API tags agents
+	mux.Handle("GET /api/v1/agents/{id}/tags", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentTagsListHandler)))
+	mux.Handle("PUT /api/v1/agents/{id}/tags", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentTagsSetHandler)))
+	mux.Handle("DELETE /api/v1/agents/{id}/tags", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentTagsDeleteHandler)))
+
 }
