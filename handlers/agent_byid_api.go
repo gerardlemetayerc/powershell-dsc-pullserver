@@ -42,6 +42,11 @@ func AgentByIdAPIHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Agent non trouvé", http.StatusNotFound)
 		return
 	}
+	// Ajoute les configurations associées
+	configs, err := db.GetAgentConfigurations(database, agentId)
+	if err == nil {
+		a.Configurations = configs
+	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(a)
 }

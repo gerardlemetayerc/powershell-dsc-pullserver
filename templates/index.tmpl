@@ -1,5 +1,6 @@
 {{define "content"}}
 <script src="/web/auth_check.js"></script>
+<script src="/web/jwt_ajax.js"></script>
 <section class="content">
     <div class="container-fluid">
         <br/>
@@ -28,6 +29,11 @@
                     </div>
                 </div>
             </div>
+        </div>
+        <div class="d-flex justify-content-end mb-2">
+            <button id="preenroll-btn" class="btn btn-success" data-toggle="modal" data-target="#preenrollModal">
+                <i class="fas fa-plus"></i> Ajouter un noeud
+            </button>
         </div>
         <div class="card">
             <div class="card-body">
@@ -61,4 +67,29 @@
     </div>
 </section>
 <script src="/web/reports.js"></script>
+        <!-- Modal for pre-enrolling a node -->
+        <div class="modal fade" id="preenrollModal" tabindex="-1" role="dialog" aria-labelledby="preenrollModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="preenrollModalLabel">Ajouter un noeud (pré-enregistrement)</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="preenroll-node-name">Nom du noeud</label>
+                            <input type="text" class="form-control" id="preenroll-node-name" placeholder="Entrer le nom du noeud">
+                        </div>
+                        <div id="preenroll-error" class="text-danger"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Annuler</button>
+                        <button type="button" class="btn btn-primary" id="preenroll-submit">Ajouter</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+<script src="/web/preenroll.js"></script>
 {{end}}

@@ -1,3 +1,11 @@
+-- Table pour les tags clé/valeur par agent
+CREATE TABLE IF NOT EXISTS agent_tags (
+    agent_id TEXT,
+    tag_key TEXT NOT NULL,
+    tag_value TEXT NOT NULL,
+    PRIMARY KEY (agent_id, tag_key, tag_value),
+    FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
+);
 
 -- Table pour les tokens API utilisateurs
 CREATE TABLE IF NOT EXISTS user_api_tokens (

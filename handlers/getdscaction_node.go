@@ -20,8 +20,10 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 		   exeDir, errExe := utils.ExePath()
 		   if errExe == nil {
 			   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+			   log.Printf("[GETDSCACTION-NODE] Utilisation du chemin config.json: %s", configPath)
 			   dbCfgUpdate, errUpdate := db.LoadDBConfig(configPath)
 			   if errUpdate == nil {
+				   log.Printf("[GETDSCACTION-NODE] Chemin base de données (database): %s", dbCfgUpdate.Database)
 				   database, err := db.OpenDB(dbCfgUpdate)
 				   if err == nil {
 					   _, err := database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP WHERE agent_id = ?", agentId)
@@ -29,8 +31,14 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 						   log.Printf("[GETDSCACTION-NODE] Erreur update last_communication: %v", err)
 					   }
 					   database.Close()
+				   } else {
+					   log.Printf("[GETDSCACTION-NODE] Erreur ouverture base: %v", err)
 				   }
+			   } else {
+				   log.Printf("[GETDSCACTION-NODE] Erreur chargement config DB: %v", errUpdate)
 			   }
+		   } else {
+			   log.Printf("[GETDSCACTION-NODE] Erreur récupération chemin exécutable: %v", errExe)
 		   }
 	// Log du body et des headers reçus pour debug
 	body, _ := io.ReadAll(r.Body)
@@ -44,9 +52,11 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 	   dbCfg := (*db.DBConfig)(nil)
 	   if errExe == nil {
 		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+		   log.Printf("[GETDSCACTION-NODE] Utilisation du chemin config.json: %s", configPath)
 		   dbCfgTmp, err := db.LoadDBConfig(configPath)
 		   if err == nil {
 			   dbCfg = dbCfgTmp
+			   log.Printf("[GETDSCACTION-NODE] Chemin base de données (database): %s", dbCfg.Database)
 			   database, err := db.OpenDB(dbCfg)
 			   if err == nil {
 				   rows, err := database.Query(`SELECT configuration_name FROM agent_configurations WHERE agent_id = ?`, agentId)
@@ -61,7 +71,11 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 					   }
 				   }
 				   database.Close()
+			   } else {
+				   log.Printf("[GETDSCACTION-NODE] Erreur ouverture base: %v", err)
 			   }
+		   } else {
+			   log.Printf("[GETDSCACTION-NODE] Erreur chargement config DB: %v", err)
 		   }
 	   }
 
@@ -69,19 +83,23 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 	   dbCfgCheck := (*db.DBConfig)(nil)
 	   if errExe == nil {
 		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+		   log.Printf("[GETDSCACTION-NODE] Utilisation du chemin config.json: %s", configPath)
 		   dbCfgTmp, errCheck := db.LoadDBConfig(configPath)
 		   if errCheck != nil {
+			   log.Printf("[GETDSCACTION-NODE] Erreur chargement config DB: %v", errCheck)
 			   http.Error(w, "DB config error", http.StatusInternalServerError)
 			   return
 		   }
 		   dbCfgCheck = dbCfgTmp
+		   log.Printf("[GETDSCACTION-NODE] Chemin base de données (database): %s", dbCfgCheck.Database)
 	   }
-	dbConnCheck, errCheck := db.OpenDB(dbCfgCheck)
-	if errCheck != nil {
-		http.Error(w, "DB open error", http.StatusInternalServerError)
-		return
-	}
-	defer dbConnCheck.Close()
+   dbConnCheck, errCheck := db.OpenDB(dbCfgCheck)
+   if errCheck != nil {
+	   log.Printf("[GETDSCACTION-NODE] Erreur ouverture base: %v", errCheck)
+	   http.Error(w, "DB open error", http.StatusInternalServerError)
+	   return
+   }
+   defer dbConnCheck.Close()
 	row := dbConnCheck.QueryRow("SELECT COUNT(*) FROM agent_configurations WHERE agent_id = ?", agentId)
 	var count int
 	if err := row.Scan(&count); err != nil {

@@ -20,6 +20,9 @@ $(document).ready(function() {
                 title: 'Status',
                 className: 'text-center',
                 render: function(data, type, row) {
+                    if (row.last_communication === '0000-00-01 00:00:00') {
+                        return `<span class="badge bg-secondary" style="min-width:100px;">Pending Enroll</span>`;
+                    }
                     if (data === false || data === 0 || data === 'false') {
                         return `<span class="badge bg-success" style="min-width:60px;">OK</span>`;
                     } else {

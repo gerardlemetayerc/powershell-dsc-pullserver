@@ -27,9 +27,14 @@ type DBConfig struct {
 }
 
 func LoadDBConfig(path string) (*DBConfig, error) {
-	exeDir, err := utils.ExePath()
-	if err != nil { return nil, err }
-	absPath := filepath.Join(filepath.Dir(exeDir), path)
+	var absPath string
+	if filepath.IsAbs(path) {
+		absPath = path
+	} else {
+		exeDir, err := utils.ExePath()
+		if err != nil { return nil, err }
+		absPath = filepath.Join(filepath.Dir(exeDir), path)
+	}
 	f, err := os.Open(absPath)
 	if err != nil { return nil, err }
 	defer f.Close()
