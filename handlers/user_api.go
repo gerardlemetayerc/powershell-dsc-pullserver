@@ -35,10 +35,10 @@ func MyUserInfoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		email := claims["sub"].(string)
-		row := db.QueryRow("SELECT id, first_name, last_name, email, is_active, created_at, last_logon_date FROM users WHERE email = ?", email)
+		row := db.QueryRow("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date FROM users WHERE email = ?", email)
 		var u schema.User
 		var lastLogon sql.NullString
-		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.IsActive, &u.CreatedAt, &lastLogon); err != nil {
+		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &lastLogon); err != nil {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
@@ -183,7 +183,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 // List users
 func ListUsersHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query("SELECT id, first_name, last_name, email, is_active, created_at, last_logon_date FROM users")
+		rows, err := db.Query("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date FROM users")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -192,7 +192,15 @@ func ListUsersHandler(db *sql.DB) http.HandlerFunc {
 		var users []schema.User
 		for rows.Next() {
 			var u schema.User
-			rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.IsActive, &u.CreatedAt, &u.LastLogonDate)
+			var lastLogon sql.NullString
+			if err := rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &lastLogon); err != nil {
+				continue
+			}
+			if lastLogon.Valid {
+				u.LastLogonDate = &lastLogon.String
+			} else {
+				u.LastLogonDate = nil
+			}
 			users = append(users, u)
 		}
 		json.NewEncoder(w).Encode(users)
@@ -203,14 +211,10 @@ func ListUsersHandler(db *sql.DB) http.HandlerFunc {
 func GetUserHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
-		log.Printf("[API] GetUserHandler id=%v", id)
-		row := db.QueryRow("SELECT id, first_name, last_name, email, is_active, created_at, last_logon_date FROM users WHERE id = ?", id)
-		var (
-			u schema.User
-			lastLogon sql.NullString
-		)
-		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.IsActive, &u.CreatedAt, &lastLogon); err != nil {
-			log.Printf("[API] GetUserHandler SQL error: %v", err)
+		row := db.QueryRow("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date FROM users WHERE id = ?", id)
+		var u schema.User
+		var lastLogon sql.NullString
+		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &lastLogon); err != nil {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
@@ -226,41 +230,43 @@ func GetUserHandler(db *sql.DB) http.HandlerFunc {
 // Create user
 func CreateUserHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		   var req struct {
-			   FirstName string `json:"first_name"`
-			   LastName string `json:"last_name"`
-			   Email string `json:"email"`
-			   Password string `json:"password"`
-			   IsActive string `json:"is_active"`
-		   }
-		   if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			   http.Error(w, "Bad request", http.StatusBadRequest)
-			   return
-		   }
-		   if req.Password == "" {
-			   http.Error(w, "Le mot de passe est obligatoire", http.StatusBadRequest)
-			   return
-		   }
-		   hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-		   if err != nil {
-			   http.Error(w, "Erreur hash mot de passe", http.StatusInternalServerError)
-			   return
-		   }
-		   isActive := req.IsActive == "1" || req.IsActive == "true"
-		   res, err := db.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?)", req.FirstName, req.LastName, req.Email, string(hash), isActive)
-		   if err != nil {
-			   http.Error(w, err.Error(), http.StatusInternalServerError)
-			   return
-		   }
-		   id, _ := res.LastInsertId()
-		   u := schema.User{
-			   ID: id,
-			   FirstName: req.FirstName,
-			   LastName: req.LastName,
-			   Email: req.Email,
-			   IsActive: isActive,
-		   }
-		   json.NewEncoder(w).Encode(u)
+		var req struct {
+			FirstName string `json:"first_name"`
+			LastName  string `json:"last_name"`
+			Email     string `json:"email"`
+			Password  string `json:"password"`
+			Role      string `json:"role"`
+			IsActive  string `json:"is_active"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+		if req.Password == "" {
+			http.Error(w, "Le mot de passe est obligatoire", http.StatusBadRequest)
+			return
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, "Erreur hash mot de passe", http.StatusInternalServerError)
+			return
+		}
+		isActive := req.IsActive == "1" || req.IsActive == "true"
+		res, err := db.Exec("INSERT INTO users (first_name, last_name, email, password_hash, role, is_active) VALUES (?, ?, ?, ?, ?, ?)", req.FirstName, req.LastName, req.Email, string(hash), req.Role, isActive)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		id, _ := res.LastInsertId()
+		u := schema.User{
+			ID:        id,
+			FirstName: req.FirstName,
+			LastName:  req.LastName,
+			Email:     req.Email,
+			Role:      req.Role,
+			IsActive:  isActive,
+		}
+		json.NewEncoder(w).Encode(u)
 	}
 }
 
@@ -273,7 +279,7 @@ func UpdateUserHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
-		_, err := db.Exec("UPDATE users SET first_name=?, last_name=?, email=?, is_active=?, last_logon_date=? WHERE id=?", u.FirstName, u.LastName, u.Email, u.IsActive, u.LastLogonDate, id)
+		_, err := db.Exec("UPDATE users SET first_name=?, last_name=?, email=?, role=?, is_active=?, last_logon_date=? WHERE id=?", u.FirstName, u.LastName, u.Email, u.Role, u.IsActive, u.LastLogonDate, id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -322,7 +328,6 @@ func ChangeUserPasswordHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
-		// Hash du mot de passe avec bcrypt
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
 			http.Error(w, "Hash error", http.StatusInternalServerError)

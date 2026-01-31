@@ -9,6 +9,7 @@ import (
 	"go-dsc-pull/internal/schema"
 	"path/filepath"
 	"go-dsc-pull/utils"
+	"go-dsc-pull/internal/auth"
 )
 
 // --- Properties CRUD ---
@@ -38,14 +39,18 @@ func PropertiesListHandler(w http.ResponseWriter, r *http.Request) {
 func PropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
 	var p schema.Property
 	_ = json.NewDecoder(r.Body).Decode(&p)
-	   exeDir, err := utils.ExePath()
-	   var dbCfg *db.DBConfig
-	   if err == nil {
-		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
-		   dbCfg, _ = db.LoadDBConfig(configPath)
-	   }
-	   database, _ := db.OpenDB(dbCfg)
+	exeDir, err := utils.ExePath()
+	var dbCfg *db.DBConfig
+	if err == nil {
+		configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+		dbCfg, _ = db.LoadDBConfig(configPath)
+	}
+	database, _ := db.OpenDB(dbCfg)
 	defer database.Close()
+	if !auth.IsAdmin(r, database) {
+		http.Error(w, "Forbidden: admin only", http.StatusForbidden)
+		return
+	}
 	res, err := database.Exec("INSERT INTO properties (name, description, priority) VALUES (?, ?, ?)", p.Name, p.Description, p.Priority)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
@@ -84,6 +89,10 @@ func PropertiesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	dbCfg, _ := db.LoadDBConfig("config.json")
 	database, _ := db.OpenDB(dbCfg)
 	defer database.Close()
+	if !auth.IsAdmin(r, database) {
+		http.Error(w, "Forbidden: admin only", http.StatusForbidden)
+		return
+	}
 	_, err := database.Exec("UPDATE properties SET name=?, description=?, priority=? WHERE id=?", p.Name, p.Description, p.Priority, id)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
@@ -97,6 +106,10 @@ func PropertiesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	dbCfg, _ := db.LoadDBConfig("config.json")
 	database, _ := db.OpenDB(dbCfg)
 	defer database.Close()
+	if !auth.IsAdmin(r, database) {
+		http.Error(w, "Forbidden: admin only", http.StatusForbidden)
+		return
+	}
 	_, err := database.Exec("DELETE FROM properties WHERE id=?", id)
 	if err != nil {
 		http.Error(w, err.Error(), 400)

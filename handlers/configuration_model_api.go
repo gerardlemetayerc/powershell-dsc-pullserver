@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"go-dsc-pull/internal/utils"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
 	jwt "github.com/golang-jwt/jwt/v5"
@@ -161,6 +162,10 @@ func UpdateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if !utils.IsAdmin(r, dbConn) {
+		http.Error(w, "Forbidden: admin only", http.StatusForbidden)
 		return
 	}
 	name := r.FormValue("name")

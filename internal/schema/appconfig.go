@@ -26,12 +26,19 @@ type SAMLConfig struct {
 	SPKeyFile       string `json:"sp_key_file"`
 	SPCertFile      string `json:"sp_cert_file"`
 	UserMapping     SAMLAttributeMapping `json:"user_mapping"`
+	GroupMapping    SAMLGroupMapping     `json:"group_mapping"`
 }
 
 type SAMLAttributeMapping struct {
 	Email       string `json:"email"`
 	Sn          string `json:"sn"`
 	GivenName   string `json:"givenname"`
+}
+
+type SAMLGroupMapping struct {
+	Attribute   string `json:"attribute"`
+	AdminValue  string `json:"admin_value"`
+	UserValue   string `json:"user_value"`
 }
 
 type SAMLUserMapping map[string]string

@@ -1,9 +1,11 @@
+
 package handlers
 
 import (
 	"encoding/json"
 	"net/http"
 	"log"
+	"go-dsc-pull/internal/auth"
 	"go-dsc-pull/internal/db"
 )
 
@@ -29,30 +31,36 @@ func AgentConfigsAPIHandlerPostDelete(w http.ResponseWriter, r *http.Request) {
 	defer database.Close()
 
 	switch r.Method {
-	case http.MethodPost:
-		var req struct { ConfigurationName string `json:"configuration_name"` }
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ConfigurationName == "" {
-			http.Error(w, "Nom de configuration manquant ou invalide", http.StatusBadRequest)
+	case http.MethodPost, http.MethodDelete:
+		if !auth.IsAdmin(r, database) {
+			http.Error(w, "Forbidden: admin only", http.StatusForbidden)
 			return
 		}
-		_, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, req.ConfigurationName)
-		if err != nil {
-			http.Error(w, "Erreur insertion config", http.StatusInternalServerError)
-			return
+		if r.Method == http.MethodPost {
+			var req struct { ConfigurationName string `json:"configuration_name"` }
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ConfigurationName == "" {
+				http.Error(w, "Nom de configuration manquant ou invalide", http.StatusBadRequest)
+				return
+			}
+			_, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, req.ConfigurationName)
+			if err != nil {
+				http.Error(w, "Erreur insertion config", http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+		} else {
+			var req struct { ConfigurationName string `json:"configuration_name"` }
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ConfigurationName == "" {
+				http.Error(w, "Nom de configuration manquant ou invalide", http.StatusBadRequest)
+				return
+			}
+			_, err := database.Exec(`DELETE FROM agent_configurations WHERE agent_id = ? AND configuration_name = ?`, agentId, req.ConfigurationName)
+			if err != nil {
+				http.Error(w, "Erreur suppression config", http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
 		}
-		w.WriteHeader(http.StatusCreated)
-	case http.MethodDelete:
-		var req struct { ConfigurationName string `json:"configuration_name"` }
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ConfigurationName == "" {
-			http.Error(w, "Nom de configuration manquant ou invalide", http.StatusBadRequest)
-			return
-		}
-		_, err := database.Exec(`DELETE FROM agent_configurations WHERE agent_id = ? AND configuration_name = ?`, agentId, req.ConfigurationName)
-		if err != nil {
-			http.Error(w, "Erreur suppression config", http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "Méthode non autorisée", http.StatusMethodNotAllowed)
 	}
