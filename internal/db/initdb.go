@@ -4,6 +4,7 @@ package db
 import (
     "log"
     "io/ioutil"
+    "path/filepath"
 )
 
 
@@ -15,7 +16,7 @@ func InitDB(cfg *DBConfig) {
     }
     defer database.Close()
 
-    schema, err := ioutil.ReadFile("internal\\db\\schema.sql")
+    schema, err := ioutil.ReadFile(filepath.Join("internal", "db", "schema.sql"))
     if err != nil {
         log.Fatalf("[INITDB] Erreur lecture schema.sql: %v", err)
     }
