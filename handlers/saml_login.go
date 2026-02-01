@@ -68,29 +68,70 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 				   return
 			   }
 			   groupAttr := appCfg.SAML.GroupMapping.Attribute
-			   groupValues := samlsp.AttributeFromContext(r.Context(), groupAttr)
 			   role := "user" // default
-			   if groupValues != "" {
-				   // Support multi-value (comma or semicolon separated)
-				   foundAdmin := false
-				   foundUser := false
-				   for _, v := range []string{groupValues} {
-					   // If multiple values, split
-					   for _, g := range splitGroups(v) {
-						   if g == appCfg.SAML.GroupMapping.AdminValue {
-							   foundAdmin = true
-						   }
-						   if g == appCfg.SAML.GroupMapping.UserValue {
-							   foundUser = true
+			   var groupList []string
+			   // Récupère tous les groupes SAML (multi-value)
+			   samlSession = samlsp.SessionFromContext(r.Context())
+			   if samlSession != nil {
+				   if attrs, ok := samlSession.(interface{ GetAttributes() map[string][]string }); ok {
+					   if groupVals, ok := attrs.GetAttributes()[groupAttr]; ok {
+						   groupList = append(groupList, groupVals...)
+					   }
+				   }
+			   }
+			   // Fallback si GetAttributes ne marche pas
+			   if len(groupList) == 0 {
+				   // Tentative de récupération directe depuis le JWT SAML dans le contexte
+				   if claimsRaw := r.Context().Value("claims"); claimsRaw != nil {
+					   log.Printf("[SAML][DEBUG] claims brut: %#v", claimsRaw)
+					   if claims, ok := claimsRaw.(map[string]interface{}); ok {
+						   if attrRaw, ok := claims["attr"]; ok {
+							   if attr, ok := attrRaw.(map[string]interface{}); ok {
+								   log.Printf("[SAML][DEBUG] attr brut: %#v", attr)
+								   if groupValsRaw, ok := attr[groupAttr]; ok {
+									   log.Printf("[SAML][DEBUG] groupValsRaw: %#v", groupValsRaw)
+									   switch groupVals := groupValsRaw.(type) {
+									   case []interface{}:
+										   for _, v := range groupVals {
+											   if s, ok := v.(string); ok {
+												   groupList = append(groupList, s)
+											   }
+										   }
+									   case string:
+										   groupList = append(groupList, splitGroups(groupVals)...)
+									   }
+								   }
+							   }
 						   }
 					   }
 				   }
-				   if foundAdmin {
-					   role = "admin"
-				   } else if foundUser {
-					   role = "user"
+				   // Fallback ultime : AttributeFromContext (ancienne logique)
+				   if len(groupList) == 0 {
+					   groupValue := samlsp.AttributeFromContext(r.Context(), groupAttr)
+					   if groupValue != "" {
+						   groupList = append(groupList, splitGroups(groupValue)...)
+					   }
 				   }
 			   }
+			   // Mapping du rôle selon le plus haut niveau trouvé
+			   roleLevel := 0 // 0: aucun, 1: user, 2: admin
+			   for _, g := range groupList {
+				   if g == appCfg.SAML.GroupMapping.UserValue && roleLevel < 1 {
+					   roleLevel = 1
+				   }
+				   if g == appCfg.SAML.GroupMapping.AdminValue && roleLevel < 2 {
+					   roleLevel = 2
+				   }
+			   }
+			   switch roleLevel {
+				   case 2:
+					   role = "admin"
+				   case 1:
+					   role = "user"
+				   default:
+					   role = "user"
+			   }
+			   log.Printf("[SAML] Groupes SAML: %v => rôle attribué: %s", groupList, role)
 			   var userId int
 			   var isActive int
 			   err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActive)
@@ -118,38 +159,7 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 		       }
 	       }
 
-	       // --- SAML group mapping for role assignment ---
-	       appCfg, err = internal.LoadAppConfig("config.json")
-	       if err != nil || appCfg.SAML.GroupMapping.Attribute == "" {
-		       log.Printf("[SAML] Erreur lecture config group_mapping: %v", err)
-		       http.Error(w, "Erreur config SAML group_mapping", http.StatusInternalServerError)
-		       return
-	       }
-	       groupAttr = appCfg.SAML.GroupMapping.Attribute
-	       groupValues = samlsp.AttributeFromContext(r.Context(), groupAttr)
-	       role = "user" // default
-	       if groupValues != "" {
-		       // Support multi-value (comma or semicolon separated)
-		       foundAdmin := false
-		       foundUser := false
-		       for _, v := range []string{groupValues} {
-			       // If multiple values, split
-			       for _, g := range splitGroups(v) {
-				       if g == appCfg.SAML.GroupMapping.AdminValue {
-					       foundAdmin = true
-				       }
-				       if g == appCfg.SAML.GroupMapping.UserValue {
-					       foundUser = true
-				       }
-			       }
-		       }
-		       if foundAdmin {
-			       role = "admin"
-		       } else if foundUser {
-			       role = "user"
-		       }
-	       }
-	       // --- End SAML group mapping ---
+		       // --- End SAML group mapping ---
 
 	       // Update or create user with role
 	       err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActive)
