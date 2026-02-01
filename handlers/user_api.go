@@ -143,21 +143,30 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
-		row := db.QueryRow("SELECT id, password_hash FROM users WHERE email = ? AND is_active = 1", req.Username)
-		var id int64
-		var hash string
-		err := row.Scan(&id, &hash)
-		log.Printf("[LOGIN] Résultat SQL: id=%v, hash=%v, err=%v", id, hash, err)
-		log.Printf("[LOGIN] Teste mot de passe: username='%s', password='%s', hash='%s'", req.Username, req.Password, hash)
-		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		// Vérification du mot de passe
-		if bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)) != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
+		       // On récupère aussi la source
+		       row := db.QueryRow("SELECT id, password_hash, source FROM users WHERE email = ? AND is_active = 1", req.Username)
+		       var id int64
+		       var hash string
+		       var source string
+			       err := row.Scan(&id, &hash, &source)
+			       if err == sql.ErrNoRows {
+				       http.Error(w, "Utilisateur ou mot de passe incorrect", http.StatusUnauthorized)
+				       return
+			       } else if err != nil {
+				       log.Printf("[LOGIN] Erreur DB: %v", err)
+				       http.Error(w, "Erreur interne", http.StatusInternalServerError)
+				       return
+			       }
+		       // Si source = saml, on refuse l'authentification par mot de passe
+		       if strings.ToLower(source) == "saml" {
+			       http.Error(w, "Authentification par mot de passe interdite pour les utilisateurs SAML", http.StatusUnauthorized)
+			       return
+		       }
+		       // Vérification du mot de passe
+		       if bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)) != nil {
+			       http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			       return
+		       }
 		// Met à jour la date de dernière connexion
 		if err := internaldb.UpdateLastLogon(db, id); err != nil {
 			log.Printf("[LOGIN] Erreur update last_logon_date: %v", err)
@@ -183,7 +192,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 // List users
 func ListUsersHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date FROM users")
+		rows, err := db.Query("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date, source FROM users")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -193,7 +202,7 @@ func ListUsersHandler(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var u schema.User
 			var lastLogon sql.NullString
-			if err := rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &lastLogon); err != nil {
+			if err := rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &lastLogon, &u.Source); err != nil {
 				continue
 			}
 			if lastLogon.Valid {
@@ -211,10 +220,10 @@ func ListUsersHandler(db *sql.DB) http.HandlerFunc {
 func GetUserHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
-		row := db.QueryRow("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date FROM users WHERE id = ?", id)
+		row := db.QueryRow("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date, source FROM users WHERE id = ?", id)
 		var u schema.User
 		var lastLogon sql.NullString
-		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &lastLogon); err != nil {
+		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &lastLogon, &u.Source); err != nil {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
@@ -265,6 +274,7 @@ func CreateUserHandler(db *sql.DB) http.HandlerFunc {
 			Email:     req.Email,
 			Role:      req.Role,
 			IsActive:  isActive,
+			Source:    "local",
 		}
 		json.NewEncoder(w).Encode(u)
 	}
