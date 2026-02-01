@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btn) {
         btn.onclick = function() {
             localStorage.removeItem('jwt_token');
+            // Supprime le cookie JWT si présent
+            document.cookie = 'jwt_token=; Max-Age=0; path=/;';
+            document.cookie = 'token=; Max-Age=0; path=/;';
             window.location.href = '/web/login';
         };
     }

@@ -85,8 +85,8 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			} else {
 				// Insertion normale
-				_, err = database.Exec(`INSERT OR REPLACE INTO agents (agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-					agentId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter)
+				_, err = database.Exec(`INSERT OR REPLACE INTO agents (agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					agentId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, "pending_apply")
 				if err != nil {
 					log.Printf("[REGISTER][DB] Erreur insertion agent: %v", err)
 				}

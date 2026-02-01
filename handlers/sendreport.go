@@ -105,7 +105,7 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 				   if strings.ToLower(report.Status) == "failure" {
 					   hasError = 1
 				   }
-				   _, err = database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP, has_error_last_report = ? WHERE agent_id = ?", hasError, agentId)
+				   _, err = database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP, has_error_last_report = ?, state = ? WHERE agent_id = ?", hasError, report.Status, agentId)
 				   if err != nil {
 					   log.Printf("[SENDREPORT] Erreur update last_communication/has_error_last_report: %v", err)
 				   }

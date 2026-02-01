@@ -26,7 +26,7 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 				   log.Printf("[GETDSCACTION-NODE] Chemin base de données (database): %s", dbCfgUpdate.Database)
 				   database, err := db.OpenDB(dbCfgUpdate)
 				   if err == nil {
-					   _, err := database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP WHERE agent_id = ?", agentId)
+					   _, err := database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP, state = 'retrieving_configurations' WHERE agent_id = ?", agentId)
 					   if err != nil {
 						   log.Printf("[GETDSCACTION-NODE] Erreur update last_communication: %v", err)
 					   }

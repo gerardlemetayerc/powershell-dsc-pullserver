@@ -42,7 +42,7 @@ func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
 	       }
 
 		       // Filtrage dynamique
-		       q := `SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report FROM agents WHERE 1=1`
+		       q := `SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report, state FROM agents WHERE 1=1`
 		       args := []interface{}{}
 		       nodeName := r.URL.Query().Get("node_name")
 		       if nodeName != "" {
@@ -65,9 +65,9 @@ func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
 			   agents := []schema.Agent{}
 			   for rows.Next() {
 				   var a schema.Agent
-				   var lcmVersion, registrationType, certificateThumbprint, certificateSubject, certificateIssuer, certificateNotBefore, certificateNotAfter, registeredAt *string
+				   var lcmVersion, registrationType, certificateThumbprint, certificateSubject, certificateIssuer, certificateNotBefore, certificateNotAfter, registeredAt, state *string
 				   var hasErrorInt int
-				   if err := rows.Scan(&a.AgentId, &a.NodeName, &lcmVersion, &registrationType, &certificateThumbprint, &certificateSubject, &certificateIssuer, &certificateNotBefore, &certificateNotAfter, &registeredAt, &a.LastCommunication, &hasErrorInt); err == nil {
+				   if err := rows.Scan(&a.AgentId, &a.NodeName, &lcmVersion, &registrationType, &certificateThumbprint, &certificateSubject, &certificateIssuer, &certificateNotBefore, &certificateNotAfter, &registeredAt, &a.LastCommunication, &hasErrorInt, &state); err == nil {
 					   // Pour DataTables, renvoyer les champs attendus même vides
 					   empty := ""
 					   a.LCMVersion = lcmVersion
@@ -87,6 +87,7 @@ func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
 					   a.RegisteredAt = registeredAt
 					   if a.RegisteredAt == nil { a.RegisteredAt = &empty }
 					   a.HasErrorLastReport = hasErrorInt != 0
+					   a.State = state
 					   agents = append(agents, a)
 				   }
 			   }

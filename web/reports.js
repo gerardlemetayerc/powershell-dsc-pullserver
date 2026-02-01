@@ -6,7 +6,7 @@ $(document).ready(function() {
                 $('#total-configurations').text(data.count);
             }
         });
-    $('#agents-table').DataTable({
+    var dataTable = $('#agents-table').DataTable({
         ajax: {
             url: '/api/v1/agents',
             dataSrc: ''
@@ -20,13 +20,25 @@ $(document).ready(function() {
                 title: 'Status',
                 className: 'text-center',
                 render: function(data, type, row) {
-                    if (row.last_communication === '0000-00-01 00:00:00') {
-                        return `<span class="badge bg-secondary" style="min-width:100px;">Pending Enroll</span>`;
+                    if (row.state) {
+                        switch (row.state.toLowerCase()) {
+                            case 'waiting_for_registration':
+                                return `<span class="badge bg-secondary" style="min-width:100px;">Pending Enroll</span>`;
+                            case 'pending_apply':
+                                return `<span class="badge bg-warning" style="min-width:100px;">Pending Apply</span>`;
+                            case 'success':
+                                return `<span class="badge bg-success" style="min-width:60px;">OK</span>`;
+                            case 'failure':
+                                return `<span class="badge bg-danger" style="min-width:60px;">Failed</span>`;
+                            default:
+                                return `<span class="badge bg-info" style="min-width:80px;">${row.state}</span>`;
+                        }
                     }
+                    // fallback legacy
                     if (data === false || data === 0 || data === 'false') {
                         return `<span class="badge bg-success" style="min-width:60px;">OK</span>`;
                     } else {
-                        return `<span class="badge bg-danger" style="min-width:60px;">Error</span>`;
+                        return `<span class="badge bg-danger" style="min-width:60px;">Failed</span>`;
                     }
                 }
             },
@@ -48,7 +60,15 @@ $(document).ready(function() {
         // Calcule le nombre d'agents OK/Erreur
         let ok = 0, err = 0;
         agents.forEach(a => {
-            if (a.has_error_last_report) err++; else ok++;
+            if (a.state && a.state.toLowerCase() === 'waiting_for_registration') {
+                // ignore, not counted as OK or Error
+            } else if (a.state && a.state.toLowerCase() === 'pending_apply') {
+                // ignore, not counted as OK or Error
+            } else if (a.has_error_last_report) {
+                err++;
+            } else {
+                ok++;
+            }
         });
         // Affiche le camembert
         const ctx = document.getElementById('agents-pie').getContext('2d');
@@ -94,5 +114,32 @@ $(document).ready(function() {
         if (data && typeof data.count !== 'undefined') {
             $('#total-modules').text(data.count);
         }
+    });
+    $('#preenroll-btn').click(function() {
+        $('#preenrollModal').modal('show');
+    });
+    $('#preenroll-submit').click(function() {
+        var nodeName = $('#preenroll-node-name').val();
+        if (!nodeName) {
+            $('#preenroll-error').text('Node name is required');
+            return;
+        }
+        $('#preenroll-error').text('');
+        $.ajax({
+            url: '/api/v1/agents/preenroll',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ node_name: nodeName }),
+            // header Authorization ajouté globalement par jwt_ajax.js
+            success: function(data) {
+                $('#preenrollModal').modal('hide');
+                $('#preenroll-node-name').val('');
+                // Optionally refresh the agents table
+                dataTable.ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                $('#preenroll-error').text(xhr.responseText || 'Error');
+            }
+        });
     });
 });

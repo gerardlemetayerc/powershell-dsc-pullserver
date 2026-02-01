@@ -11,6 +11,10 @@ import (
 	"go-dsc-pull/internal/logs"
 )
 
+// ptr retourne un pointeur sur une chaîne (utilitaire)
+func ptr(s string) *string { return &s }
+
+
 // PreEnrollAgentHandler allows pre-registration of an agent with only NodeName
 func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -44,7 +48,7 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 	defer database.Close()
 
 	// Insert agent (ignore if already exists)
-	_, err = database.Exec(`INSERT OR IGNORE INTO agents (agent_id, node_name, last_communication) VALUES (?, ?, ?)`, tempAgentId, req.NodeName, "0000-00-01 00:00:00")
+	_, err = database.Exec(`INSERT OR IGNORE INTO agents (agent_id, node_name, last_communication, state) VALUES (?, ?, ?, ?)`, tempAgentId, req.NodeName, "0000-00-01 00:00:00", "waiting_for_registration")
 	if err != nil {
 		log.Printf("[API][DB] Erreur insertion agent: %v", err)
 		_ = logs.WriteLogFile(fmt.Sprintf("ERROR [API][PRE-ENROLL] Erreur insertion agent: %v (NodeName=%s)", err, req.NodeName))
@@ -58,6 +62,7 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 		AgentId:           tempAgentId,
 		NodeName:          req.NodeName,
 		LastCommunication: "0000-00-01 00:00:00",
+		State:             ptr("waiting_for_registration"),
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(agent)

@@ -68,7 +68,8 @@ CREATE TABLE IF NOT EXISTS agents (
     certificate_notafter TEXT,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_communication TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    has_error_last_report BOOLEAN DEFAULT 0
+    has_error_last_report BOOLEAN DEFAULT 0,
+    state TEXT
 );
 -- Migration : ajout de la colonne has_error_last_report si besoin
 -- N'exécuter que si la version de la db est antérieure à 0.0.3
