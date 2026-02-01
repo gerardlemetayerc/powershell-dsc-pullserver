@@ -88,7 +88,7 @@ func main() {
 			   err := dbConn.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 			   if err == nil && count == 0 {
 				   hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
-				   _, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?)", "Admin", "User", "admin@localhost", string(hash), 1)
+				   _, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active, role, source) VALUES (?, ?, ?, ?, ?, ?, ?)", "Admin", "User", "admin@localhost", string(hash), 1, "admin", "local")
 				   if err != nil {
 					   logs.WriteLogFile(fmt.Sprintf("ERROR [INITDB] Failed to insert admin: %v", err))
 				   } else {

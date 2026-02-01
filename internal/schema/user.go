@@ -10,4 +10,5 @@ type User struct {
 	IsActive       bool    `json:"is_active"`
 	CreatedAt      string  `json:"created_at"`
 	LastLogonDate  *string `json:"last_logon_date"`
+	Source         string  `json:"source"`
 }

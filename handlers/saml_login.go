@@ -60,18 +60,49 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 		       http.Error(w, "Email SAML manquant", http.StatusForbidden)
 		       return
 	       }
-	       var userId int
-	       var isActive int
-	       err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActive)
-	       if err == sql.ErrNoRows {
-		       log.Printf("[SAML] Création nouvel utilisateur: %s %s <%s>", firstName, lastName, email)
-		       _, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active, last_logon_date) VALUES (?, ?, ?, '', 1, ?)", firstName, lastName, email, time.Now().Format("2006-01-02 15:04:05"))
-		       if err != nil {
-			       log.Printf("[SAML] Erreur création utilisateur: %v", err)
-			       http.Error(w, "Erreur création utilisateur", http.StatusInternalServerError)
-			       return
-		       }
-	       } else if err != nil && err != sql.ErrNoRows {
+			   // --- SAML group mapping for role assignment ---
+			   appCfg, err := internal.LoadAppConfig("config.json")
+			   if err != nil || appCfg.SAML.GroupMapping.Attribute == "" {
+				   log.Printf("[SAML] Erreur lecture config group_mapping: %v", err)
+				   http.Error(w, "Erreur config SAML group_mapping", http.StatusInternalServerError)
+				   return
+			   }
+			   groupAttr := appCfg.SAML.GroupMapping.Attribute
+			   groupValues := samlsp.AttributeFromContext(r.Context(), groupAttr)
+			   role := "user" // default
+			   if groupValues != "" {
+				   // Support multi-value (comma or semicolon separated)
+				   foundAdmin := false
+				   foundUser := false
+				   for _, v := range []string{groupValues} {
+					   // If multiple values, split
+					   for _, g := range splitGroups(v) {
+						   if g == appCfg.SAML.GroupMapping.AdminValue {
+							   foundAdmin = true
+						   }
+						   if g == appCfg.SAML.GroupMapping.UserValue {
+							   foundUser = true
+						   }
+					   }
+				   }
+				   if foundAdmin {
+					   role = "admin"
+				   } else if foundUser {
+					   role = "user"
+				   }
+			   }
+			   var userId int
+			   var isActive int
+			   err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActive)
+			   if err == sql.ErrNoRows {
+				   log.Printf("[SAML] Création nouvel utilisateur: %s %s <%s> (source: SAML)", firstName, lastName, email)
+				   _, err = dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active, last_logon_date, role, source) VALUES (?, ?, ?, '', 1, ?, ?, ?)", firstName, lastName, email, time.Now().Format("2006-01-02 15:04:05"), role, "saml")
+				   if err != nil {
+					   log.Printf("[SAML] Erreur création utilisateur: %v", err)
+					   http.Error(w, "Erreur création utilisateur", http.StatusInternalServerError)
+					   return
+				   }
+			   } else if err != nil && err != sql.ErrNoRows {
 		       log.Printf("[SAML] Erreur DB: %v", err)
 		       http.Error(w, "Erreur DB", http.StatusInternalServerError)
 		       return
@@ -88,15 +119,15 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 	       }
 
 	       // --- SAML group mapping for role assignment ---
-	       appCfg, err := internal.LoadAppConfig("config.json")
+	       appCfg, err = internal.LoadAppConfig("config.json")
 	       if err != nil || appCfg.SAML.GroupMapping.Attribute == "" {
 		       log.Printf("[SAML] Erreur lecture config group_mapping: %v", err)
 		       http.Error(w, "Erreur config SAML group_mapping", http.StatusInternalServerError)
 		       return
 	       }
-	       groupAttr := appCfg.SAML.GroupMapping.Attribute
-	       groupValues := samlsp.AttributeFromContext(r.Context(), groupAttr)
-	       role := "user" // default
+	       groupAttr = appCfg.SAML.GroupMapping.Attribute
+	       groupValues = samlsp.AttributeFromContext(r.Context(), groupAttr)
+	       role = "user" // default
 	       if groupValues != "" {
 		       // Support multi-value (comma or semicolon separated)
 		       foundAdmin := false

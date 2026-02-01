@@ -11,6 +11,8 @@ import (
 
 // RegisterWebRoutes sets up all web/API endpoints on the provided mux
 func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware func(http.Handler) http.Handler, samlMiddleware http.Handler) {
+		// Endpoint pour la liste des profils utilisateurs disponibles
+		mux.Handle("GET /api/v1/user_roles", jwtAuthMiddleware(http.HandlerFunc(handlers.UserRolesHandler())))
 	exeDir, err := utils.ExePath()
 	if err != nil {
 		panic("Failed to get executable path: " + err.Error())

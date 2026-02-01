@@ -19,6 +19,11 @@
       "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
       "sn": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
       "givenName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
+    },
+    "group_mapping": {
+      "attribute": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups",
+      "admin_value": "e25f7f74-df75-448f-9685-71fd21d35f07",
+      "user_value": "_APP_DSC_USERS"
     }
   },
   "server": "localhost",
