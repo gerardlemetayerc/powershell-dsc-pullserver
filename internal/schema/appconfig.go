@@ -5,6 +5,8 @@ type HTTPConfig struct {
 	EnableHTTPS bool   `json:"enable_https"`
 	CertFile    string `json:"cert_file"`
 	KeyFile     string `json:"key_file"`
+	EnableClientCertValidation bool `json:"enable_client_cert_validation"`
+	BypassCAValidation bool `json:"bypass_ca_validation"`
 }
 
 type AppConfig struct {

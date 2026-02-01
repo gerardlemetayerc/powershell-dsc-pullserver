@@ -6,6 +6,10 @@ import (
 	"runtime"
 	"os"
 	"path/filepath"
+	"crypto/sha1"
+	"encoding/hex"
+	"crypto/tls"
+	"strings"
 	"go-dsc-pull/utils"
 	"go-dsc-pull/internal/routes"
 	"go-dsc-pull/internal/db"
@@ -100,12 +104,44 @@ func main() {
 		   // --- Mux DSC (endpoints MS-DSCPM) ---
 		   dscMux := http.NewServeMux()
 		   routes.RegisterDSCRoutes(dscMux, dbConn)
+		   // Middleware pour logguer le certificat client DSC
+		   dscCertLogMiddleware := func(next http.Handler) http.Handler {
+			   return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				   if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+					   clientCert := r.TLS.PeerCertificates[0]
+					   h := sha1.New()
+					   h.Write(clientCert.Raw)
+					   sha1sum := hex.EncodeToString(h.Sum(nil))
+					   sha1sumLower := strings.ToLower(sha1sum)
+					   logs.WriteLogFile(fmt.Sprintf("[DSC][TLS] Certificat client reçu: Subject=%s, Thumbprint=%s", clientCert.Subject, sha1sumLower))
+					   // Vérification de l'empreinte si la validation du certificat client est activée
+					   // On ne fait PAS ce contrôle pour la route de registration DSC (PUT /PSDSCPullServer.svc/{node})
+					   isRegister := r.Method == "PUT" && strings.HasPrefix(r.URL.Path, "/PSDSCPullServer.svc/") && len(strings.Split(r.URL.Path, "/")) == 3
+					   if appCfg.DSCPullServer.EnableClientCertValidation && !isRegister {
+						   // Vérifier la présence de l'empreinte dans la base de données (en minuscules)
+						   var count int
+						   err := dbConn.QueryRow("SELECT COUNT(*) FROM agents WHERE LOWER(certificate_thumbprint) = ?", sha1sumLower).Scan(&count)
+						   if err != nil {
+							   logs.WriteLogFile(fmt.Sprintf("[DSC][TLS] Error verifying thumbprint: %v", err))
+							   http.Error(w, "Internal error verifying certificate", http.StatusInternalServerError)
+							   return
+						   }
+						   if count == 0 {
+							   logs.WriteLogFile(fmt.Sprintf("[DSC][TLS] Certificate thumbprint not recognized: %s", sha1sumLower))
+							   http.Error(w, "Certificate unauthorized", http.StatusUnauthorized)
+							   return
+						   }
+					   }
+				   }
+				   next.ServeHTTP(w, r)
+			   })
+		   }
 		   // --- Mux Web/API/GUI ---
 		   webMux := http.NewServeMux()
 		   routes.RegisterWebRoutes(webMux, dbConn, auth.JwtOrAPITokenAuthMiddleware(dbConn), samlMiddleware)
 
 		   // Ajout du logging middleware
-		   dscHandler := logs.LoggingMiddleware(dscMux)
+		   dscHandler := logs.LoggingMiddleware(dscCertLogMiddleware(dscMux))
 		   webHandler := logs.LoggingMiddleware(webMux)
 
 		   // Lancer les deux serveurs sur des ports différents avec HTTPS optionnel
@@ -113,12 +149,23 @@ func main() {
 			   if appCfg.DSCPullServer.EnableHTTPS {
 				   logs.WriteLogFile(fmt.Sprintf("INFO [DSC Core Server] DSC Server (HTTPS) on :%d ...", appCfg.DSCPullServer.Port))
 				   certFile, keyFile := resolveCertKeyPath(appCfg.DSCPullServer.CertFile, appCfg.DSCPullServer.KeyFile)
-				   err := http.ListenAndServeTLS(
-					   fmt.Sprintf(":%d", appCfg.DSCPullServer.Port),
-					   certFile,
-					   keyFile,
-					   dscHandler,
-				   )
+				   // Bypass CA verification: accepter tout certificat client présenté
+				 tlsConfig := &tls.Config{}
+				   if appCfg.DSCPullServer.EnableClientCertValidation {
+					   if appCfg.DSCPullServer.BypassCAValidation {  
+							tlsConfig = &tls.Config{
+								ClientAuth: tls.RequireAnyClientCert,
+							}
+						}
+					}else{
+						logs.WriteLogFile(fmt.Sprintf("WARN [DSC Core Server] Client certificate validation is disabled."))
+					}
+				   server := &http.Server{
+					   Addr:      fmt.Sprintf(":%d", appCfg.DSCPullServer.Port),
+					   Handler:   dscHandler,
+					   TLSConfig: tlsConfig,
+				   }
+				   err := server.ListenAndServeTLS(certFile, keyFile)
 				   if err != nil {
 					   logs.WriteLogFile(fmt.Sprintf("ERROR [DSC Core Server] Error starting HTTPS server: %v", err))
 					   os.Exit(1)

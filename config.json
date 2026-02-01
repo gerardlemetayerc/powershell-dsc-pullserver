@@ -4,6 +4,8 @@
   "dsc_pullserver": {
     "cert_file": "dsc-dev.local.crt",
     "enable_https": true,
+    "enable_client_cert_validation": false,
+    "bypass_ca_validation": true,
     "key_file": "dsc-dev.local.key",
     "port": 8484
   },
@@ -23,7 +25,7 @@
     "group_mapping": {
       "attribute": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups",
       "admin_value": "e25f7f74-df75-448f-9685-71fd21d35f07",
-      "user_value": "_APP_DSC_USERS"
+      "user_value": "b79fbf4d-3ef9-4689-8143-76b194e85509"
     }
   },
   "server": "localhost",
