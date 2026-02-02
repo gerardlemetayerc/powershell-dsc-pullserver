@@ -47,14 +47,23 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
-	// Insert agent (ignore if already exists)
-	_, err = database.Exec(`INSERT OR IGNORE INTO agents (agent_id, node_name, last_communication, state) VALUES (?, ?, ?, ?)`, tempAgentId, req.NodeName, "0000-00-01 00:00:00", "waiting_for_registration")
-	if err != nil {
-		log.Printf("[API][DB] Erreur insertion agent: %v", err)
-		_ = logs.WriteLogFile(fmt.Sprintf("ERROR [API][PRE-ENROLL] Erreur insertion agent: %v (NodeName=%s)", err, req.NodeName))
-		http.Error(w, "DB insert error", http.StatusInternalServerError)
-		return
-	}
+	       // Insert agent (ignore if already exists), compatible SQLite/MSSQL
+			       driver := dbCfg.Driver
+				       if driver == "sqlite" {
+					       _, err = database.Exec(`INSERT OR IGNORE INTO agents (agent_id, node_name, last_communication, state) VALUES (?, ?, ?, ?)`, tempAgentId, req.NodeName, "0000-00-01 00:00:00", "waiting_for_registration")
+				       } else if driver == "mssql" {
+					       // MSSQL : insérer avec la date minimale valide
+					       _, err = database.Exec(`IF NOT EXISTS (SELECT 1 FROM agents WHERE agent_id = ?) INSERT INTO agents (agent_id, node_name, last_communication, state) VALUES (?, ?, ?, ?)`, tempAgentId, tempAgentId, req.NodeName, "1753-01-01 00:00:00", "waiting_for_registration")
+				       } else {
+					       // fallback générique
+					       _, err = database.Exec(`INSERT INTO agents (agent_id, node_name) VALUES (?, ?)`, tempAgentId, req.NodeName)
+				       }
+	       if err != nil {
+		       log.Printf("[API][DB] Erreur insertion agent: %v", err)
+		       _ = logs.WriteLogFile(fmt.Sprintf("ERROR [API][PRE-ENROLL] Erreur insertion agent: %v (NodeName=%s)", err, req.NodeName))
+		       http.Error(w, "DB insert error", http.StatusInternalServerError)
+		       return
+	       }
 
 	_ = logs.WriteLogFile(fmt.Sprintf("INFO [API][PRE-ENROLL] Agent pré-enregistré: NodeName=%s, AgentId=%s", req.NodeName, tempAgentId))
 

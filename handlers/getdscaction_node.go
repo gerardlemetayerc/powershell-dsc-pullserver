@@ -49,7 +49,7 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 
 	// Charger les noms de configuration depuis la base
 	var configNames []string
-	   dbCfg := (*db.DBConfig)(nil)
+	   dbCfg := (*schema.DBConfig)(nil)
 	   if errExe == nil {
 		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
 		   log.Printf("[GETDSCACTION-NODE] Utilisation du chemin config.json: %s", configPath)
@@ -80,7 +80,7 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 	   }
 
 	// Vérifie qu'il existe au moins une configuration en base pour cet agent
-	   dbCfgCheck := (*db.DBConfig)(nil)
+	   dbCfgCheck := (*schema.DBConfig)(nil)
 	   if errExe == nil {
 		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
 		   log.Printf("[GETDSCACTION-NODE] Utilisation du chemin config.json: %s", configPath)

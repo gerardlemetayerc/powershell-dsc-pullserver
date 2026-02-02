@@ -1,3 +1,11 @@
+-- Table pour les tags clé/valeur par agent
+CREATE TABLE IF NOT EXISTS agent_tags (
+    agent_id TEXT,
+    tag_key TEXT NOT NULL,
+    tag_value TEXT NOT NULL,
+    PRIMARY KEY (agent_id, tag_key, tag_value),
+    FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
+);
 
 -- Table pour les tokens API utilisateurs
 CREATE TABLE IF NOT EXISTS user_api_tokens (
@@ -60,7 +68,8 @@ CREATE TABLE IF NOT EXISTS agents (
     certificate_notafter TEXT,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_communication TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    has_error_last_report BOOLEAN DEFAULT 0
+    has_error_last_report BOOLEAN DEFAULT 0,
+    state TEXT
 );
 -- Migration : ajout de la colonne has_error_last_report si besoin
 -- N'exécuter que si la version de la db est antérieure à 0.0.3
@@ -124,4 +133,3 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT DEFAULT 'readonly',
     source TEXT DEFAULT 'local'
 );
-

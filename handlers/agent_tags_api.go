@@ -63,11 +63,11 @@ func AgentTagsSetHandler(w http.ResponseWriter, r *http.Request) {
 		   http.Error(w, "Invalid key/value", http.StatusBadRequest)
 		   return
 	   }
-	   if err := db.SetAgentTag(database, agentId, req.Key, req.Value); err != nil {
-		   logs.WriteLogFile("AgentTagsSetHandler: DB update error: " + err.Error())
-		   http.Error(w, "DB update error", http.StatusInternalServerError)
-		   return
-	   }
+	if err := db.SetAgentTag(database, dbCfg.Driver, agentId, req.Key, req.Value); err != nil {
+		logs.WriteLogFile("AgentTagsSetHandler: DB update error: " + err.Error())
+		http.Error(w, "DB update error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	   w.WriteHeader(http.StatusNoContent)
 }
 

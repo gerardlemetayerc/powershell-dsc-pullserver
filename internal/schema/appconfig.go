@@ -15,10 +15,19 @@ type AppConfig struct {
 	Port          int         `json:"port"`
 	User          string      `json:"user"`
 	Password      string      `json:"password"`
-	Database      string      `json:"database"`
+	Database      DBConfig    `json:"database"`
 	DSCPullServer HTTPConfig  `json:"dsc_pullserver"`
 	WebUI         HTTPConfig  `json:"web_ui"`
 	SAML          SAMLConfig  `json:"saml"`
+}
+
+type DBConfig struct {
+	Driver   string `json:"driver"`
+	Server   string `json:"server"`
+	Port     int    `json:"port"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	Database string `json:"name"`
 }
 
 type SAMLConfig struct {

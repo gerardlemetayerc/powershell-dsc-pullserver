@@ -39,7 +39,7 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Insérer en base
 	   exeDir, err := utils.ExePath()
-	   var dbCfg *db.DBConfig
+	   var dbCfg *schema.DBConfig
 	   if err == nil {
 		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
 		   dbCfg, err = db.LoadDBConfig(configPath)

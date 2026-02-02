@@ -43,9 +43,9 @@ func JwtOrAPITokenAuthMiddleware(dbConn *sql.DB) func(http.Handler) http.Handler
 				userId, apiErr := db.CheckAPIToken(dbConn, tokenStr)
 				if apiErr == nil && userId > 0 {
 					// Vérifie que l'utilisateur existe et est actif
-					var isActive int
-					err := dbConn.QueryRow("SELECT is_active FROM users WHERE id = ?", userId).Scan(&isActive)
-					if err != nil || isActive != 1 {
+					var isActiveBool bool
+					err := dbConn.QueryRow("SELECT is_active FROM users WHERE id = ?", userId).Scan(&isActiveBool)
+					if err != nil || !isActiveBool {
 						http.Error(w, "User not found or inactive", http.StatusUnauthorized)
 						return
 					}

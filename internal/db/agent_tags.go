@@ -6,8 +6,14 @@ import (
 
 
 // SetAgentTag ajoute une valeur à un tag clé pour un agent (plusieurs valeurs possibles)
-func SetAgentTag(db *sql.DB, agentId, key, value string) error {
-       _, err := db.Exec(`INSERT OR IGNORE INTO agent_tags (agent_id, tag_key, tag_value) VALUES (?, ?, ?)`, agentId, key, value)
+// Ajoutez driverName comme argument pour choisir la syntaxe
+func SetAgentTag(db *sql.DB, driverName, agentId, key, value string) error {
+       var err error
+       if driverName == "sqlite" {
+	       _, err = db.Exec(`INSERT OR IGNORE INTO agent_tags (agent_id, tag_key, tag_value) VALUES (?, ?, ?)`, agentId, key, value)
+       } else {
+	       _, err = db.Exec(`IF NOT EXISTS (SELECT 1 FROM agent_tags WHERE agent_id = ? AND tag_key = ? AND tag_value = ?) INSERT INTO agent_tags (agent_id, tag_key, tag_value) VALUES (?, ?, ?)`, agentId, key, value, agentId, key, value)
+       }
        return err
 }
 

@@ -38,10 +38,12 @@ func MyUserInfoHandler(db *sql.DB) http.HandlerFunc {
 		row := db.QueryRow("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date FROM users WHERE email = ?", email)
 		var u schema.User
 		var lastLogon sql.NullString
-		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &lastLogon); err != nil {
+		var isActiveBool bool
+		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &isActiveBool, &u.CreatedAt, &lastLogon); err != nil {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
+		       u.IsActive = isActiveBool
 		if lastLogon.Valid { u.LastLogonDate = &lastLogon.String } else { u.LastLogonDate = nil }
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(u)
@@ -202,9 +204,11 @@ func ListUsersHandler(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var u schema.User
 			var lastLogon sql.NullString
-			if err := rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &lastLogon, &u.Source); err != nil {
+			var isActiveBool bool
+			if err := rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &isActiveBool, &u.CreatedAt, &lastLogon, &u.Source); err != nil {
 				continue
 			}
+			u.IsActive = isActiveBool
 			if lastLogon.Valid {
 				u.LastLogonDate = &lastLogon.String
 			} else {
@@ -223,10 +227,12 @@ func GetUserHandler(db *sql.DB) http.HandlerFunc {
 		row := db.QueryRow("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date, source FROM users WHERE id = ?", id)
 		var u schema.User
 		var lastLogon sql.NullString
-		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &u.IsActive, &u.CreatedAt, &lastLogon, &u.Source); err != nil {
+		var isActiveBool bool
+		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &isActiveBool, &u.CreatedAt, &lastLogon, &u.Source); err != nil {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
+		u.IsActive = isActiveBool
 		if lastLogon.Valid {
 			u.LastLogonDate = &lastLogon.String
 		} else {

@@ -15,7 +15,7 @@ import (
 // --- Properties CRUD ---
 func PropertiesListHandler(w http.ResponseWriter, r *http.Request) {
 	   exeDir, err := utils.ExePath()
-	   var dbCfg *db.DBConfig
+	   var dbCfg *schema.DBConfig
 	   if err == nil {
 		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
 		   dbCfg, _ = db.LoadDBConfig(configPath)
@@ -40,7 +40,7 @@ func PropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
 	var p schema.Property
 	_ = json.NewDecoder(r.Body).Decode(&p)
 	exeDir, err := utils.ExePath()
-	var dbCfg *db.DBConfig
+	var dbCfg *schema.DBConfig
 	if err == nil {
 		configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
 		dbCfg, _ = db.LoadDBConfig(configPath)
@@ -65,7 +65,7 @@ func PropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
 func PropertiesGetHandler(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(r.PathValue("id"))
 	   exeDir, err := utils.ExePath()
-	   var dbCfg *db.DBConfig
+	   var dbCfg *schema.DBConfig
 	   if err == nil {
 		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
 		   dbCfg, _ = db.LoadDBConfig(configPath)

@@ -133,8 +133,8 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 			   }
 			   log.Printf("[SAML] Groupes SAML: %v => rôle attribué: %s", groupList, role)
 			   var userId int
-			   var isActive int
-			   err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActive)
+			   var isActiveBool bool
+			   err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActiveBool)
 			   if err == sql.ErrNoRows {
 				   log.Printf("[SAML] Création nouvel utilisateur: %s %s <%s> (source: SAML)", firstName, lastName, email)
 				   _, err = dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active, last_logon_date, role, source) VALUES (?, ?, ?, '', 1, ?, ?, ?)", firstName, lastName, email, time.Now().Format("2006-01-02 15:04:05"), role, "saml")
@@ -147,7 +147,7 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 		       log.Printf("[SAML] Erreur DB: %v", err)
 		       http.Error(w, "Erreur DB", http.StatusInternalServerError)
 		       return
-	       } else if isActive == 0 {
+			   } else if !isActiveBool {
 		       // Compte inactif : refuse l'accès et redirige avec message
 		       log.Printf("[SAML] Compte inactif pour %s", email)
 		       http.Redirect(w, r, "/web/login?error=blocked", http.StatusFound)
@@ -162,7 +162,7 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 		       // --- End SAML group mapping ---
 
 	       // Update or create user with role
-	       err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActive)
+		err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActiveBool)
 	       if err == sql.ErrNoRows {
 		       log.Printf("[SAML] Création nouvel utilisateur: %s %s <%s> (role: %s)", firstName, lastName, email, role)
 		       _, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active, last_logon_date, role) VALUES (?, ?, ?, '', 1, ?, ?)", firstName, lastName, email, time.Now().Format("2006-01-02 15:04:05"), role)
@@ -175,7 +175,7 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 		       log.Printf("[SAML] Erreur DB: %v", err)
 		       http.Error(w, "Erreur DB", http.StatusInternalServerError)
 		       return
-	       } else if isActive == 0 {
+		} else if !isActiveBool {
 		       // Compte inactif : refuse l'accès et redirige avec message
 		       log.Printf("[SAML] Compte inactif pour %s", email)
 		       http.Redirect(w, r, "/web/login?error=blocked", http.StatusFound)

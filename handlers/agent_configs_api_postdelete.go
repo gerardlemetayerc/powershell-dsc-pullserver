@@ -42,12 +42,21 @@ func AgentConfigsAPIHandlerPostDelete(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Nom de configuration manquant ou invalide", http.StatusBadRequest)
 				return
 			}
-			_, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, req.ConfigurationName)
-			if err != nil {
-				http.Error(w, "Erreur insertion config", http.StatusInternalServerError)
-				return
-			}
-			w.WriteHeader(http.StatusCreated)
+			   driver := dbCfg.Driver
+			   if driver == "sqlite" {
+				   _, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, req.ConfigurationName)
+				   if err != nil {
+					   http.Error(w, "Erreur insertion config", http.StatusInternalServerError)
+					   return
+				   }
+			   } else {
+				   _, err := database.Exec(`IF NOT EXISTS (SELECT 1 FROM agent_configurations WHERE agent_id = ? AND configuration_name = ?) INSERT INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, req.ConfigurationName, agentId, req.ConfigurationName)
+				   if err != nil {
+					   http.Error(w, "Erreur insertion config", http.StatusInternalServerError)
+					   return
+				   }
+			   }
+			   w.WriteHeader(http.StatusCreated)
 		} else {
 			var req struct { ConfigurationName string `json:"configuration_name"` }
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ConfigurationName == "" {

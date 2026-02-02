@@ -65,9 +65,9 @@ func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
 			   agents := []schema.Agent{}
 			   for rows.Next() {
 				   var a schema.Agent
-				   var lcmVersion, registrationType, certificateThumbprint, certificateSubject, certificateIssuer, certificateNotBefore, certificateNotAfter, registeredAt, state *string
-				   var hasErrorInt int
-				   if err := rows.Scan(&a.AgentId, &a.NodeName, &lcmVersion, &registrationType, &certificateThumbprint, &certificateSubject, &certificateIssuer, &certificateNotBefore, &certificateNotAfter, &registeredAt, &a.LastCommunication, &hasErrorInt, &state); err == nil {
+				   var lcmVersion, registrationType, certificateThumbprint, certificateSubject, certificateIssuer, certificateNotBefore, certificateNotAfter, registeredAt, lastCommunication, state *string
+				   var hasErrorBool bool
+				   if err := rows.Scan(&a.AgentId, &a.NodeName, &lcmVersion, &registrationType, &certificateThumbprint, &certificateSubject, &certificateIssuer, &certificateNotBefore, &certificateNotAfter, &registeredAt, &lastCommunication, &hasErrorBool, &state); err == nil {
 					   // Pour DataTables, renvoyer les champs attendus même vides
 					   empty := ""
 					   a.LCMVersion = lcmVersion
@@ -86,9 +86,17 @@ func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
 					   if a.CertificateNotAfter == nil { a.CertificateNotAfter = &empty }
 					   a.RegisteredAt = registeredAt
 					   if a.RegisteredAt == nil { a.RegisteredAt = &empty }
-					   a.HasErrorLastReport = hasErrorInt != 0
+					   // Correction pour last_communication
+					   if lastCommunication != nil {
+						   a.LastCommunication = *lastCommunication
+					   } else {
+						   a.LastCommunication = empty
+					   }
+					   a.HasErrorLastReport = hasErrorBool
 					   a.State = state
 					   agents = append(agents, a)
+				   } else {
+					   log.Printf("[API][DB] Agent ignoré, erreur scan: %v", err)
 				   }
 			   }
 		       w.Header().Set("Content-Type", "application/json")
