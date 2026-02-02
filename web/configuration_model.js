@@ -19,7 +19,7 @@ $(function() {
                 loadConfigModels();
             },
             error: function(xhr) {
-                alert('Erreur upload: ' + xhr.responseText);
+                alert('Failed to upload: ' + xhr.responseText);
             }
         });
     });
@@ -48,15 +48,12 @@ $(function() {
                     '<td>' + uploadDate + '</td>' +
                     '<td>' + lastUsage + '</td>' +
                     '<td>' +
-                        '<button class="btn btn-danger btn-sm delete-config-model" data-id="' + model.id + '">Supprimer</button>' +
+                        '<button class="btn btn-danger btn-sm delete-config-model" data-id="' + model.id + '">Delete</button>' +
                     '</td>' +
                 '</tr>';
             });
             $('#config-models-table tbody').html(tbody);
             $('#config-models-table').DataTable({
-                language: {
-                    url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json'
-                },
                 order: [[0, 'desc']]
             });
         });
@@ -65,7 +62,7 @@ $(function() {
     // Suppression
     $('#config-models-table').on('click', '.delete-config-model', function() {
         var id = $(this).data('id');
-        if (confirm('Supprimer ce modèle ?')) {
+        if (confirm('Remove this model ?')) {
             $.ajax({
                 url: '/api/v1/configuration_models?id=' + id,
                 type: 'DELETE',
@@ -73,7 +70,7 @@ $(function() {
                     loadConfigModels();
                 },
                 error: function(xhr) {
-                    alert('Erreur suppression: ' + xhr.responseText);
+                    alert('Failed to delete: ' + xhr.responseText);
                 }
             });
         }

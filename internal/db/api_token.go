@@ -32,20 +32,24 @@ func StoreAPIToken(db *sql.DB, userId int64, plainToken, label string) error {
 
 // Vérifie si un token API est valide et actif, retourne l'user_id si OK
 func CheckAPIToken(db *sql.DB, token string) (int64, error) {
-	rows, err := db.Query(`SELECT user_id, token_hash FROM user_api_tokens WHERE is_active=1 AND revoked_at IS NULL`)
-	if err != nil {
-		return 0, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var userId int64
-		var hash string
-		if err := rows.Scan(&userId, &hash); err != nil {
-			continue
-		}
-		if bcrypt.CompareHashAndPassword([]byte(hash), []byte(token)) == nil {
-			return userId, nil
-		}
-	}
-	return 0, errors.New("invalid token")
+       rows, err := db.Query(`SELECT user_id, token_hash, is_active FROM user_api_tokens WHERE revoked_at IS NULL`)
+       if err != nil {
+	       return 0, err
+       }
+       defer rows.Close()
+       for rows.Next() {
+	       var userId int64
+	       var hash string
+	       var isActive bool
+	       if err := rows.Scan(&userId, &hash, &isActive); err != nil {
+		       continue
+	       }
+	       if !isActive {
+		       continue
+	       }
+	       if bcrypt.CompareHashAndPassword([]byte(hash), []byte(token)) == nil {
+		       return userId, nil
+	       }
+       }
+       return 0, errors.New("invalid token")
 }

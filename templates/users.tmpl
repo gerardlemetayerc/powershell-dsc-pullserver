@@ -38,6 +38,13 @@
                                             <option value="0">Disable</option>
                                         </select>
                                     </div>
+                                    <div class="form-group">
+                                        <label for="role">Role</label>
+                                        <select class="form-control" id="role" name="role">
+                                            <option value="readonly">readonly</option>
+                                            <option value="admin">admin</option>
+                                        </select>
+                                    </div>
                                     <div id="createUserError" class="text-danger mb-2" style="display:none;"></div>
                                     <button type="submit" class="btn btn-primary">Create</button>
                                 </form>
@@ -70,6 +77,14 @@
 <script src="/web/users.js"></script>
 <script>
 $(function() {
+    // Remplit dynamiquement la liste des rôles
+    $.get('/api/v1/user_roles', function(roles) {
+        var $role = $('#role');
+        $role.empty();
+        $.each(roles, function(i, r) {
+            $role.append($('<option>', { value: r, text: r }));
+        });
+    });
     $('#createUserForm').on('submit', function(e) {
         e.preventDefault();
         $('#createUserError').hide();
@@ -78,7 +93,8 @@ $(function() {
             last_name: $('#lastName').val(),
             email: $('#email').val(),
             password: $('#password').val(),
-            is_active: $('#isActive').val()
+            is_active: $('#isActive').val(),
+            role: $('#role').val()
         };
         $.ajax({
             url: '/api/v1/users',

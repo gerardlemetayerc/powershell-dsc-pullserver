@@ -17,10 +17,7 @@ $(document).ready(function() {
                     return `<button onclick="viewAgentDetail('${data}')">View</button>`;
                 }
             }
-        ],
-        language: {
-            url: '/web/fr-FR.json'
-        }
+        ]
     });
 });
 

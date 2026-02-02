@@ -1,210 +1,218 @@
 package main
 
-import(
-	"crypto"
-	"crypto/tls"
-	samlsp "github.com/crewjam/saml/samlsp"
-	"log"
-	"strings"
+import (
 	"fmt"
-	"context"
-	"net/url"
 	"net/http"
+	"runtime"
+	"os"
+	"path/filepath"
+	"crypto/sha1"
+	"encoding/hex"
+	"crypto/tls"
+	"strings"
+	"go-dsc-pull/utils"
 	"go-dsc-pull/internal/routes"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal"
+	"go-dsc-pull/internal/logs"
+	"go-dsc-pull/internal/auth"
+	"go-dsc-pull/internal/service"
 	"go-dsc-pull/internal/schema"
-	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
-	"database/sql"
 )
 
-// Helper pour parser une URL ou panic
-func mustParseURL(raw string) *url.URL {
-       u, err := url.Parse(raw)
-       if err != nil {
-	       panic(err)
-       }
-       return u
-}
-
-
-// StatusRecorder is now in internal/schema
-
-// loggingMiddleware logs all HTTP requests with method, path, remote addr, and status
-func loggingMiddleware(next http.Handler) http.Handler {
-	   return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		   rec := &schema.StatusRecorder{ResponseWriter: w, Status: 200}
-		   next.ServeHTTP(rec, r)
-		   log.Printf("[HTTP] %s %s %s %d", r.Method, r.URL.Path, r.RemoteAddr, rec.Status)
-	   })
-}
-
 func main() {
-	
-	webMux := http.NewServeMux()
-	// Chargement de la configuration globale (incluant SAML)
-	appCfg, err := internal.LoadAppConfig("config.json")
-	if err != nil {
-		log.Fatalf("[INIT] Erreur chargement config globale: %v", err)
-	}
-	
-	// Initialisation SAML Service Provider si activé
-	var samlMiddleware *samlsp.Middleware
-	if appCfg.SAML.Enabled {
-		log.Println("[SAML] Initialisation du Service Provider SAML...")
-		// Charge la clé privée et le certificat
-		cert, err := tls.LoadX509KeyPair(appCfg.SAML.SPCertFile, appCfg.SAML.SPKeyFile)
-		if err != nil {
-			log.Fatalf("[SAML] Erreur chargement clé/cert SP: %v", err)
-		}
 
-		// Utilise l'entity_id de la config pour l'URL du SP
-		spURL := appCfg.SAML.EntityID
-		idpMetadataURL := appCfg.SAML.IdpMetadataURL
-		idpMetadata, err := samlsp.FetchMetadata(context.Background(), http.DefaultClient, *mustParseURL(idpMetadataURL))
-		if err != nil {
-			log.Fatalf("[SAML] Erreur récupération metadata IdP: %v", err)
-		}
-		samlOptions := samlsp.Options{
-			URL: *mustParseURL(spURL),
-			Key: cert.PrivateKey.(crypto.Signer),
-			Certificate: cert.Leaf,
-			IDPMetadata:  idpMetadata,
-		}
-		samlMiddleware, err = samlsp.New(samlOptions)
-		if samlMiddleware != nil {
-			// Force explicitement l'EntityID à la valeur de la config
-			samlMiddleware.ServiceProvider.EntityID = appCfg.SAML.EntityID
-			log.Printf("[SAML] SP EntityID: %s", samlMiddleware.ServiceProvider.EntityID)
-			log.Printf("[SAML] SP ACS URL: %s", samlMiddleware.ServiceProvider.AcsURL.String())
-			log.Printf("[SAML] SP Metadata URL: %s", samlMiddleware.ServiceProvider.MetadataURL.String())
-		}
-		if err != nil {
-			log.Fatalf("[SAML] Erreur initialisation SAML middleware: %v", err)
-		}
-	}
-	       // Initialisation automatique de la base (CREATE IF NOT EXISTS)
-	       dbCfg := &db.DBConfig{
-		       Driver:   appCfg.Driver,
-		       Server:   appCfg.Server,
-		       Port:     appCfg.Port,
-		       User:     appCfg.User,
-		       Password: appCfg.Password,
-		       Database: appCfg.Database,
-	       }
-	       db.InitDB(dbCfg)
-	       dbConn, err := db.OpenDB(dbCfg)
-	       if err != nil {
-		       log.Fatalf("Erreur ouverture DB: %v", err)
-	       }
-	       // Log SAML activé
-	       if appCfg.SAML.Enabled {
-		       log.Printf("[SAML] Authentification SAML activée (EntityID: %s)", appCfg.SAML.EntityID)
-	       } else {
-		       log.Printf("[SAML] Authentification SAML désactivée (auth locale)")
-	       }
+	   runApp := func() {
+		   // Résout dynamiquement les chemins de cert/key si nécessaire
+		   resolveCertKeyPath := func(certFile, keyFile string) (string, string) {
+			   if filepath.IsAbs(certFile) && filepath.IsAbs(keyFile) {
+				   return certFile, keyFile
+			   }
+			   exePath, err := utils.ExePath()
+			   baseDir := ""
+			   if err == nil {
+				   baseDir = filepath.Dir(exePath)
+			   }
+			   if !filepath.IsAbs(certFile) {
+				   certFile = filepath.Join(baseDir, certFile)
+			   }
+			   if !filepath.IsAbs(keyFile) {
+				   keyFile = filepath.Join(baseDir, keyFile)
+			   }
+			   return certFile, keyFile
+		   }
+		   // Chargement de la configuration globale (incluant SAML)
+		   appCfg, err := internal.LoadAppConfig("config.json")
+		   if err != nil {
+			   logs.WriteLogFile(fmt.Sprintf("ERROR [INIT] Failed to load global config: %v", err))
+			   os.Exit(1)
+		   }
 
-	// Vérifie si la table users est vide et insère le compte admin si besoin
-	{
-		var count int
-		err := dbConn.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
-		if err == nil && count == 0 {
-			hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
-			_, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?)", "Admin", "User", "admin@localhost", string(hash), 1)
-			if err != nil {
-				log.Printf("[INITDB] Erreur insertion admin: %v", err)
-			} else {
-				log.Printf("[INITDB] Compte admin créé: admin@localhost / password")
-			}
-		}
-	}
+		   // Initialisation SAML Service Provider si activé
+		   samlMiddleware, err := auth.InitSamlMiddleware(appCfg)
+		   if err != nil {
+			   logs.WriteLogFile(fmt.Sprintf("ERROR [SAML] %v", err))
+			   os.Exit(1)
+		   }
 
+		   // Initialisation automatique de la base (CREATE IF NOT EXISTS)
+		   dbCfg := &schema.DBConfig{
+			   Driver:   appCfg.Database.Driver,
+			   Server:   appCfg.Database.Server,
+			   Port:     appCfg.Database.Port,
+			   User:     appCfg.Database.User,
+			   Password: appCfg.Database.Password,
+			   Database: appCfg.Database.Database,
+		   }
+		   dbPath := dbCfg.Database
+		   if dbCfg.Driver == "sqlite" && !filepath.IsAbs(dbPath) {
+			   exePath, err := utils.ExePath()
+			   baseDir := ""
+			   if err == nil {
+				   baseDir = filepath.Dir(exePath)
+				   dbCfg.Database = filepath.Join(baseDir, dbPath)
+			   }
+		   }
+		   db.InitDB(dbCfg)
+		   dbConn, err := db.OpenDB(dbCfg)
+		   if err != nil {
+			   logs.WriteLogFile(fmt.Sprintf("ERROR [INITDB] Failed to open DB: %v", err))
+			   os.Exit(1)
+		   }
 
-	// Les ports sont maintenant dans appCfg.DSCPullServer.Port et appCfg.WebUI.Port
+		   if appCfg.SAML.Enabled {
+			   logs.WriteLogFile(fmt.Sprintf("INFO [SAML] SAML Authentication activated (EntityID: %s)", appCfg.SAML.EntityID))
+		   } else {
+			   logs.WriteLogFile("INFO [SAML] SAML Authentication deactivated (local auth)")
+		   }
 
-	// --- Mux DSC (endpoints MS-DSCPM) ---
-	dscMux := http.NewServeMux()
-	routes.RegisterDSCRoutes(dscMux, dbConn)
-	// Register all web/API/GUI routes
-	routes.RegisterWebRoutes(webMux, dbConn, jwtOrAPITokenAuthMiddleware(dbConn), samlMiddleware)
-	// Wrap mux with logging middleware
-	dscHandler := loggingMiddleware(dscMux)
-	webHandler := loggingMiddleware(webMux)
+		   // Vérifie si la table users est vide et insère le compte admin si besoin
+		   {
+			   var count int
+			   err := dbConn.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
+			   if err == nil && count == 0 {
+				   hash, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+				   _, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active, role, source) VALUES (?, ?, ?, ?, ?, ?, ?)", "Admin", "User", "admin@localhost", string(hash), true, "admin", "local")
+				   if err != nil {
+					   logs.WriteLogFile(fmt.Sprintf("ERROR [INITDB] Failed to insert admin: %v", err))
+				   } else {
+					   logs.WriteLogFile("INFO [INITDB] Admin account created: admin@localhost / password")
+				   }
+			   }
+		   }
 
-	// Lancer les deux serveurs sur des ports différents avec HTTPS optionnel
-	go func() {
-		if appCfg.DSCPullServer.EnableHTTPS {
-			log.Printf("Serveur DSC (HTTPS) sur :%d ...", appCfg.DSCPullServer.Port)
-			log.Fatal(http.ListenAndServeTLS(
-				fmt.Sprintf(":%d", appCfg.DSCPullServer.Port),
-				appCfg.DSCPullServer.CertFile,
-				appCfg.DSCPullServer.KeyFile,
-				dscHandler,
-			))
-		} else {
-			log.Printf("Serveur DSC (HTTP) sur :%d ...", appCfg.DSCPullServer.Port)
-			log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", appCfg.DSCPullServer.Port), dscHandler))
-		}
-	}()
+		   // --- Mux DSC (endpoints MS-DSCPM) ---
+		   dscMux := http.NewServeMux()
+		   routes.RegisterDSCRoutes(dscMux, dbConn)
+		   // Middleware pour logguer le certificat client DSC
+		   dscCertLogMiddleware := func(next http.Handler) http.Handler {
+			   return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				   if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+					   clientCert := r.TLS.PeerCertificates[0]
+					   h := sha1.New()
+					   h.Write(clientCert.Raw)
+					   sha1sum := hex.EncodeToString(h.Sum(nil))
+					   sha1sumLower := strings.ToLower(sha1sum)
+					   logs.WriteLogFile(fmt.Sprintf("[DSC][TLS] Certificat client reçu: Subject=%s, Thumbprint=%s", clientCert.Subject, sha1sumLower))
+					   // Vérification de l'empreinte si la validation du certificat client est activée
+					   // On ne fait PAS ce contrôle pour la route de registration DSC (PUT /PSDSCPullServer.svc/{node})
+					   isRegister := r.Method == "PUT" && strings.HasPrefix(r.URL.Path, "/PSDSCPullServer.svc/") && len(strings.Split(r.URL.Path, "/")) == 3
+					   if appCfg.DSCPullServer.EnableClientCertValidation && !isRegister {
+						   // Vérifier la présence de l'empreinte dans la base de données (en minuscules)
+						   var count int
+						   err := dbConn.QueryRow("SELECT COUNT(*) FROM agents WHERE LOWER(certificate_thumbprint) = ?", sha1sumLower).Scan(&count)
+						   if err != nil {
+							   logs.WriteLogFile(fmt.Sprintf("[DSC][TLS] Error verifying thumbprint: %v", err))
+							   http.Error(w, "Internal error verifying certificate", http.StatusInternalServerError)
+							   return
+						   }
+						   if count == 0 {
+							   logs.WriteLogFile(fmt.Sprintf("[DSC][TLS] Certificate thumbprint not recognized: %s", sha1sumLower))
+							   http.Error(w, "Certificate unauthorized", http.StatusUnauthorized)
+							   return
+						   }
+					   }
+				   }
+				   next.ServeHTTP(w, r)
+			   })
+		   }
+		   // --- Mux Web/API/GUI ---
+		   webMux := http.NewServeMux()
+		   routes.RegisterWebRoutes(webMux, dbConn, auth.JwtOrAPITokenAuthMiddleware(dbConn), samlMiddleware)
 
-	if appCfg.WebUI.EnableHTTPS {
-		log.Printf("Serveur IHM/API (HTTPS) sur :%d ... (IHM sur /web/)", appCfg.WebUI.Port)
-		log.Fatal(http.ListenAndServeTLS(
-			fmt.Sprintf(":%d", appCfg.WebUI.Port),
-			appCfg.WebUI.CertFile,
-			appCfg.WebUI.KeyFile,
-			webHandler,
-		))
-	} else {
-		log.Printf("Serveur IHM/API (HTTP) sur :%d ... (IHM sur /web/)", appCfg.WebUI.Port)
-		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", appCfg.WebUI.Port), webHandler))
-	}
-}
+		   // Ajout du logging middleware
+		   dscHandler := logs.LoggingMiddleware(dscCertLogMiddleware(dscMux))
+		   webHandler := logs.LoggingMiddleware(webMux)
 
-
-// Middleware de vérification JWT Bearer
-func jwtOrAPITokenAuthMiddleware(dbConn *sql.DB) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			auth := r.Header.Get("Authorization")
-			if strings.HasPrefix(auth, "Bearer ") {
-				tokenStr := strings.TrimPrefix(auth, "Bearer ")
-				secret := []byte("supersecretkey")
-				jwtToken, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-						return nil, fmt.Errorf("Unexpected signing method")
-					}
-					return secret, nil
-				})
-				if err == nil && jwtToken.Valid {
-					if claims, ok := jwtToken.Claims.(jwt.MapClaims); ok {
-						if sub, ok := claims["sub"].(string); ok {
-							ctx := context.WithValue(r.Context(), "userId", sub)
-							r = r.WithContext(ctx)
+		   // Lancer les deux serveurs sur des ports différents avec HTTPS optionnel
+		   go func() {
+			   if appCfg.DSCPullServer.EnableHTTPS {
+				   logs.WriteLogFile(fmt.Sprintf("INFO [DSC Core Server] DSC Server (HTTPS) on :%d ...", appCfg.DSCPullServer.Port))
+				   certFile, keyFile := resolveCertKeyPath(appCfg.DSCPullServer.CertFile, appCfg.DSCPullServer.KeyFile)
+				   // Bypass CA verification: accepter tout certificat client présenté
+				 tlsConfig := &tls.Config{}
+				   if appCfg.DSCPullServer.EnableClientCertValidation {
+					   if appCfg.DSCPullServer.BypassCAValidation {  
+							tlsConfig = &tls.Config{
+								ClientAuth: tls.RequireAnyClientCert,
+							}
 						}
+					}else{
+						logs.WriteLogFile(fmt.Sprintf("WARN [DSC Core Server] Client certificate validation is disabled."))
 					}
-					next.ServeHTTP(w, r)
-					return
-				}
-				http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
-				return
-			}
-			// Si ce n'est pas Bearer, tente API token
-			if strings.HasPrefix(auth, "Token ") {
-				tokenStr := strings.TrimPrefix(auth, "Token ")
-				userId, apiErr := db.CheckAPIToken(dbConn, tokenStr)
-				if apiErr == nil && userId > 0 {
-					ctx := context.WithValue(r.Context(), "userId", userId)
-					r = r.WithContext(ctx)
-					next.ServeHTTP(w, r)
-					return
-				}
-				http.Error(w, "Invalid or expired API token", http.StatusUnauthorized)
-				return
-			}
-			http.Error(w, "Missing or invalid Authorization header", http.StatusUnauthorized)
-			return
-		})
-	}
+				   server := &http.Server{
+					   Addr:      fmt.Sprintf(":%d", appCfg.DSCPullServer.Port),
+					   Handler:   dscHandler,
+					   TLSConfig: tlsConfig,
+				   }
+				   err := server.ListenAndServeTLS(certFile, keyFile)
+				   if err != nil {
+					   logs.WriteLogFile(fmt.Sprintf("ERROR [DSC Core Server] Error starting HTTPS server: %v", err))
+					   os.Exit(1)
+				   }
+			   } else {
+				   logs.WriteLogFile(fmt.Sprintf("INFO [DSC WebUi] DSC Server (HTTP) on :%d ...", appCfg.DSCPullServer.Port))
+				   err := http.ListenAndServe(fmt.Sprintf(":%d", appCfg.DSCPullServer.Port), dscHandler)
+				   if err != nil {
+					   logs.WriteLogFile(fmt.Sprintf("ERROR [DSC WebUi] Error starting HTTP server: %v", err))
+					   os.Exit(1)
+				   }
+			   }
+		   }()
+
+		   if appCfg.WebUI.EnableHTTPS {
+			   logs.WriteLogFile(fmt.Sprintf("INFO [DSC WebUI] IHM/API (HTTPS) on :%d ... (IHM on /web/)", appCfg.WebUI.Port))
+			   certFile, keyFile := resolveCertKeyPath(appCfg.WebUI.CertFile, appCfg.WebUI.KeyFile)
+			   err := http.ListenAndServeTLS(
+				   fmt.Sprintf(":%d", appCfg.WebUI.Port),
+				   certFile,
+				   keyFile,
+				   webHandler,
+			   )
+			   if err != nil {
+				   logs.WriteLogFile(fmt.Sprintf("ERROR [DSC WebUI] Error starting HTTPS server: %v", err))
+				   os.Exit(1)
+			   }
+		   } else {
+			   logs.WriteLogFile(fmt.Sprintf("INFO [DSC WebUI] IHM/API (HTTP) on :%d ... (IHM on /web/)", appCfg.WebUI.Port))
+			   err := http.ListenAndServe(fmt.Sprintf(":%d", appCfg.WebUI.Port), webHandler)
+			   if err != nil {
+				   logs.WriteLogFile(fmt.Sprintf("ERROR [DSC WebUI] Error starting HTTP server: %v", err))
+				   os.Exit(1)
+			   }
+		   }
+	   }
+
+	   if runtime.GOOS == "windows" {
+		   err := service.StartWindowsService("DSCPullServer", runApp)
+		   if err != nil {
+			   logs.WriteLogFile(fmt.Sprintf("ERROR [SERVICE] %v", err))
+			   os.Exit(1)
+		   }
+	   } else {
+		   runApp()
+	   }
 }
+
+

@@ -4,12 +4,21 @@ import (
 	"net/http"
 	"database/sql"
 	"go-dsc-pull/handlers"
+	"path/filepath"
+	"go-dsc-pull/utils"
 	samlsp "github.com/crewjam/saml/samlsp"
 )
 
 // RegisterWebRoutes sets up all web/API endpoints on the provided mux
 func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware func(http.Handler) http.Handler, samlMiddleware http.Handler) {
-		mux.Handle("GET /api/v1/my", jwtAuthMiddleware(http.HandlerFunc(handlers.MyUserInfoHandler(dbConn))))
+		// Endpoint pour la liste des profils utilisateurs disponibles
+		mux.Handle("GET /api/v1/user_roles", jwtAuthMiddleware(http.HandlerFunc(handlers.UserRolesHandler())))
+	exeDir, err := utils.ExePath()
+	if err != nil {
+		panic("Failed to get executable path: " + err.Error())
+	}
+	baseDir := filepath.Dir(exeDir)
+	mux.Handle("GET /api/v1/my", jwtAuthMiddleware(http.HandlerFunc(handlers.MyUserInfoHandler(dbConn))))
 	mux.Handle("/web/profile", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.ProfileHandler)))
 	// API tokens utilisateur
 	mux.Handle("GET /api/v1/users/{id}/tokens", jwtAuthMiddleware(http.HandlerFunc(handlers.ListUserAPITokensHandler(dbConn))))
@@ -19,11 +28,18 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	// SAML endpoints
 	mux.Handle("GET /api/v1/saml/userinfo", http.HandlerFunc(handlers.SAMLUserInfoHandler))
 	mux.Handle("GET /api/v1/saml/enabled", http.HandlerFunc(handlers.SAMLStatusHandler))
+	// SAML config management (admin only)
+	mux.Handle("GET /api/v1/saml/config", jwtAuthMiddleware(http.HandlerFunc(handlers.SAMLConfigAPIHandler)))
+	mux.Handle("PUT /api/v1/saml/config", jwtAuthMiddleware(http.HandlerFunc(handlers.SAMLConfigAPIHandler)))
+	mux.Handle("POST /api/v1/saml/upload_sp_keycert", jwtAuthMiddleware(http.HandlerFunc(handlers.SAMLUploadSPKeyCertHandler)))
+	// Web UI for SAML config (admin only)
+	mux.Handle("GET /web/saml_config", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebSAMLConfigHandler)))
 	if samlMiddleware != nil {
 		mux.Handle("/saml/", samlMiddleware)
 	}
 	// API REST endpoints (agents, configs, reports, modules, properties, configuration_models, users, login)
 	mux.Handle("GET /api/v1/agents", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentAPIHandler)))
+	mux.Handle("POST /api/v1/agents/preenroll", jwtAuthMiddleware(http.HandlerFunc(handlers.PreEnrollAgentHandler)))
 	mux.Handle("GET /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandler)))
 	mux.Handle("POST /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete)))
 	mux.Handle("DELETE /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete)))
@@ -62,7 +78,7 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 			handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)).ServeHTTP(w, r)
 			return
 		}
-		fullPath := "web/" + path
+		fullPath := filepath.Join(baseDir, "web", path)
 		info, err := handlers.StatFile(fullPath)
 		if err != nil || info.IsDir() {
 			http.NotFound(w, r)
@@ -84,4 +100,9 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("PUT /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateUserHandler(dbConn))))
 	mux.Handle("DELETE /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteUserHandler(dbConn))))
 	mux.Handle("POST /api/v1/users/{id}/active", jwtAuthMiddleware(http.HandlerFunc(handlers.SetUserActiveHandler(dbConn))))
+	// API tags agents
+	mux.Handle("GET /api/v1/agents/{id}/tags", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentTagsListHandler)))
+	mux.Handle("PUT /api/v1/agents/{id}/tags", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentTagsSetHandler)))
+	mux.Handle("DELETE /api/v1/agents/{id}/tags", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentTagsDeleteHandler)))
+
 }

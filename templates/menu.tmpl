@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btn) {
         btn.onclick = function() {
             localStorage.removeItem('jwt_token');
+            // Supprime le cookie JWT si présent
+            document.cookie = 'jwt_token=; Max-Age=0; path=/;';
+            document.cookie = 'token=; Max-Age=0; path=/;';
             window.location.href = '/web/login';
         };
     }
@@ -97,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a disabled href="/web/auth" class="nav-link">
+                            <a disabled href="/web/saml_config" class="nav-link">
                                 <i class="fas fa-key nav-icon"></i>
                                 <p>Authentication</p>
                             </a>

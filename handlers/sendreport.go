@@ -9,6 +9,7 @@ import (
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
 	"go-dsc-pull/utils"
+	"path/filepath"
 )
 
 // SendReportHandler gère POST /PSDSCPullServer.svc/Nodes(AgentId='...')/SendReport
@@ -37,9 +38,14 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 	additionalDataJson, _ := json.Marshal(report.AdditionalData)
 
 	// Insérer en base
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err == nil {
-		database, err := db.OpenDB(dbCfg)
+	   exeDir, err := utils.ExePath()
+	   var dbCfg *schema.DBConfig
+	   if err == nil {
+		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
+		   dbCfg, err = db.LoadDBConfig(configPath)
+	   }
+	   if err == nil {
+		   database, err := db.OpenDB(dbCfg)
 		if err == nil {
 			   // Vérifie si un rapport existe déjà pour ce job_id
 			   var count int
@@ -99,7 +105,7 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 				   if strings.ToLower(report.Status) == "failure" {
 					   hasError = 1
 				   }
-				   _, err = database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP, has_error_last_report = ? WHERE agent_id = ?", hasError, agentId)
+				   _, err = database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP, has_error_last_report = ?, state = ? WHERE agent_id = ?", hasError, report.Status, agentId)
 				   if err != nil {
 					   log.Printf("[SENDREPORT] Erreur update last_communication/has_error_last_report: %v", err)
 				   }

@@ -1,0 +1,80 @@
+
+{{define "content"}}
+<section class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1>Authentication configuration</h1>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="content">
+  <div class="container-fluid">
+    <div class="card">
+      <div class="card-body">
+        <form id="saml-config-form">
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="enabled" name="enabled">
+            <label class="form-check-label" for="enabled">Enabled</label>
+          </div>
+            <!-- Hidden fields to preserve key/cert values -->
+            <input type="hidden" id="sp_cert_file" name="sp_cert_file">
+            <input type="hidden" id="sp_key_file" name="sp_key_file">
+          <div class="form-group saml-fields">
+            <label for="entity_id">Entity ID (application base URL)</label>
+            <input type="text" class="form-control" id="entity_id" name="entity_id">
+          </div>
+          <div class="form-group saml-fields">
+            <label for="idp_metadata_url">IdP Metadata URL</label>
+            <input type="text" class="form-control" id="idp_metadata_url" name="idp_metadata_url">
+          </div>
+          <div class="form-group saml-fields">
+            <label>Service Provider Key/Certificate</label>
+            <div class="input-group">
+              <div class="custom-file">
+                <input type="file" class="custom-file-input" id="sp_key_upload" name="sp_key_upload" accept=".key,.pem">
+                <label class="custom-file-label" for="sp_key_upload">Upload Private Key (.key/.pem)</label>
+              </div>
+            </div>
+            <div class="input-group mt-2">
+              <div class="custom-file">
+                <input type="file" class="custom-file-input" id="sp_cert_upload" name="sp_cert_upload" accept=".crt,.pem">
+                <label class="custom-file-label" for="sp_cert_upload">Upload Certificate (.crt/.pem)</label>
+              </div>
+            </div>
+            <button type="button" class="btn btn-secondary mt-2" id="upload-sp-keycert">Upload Key/Cert</button>
+            <span id="sp-upload-status" class="ml-3"></span>
+          </div>
+          <div class="form-group saml-fields">
+            <label>Claims mapping</label>
+            <table class="table table-bordered" id="claims-table">
+              <thead>
+                <tr><th>Field</th><th>SAML Claim URI</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>email</td>
+                  <td><input type="text" class="form-control claim-uri-input" data-claim="email" id="claim-email-uri"></td>
+                </tr>
+                <tr>
+                  <td>givenname</td>
+                  <td><input type="text" class="form-control claim-uri-input" data-claim="givenname" id="claim-givenname-uri"></td>
+                </tr>
+                <tr>
+                  <td>sn</td>
+                  <td><input type="text" class="form-control claim-uri-input" data-claim="sn" id="claim-sn-uri"></td>
+                </tr>
+              </tbody>
+            </table>
+            <!-- Ajout/suppression de claims additionnels désactivé -->
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+          <span id="saml-config-status" class="ml-3"></span>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+<script src="/web/saml_config.js"></script>
+{{end}}

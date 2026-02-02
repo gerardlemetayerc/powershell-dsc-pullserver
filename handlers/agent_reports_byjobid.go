@@ -28,7 +28,16 @@ func AgentReportsByJobIdHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
-	row := database.QueryRow(`SELECT raw_json FROM reports WHERE agent_id = ? AND job_id = ? ORDER BY created_at DESC LIMIT 1`, agentId, jobId)
+	var query string
+	switch dbCfg.Driver {
+	case "sqlite":
+		query = `SELECT raw_json FROM reports WHERE agent_id = ? AND job_id = ? ORDER BY created_at DESC LIMIT 1`
+	case "mssql":
+		query = `SELECT TOP 1 raw_json FROM reports WHERE agent_id = ? AND job_id = ? ORDER BY created_at DESC`
+	default:
+		query = `SELECT raw_json FROM reports WHERE agent_id = ? AND job_id = ? ORDER BY created_at DESC`
+	}
+	row := database.QueryRow(query, agentId, jobId)
 	var raw string
 	err = row.Scan(&raw)
 	if err != nil {

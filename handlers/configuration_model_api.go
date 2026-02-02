@@ -5,8 +5,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
+	"fmt"
+	"go-dsc-pull/internal/utils"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/logs"
 	jwt "github.com/golang-jwt/jwt/v5"
 )
 
@@ -39,13 +43,37 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Le fichier doit être au format .mof"))
 		return
 	}
-	// Calcule le nom du modèle (nom du fichier sans .mof)
-	name := filename[:len(filename)-4]
-	mofBytes, err := ioutil.ReadAll(file)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	       // Calcule le nom du modèle (nom du fichier sans .mof)
+	       name := strings.ToLower(filename[:len(filename)-4])
+	       mofBytes, err := ioutil.ReadAll(file)
+	       if err != nil {
+		       w.WriteHeader(http.StatusInternalServerError)
+		       return
+	       }
+		       // Vérifie si une config existe déjà avec ce nom
+		       var existingId int64
+		       var existingDate string
+		       err = dbConn.QueryRow("SELECT id, upload_date FROM configuration_model WHERE name = ? ORDER BY upload_date LIMIT 1", name).Scan(&existingId, &existingDate)
+		       if err == nil && existingId > 0 {
+			       // Renomme l'ancienne config : <nom>-<dateuploadinitial>
+			       safeDate := existingDate
+			       safeDate = strings.ReplaceAll(safeDate, ":", "")
+			       safeDate = strings.ReplaceAll(safeDate, "-", "")
+			       safeDate = strings.ReplaceAll(safeDate, " ", "_")
+			       newName := name + "-" + safeDate
+			       _, _ = dbConn.Exec("UPDATE configuration_model SET name = ? WHERE id = ?", newName, existingId)
+		       }
+
+			   // Met à jour le statut des agents liés à cette configuration
+			   res, err := dbConn.Exec("UPDATE agents SET state = 'pending_apply' WHERE agent_id IN (SELECT agent_id FROM agent_configurations WHERE LOWER(configuration_name) = ?)", name)
+			   if err != nil {
+				   // log erreur
+				   logs.WriteLogFile("[ERROR] Erreur UPDATE agents pending_apply: " + err.Error())
+			   } else {
+				   n, _ := res.RowsAffected()
+				   msg := fmt.Sprintf("[INFO] New configuration uploaded, impacted nodes: %d", n)
+				   logs.WriteLogFile(msg)
+			   }
 	// Récupère le username depuis le JWT (claim "sub")
 	uploadedBy := "?"
 	if r.Context().Value("user") != nil {
@@ -161,6 +189,10 @@ func UpdateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if !utils.IsAdmin(r, dbConn) {
+		http.Error(w, "Forbidden: admin only", http.StatusForbidden)
 		return
 	}
 	name := r.FormValue("name")

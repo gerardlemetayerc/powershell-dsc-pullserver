@@ -26,7 +26,6 @@ func WebJWTAuthMiddleware(next http.Handler) http.Handler {
 			   cookie, err := r.Cookie("jwt_token")
 			   if err == nil {
 				   tokenStr = cookie.Value
-				   fmt.Printf("[WebJWTAuthMiddleware] Cookie 'token' reçu: %.40s...\n", tokenStr)
 			   } else {
 				   fmt.Printf("[WebJWTAuthMiddleware] Pas de cookie 'token'\n")
 			   }

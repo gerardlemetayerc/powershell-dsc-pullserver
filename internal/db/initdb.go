@@ -2,28 +2,50 @@
 package db
 
 import (
-    "log"
+    "os"
+    "go-dsc-pull/internal/logs"
+    "go-dsc-pull/internal/schema"
     "io/ioutil"
+    "path/filepath"
+    "go-dsc-pull/utils"
 )
 
 
 // InitDB initialise la base de données à partir du schéma SQL (CREATE IF NOT EXISTS)
-func InitDB(cfg *DBConfig) {
+func InitDB(cfg *schema.DBConfig) {
     database, err := OpenDB(cfg)
     if err != nil {
-        log.Fatalf("[INITDB] Erreur ouverture DB: %v", err)
+        logs.WriteLogFile("ERROR [INITDB] Failed to open DB: " + err.Error())
+        os.Exit(1)
     }
     defer database.Close()
 
-    schema, err := ioutil.ReadFile("internal\\db\\schema.sql")
+    exeDir, err := utils.ExePath()
     if err != nil {
-        log.Fatalf("[INITDB] Erreur lecture schema.sql: %v", err)
+        logs.WriteLogFile("ERROR [INITDB] Failed to get executable path: " + err.Error())
+        os.Exit(1)
+    }
+    var schemaFile string
+    switch cfg.Driver {
+    case "sqlite":
+        schemaFile = "schema_sqlite.sql"
+    case "mssql", "sqlserver":
+        schemaFile = "schema_mssql.sql"
+    default:
+        schemaFile = "schema_sqlite.sql" // fallback
+    }
+    schemaPath := filepath.Join(filepath.Dir(exeDir), "db", schemaFile)
+    schema, err := ioutil.ReadFile(schemaPath)
+    if err != nil {
+        logs.WriteLogFile("ERROR [INITDB] Failed to read " + schemaFile + ": " + err.Error())
+        os.Exit(1)
     }
 
     _, err = database.Exec(string(schema))
     if err != nil {
-        log.Fatalf("[INITDB] Erreur exécution du schéma SQL: %v", err)
+        logs.WriteLogFile("ERROR [INITDB] Failed to execute SQL schema: " + err.Error())
+        os.Exit(1)
     }
 
-    log.Println("[INITDB] Schéma DB vérifié/créé.")
+    logs.WriteLogFile("INFO [INITDB] DB schema checked/created.")
 }

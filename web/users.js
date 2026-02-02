@@ -12,14 +12,19 @@ $(function() {
             { data: 'created_at', defaultContent: '' },
             { data: 'last_logon_date', defaultContent: '' },
             { data: null, orderable: false, render: function(data, type, row) {
-                return `
+                let html = `
                     <button class="btn btn-sm btn-info edit-user" data-id="${row.id}"><i class="fas fa-edit"></i></button>
-                    <button class="btn btn-sm btn-warning password-user" data-id="${row.id}"><i class="fas fa-key"></i></button>
+                `;
+                if (!row.source || row.source.toLowerCase() === 'local') {
+                    html += `<button class="btn btn-sm btn-warning password-user" data-id="${row.id}"><i class="fas fa-key"></i></button>`;
+                }
+                html += `
                     <button class="btn btn-sm btn-danger delete-user" data-id="${row.id}"><i class="fas fa-trash"></i></button>
                     <button class="btn btn-sm btn-${row.is_active ? 'warning' : 'success'} toggle-active" data-id="${row.id}" data-active="${row.is_active}">
                         <i class="fas fa-${row.is_active ? 'ban' : 'check'}"></i>
                     </button>
                 `;
+                return html;
             }}
         ]
     });

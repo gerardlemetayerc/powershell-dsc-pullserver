@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"path/filepath"
+	"go-dsc-pull/internal/auth"
 )
 
 // Helper: extract module name/version from .psd1
@@ -71,7 +72,7 @@ func ModuleUploadHandler(db *sql.DB) http.HandlerFunc {
 				name = parts[0]
 				version = parts[1]
 			}
-			   // (Suppression de la sauvegarde temporaire du zip)
+			// (Suppression de la sauvegarde temporaire du zip)
 			log.Printf("[DEBUG] Zip size: %d", len(nupkgBytes))
 			log.Printf("[DEBUG] name: %s, version: %s", name, version)
 			log.Printf("[DEBUG] Checksum...")
@@ -136,8 +137,11 @@ func ModuleUploadHandler(db *sql.DB) http.HandlerFunc {
 				}
 			}
 		}
-		log.Printf("[DEBUG] name: %s, version: %s", name, version)
-		if name == "" || version == "" {
+		   if !auth.IsAdmin(r, db) {
+			   http.Error(w, "Forbidden: admin only", http.StatusForbidden)
+			   return
+		   }
+		   if name == "" || version == "" {
 			http.Error(w, "Module info not found in root psd1", http.StatusBadRequest)
 			return
 		}
@@ -166,7 +170,7 @@ func ModuleUploadHandler(db *sql.DB) http.HandlerFunc {
 		}
 		zipWriter.Close()
 		zipBytes := buf.Bytes()
-		   // (Suppression de la sauvegarde temporaire du zip)
+		// (Suppression de la sauvegarde temporaire du zip)
 		log.Printf("[DEBUG] Nb fichiers extraits: %d, zipBytes size: %d", len(moduleFiles), len(zipBytes))
 		log.Printf("[DEBUG] Checksum...")
 		sha := sha256.Sum256(zipBytes)
@@ -178,5 +182,6 @@ func ModuleUploadHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		fmt.Fprintf(w, "Module %s v%s uploaded and processed.\n", name, version)
+		   // ...existing code...
 	}
 }
