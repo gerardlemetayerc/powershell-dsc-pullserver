@@ -1,0 +1,56 @@
+name: Build and Release DSC Admin Console
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build executable
+        run: |
+          go build -o DSC-Admin-Console.exe
+
+      - name: Prepare release folder
+        run: |
+          mkdir release
+          copy DSC-Admin-Console.exe release\
+          xcopy db release\db /E /I
+          xcopy web release\web /E /I
+          xcopy templates release\templates /E /I
+
+      - name: Zip release
+        run: |
+          Compress-Archive -Path release\* -DestinationPath DSC-Admin-Console.zip
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DSC-Admin-Console
+          path: DSC-Admin-Console.zip
+
+  zip-powershell:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Zip PowerShell module
+        run: |
+          Compress-Archive -Path powershell\DSCPullServer\* -DestinationPath DSCPullServer.zip
+
+      - name: Upload PowerShell artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DSCPullServer
+          path: DSCPullServer.zip
