@@ -8,3 +8,4 @@
 *.key
 *.cer
 saml_keycert_archive/*
+config.json

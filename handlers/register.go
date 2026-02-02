@@ -8,6 +8,7 @@ import (
 	"time"
 	utils "go-dsc-pull/utils"
 	internalutils "go-dsc-pull/internal/utils"
+	"go-dsc-pull/internal"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
 	"io"
@@ -16,11 +17,23 @@ import (
 // RegisterHandler gère l'enregistrement initial (POST /PSDSCPullServer.svc/Nodes)
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	// --- Contrôle de la signature Authorization DSC ---
-	const registrationKeyPlain = "AnyString" // Stockée en clair
 	authHeader := r.Header.Get("Authorization")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Unable to read request body", http.StatusInternalServerError)
+		return
+	}
+	// Charger la config pour récupérer la clé d'enregistrement
+	appCfg, err := internal.LoadAppConfig("config.json")
+	if err != nil {
+		log.Printf("[REGISTER][CONFIG] Error loading config: %v", err)
+		http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
+		return
+	}
+	registrationKeyPlain := appCfg.DSCPullServer.RegistrationKey
+	if registrationKeyPlain == "" {
+		log.Printf("[REGISTER][CONFIG] registrationKey missing in config file, server stopped.")
+		http.Error(w, "Server configuration error: registrationKey missing", http.StatusInternalServerError)
 		return
 	}
 	xmsDate := r.Header.Get("x-ms-date")

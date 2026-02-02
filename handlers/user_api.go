@@ -7,6 +7,7 @@ import (
 	"strings"
 	"golang.org/x/crypto/bcrypt"
 	"log"
+	"go-dsc-pull/internal"
 	"time"
 	"strconv"
 	"github.com/golang-jwt/jwt/v5"
@@ -173,7 +174,13 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 		if err := internaldb.UpdateLastLogon(db, id); err != nil {
 			log.Printf("[LOGIN] Erreur update last_logon_date: %v", err)
 		}
-		secret := []byte("supersecretkey")
+		appCfg, err := internal.LoadAppConfig("config.json")
+		if err != nil {
+			log.Printf("[REGISTER][CONFIG] Error loading config: %v", err)
+			http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
+			return
+		}
+		secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
 		expiresAt := time.Now().Add(60 * time.Minute).Unix()
 		claims := jwt.MapClaims{
 			"sub": req.Username,

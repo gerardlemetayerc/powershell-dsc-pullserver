@@ -7,6 +7,8 @@ type HTTPConfig struct {
 	KeyFile     string `json:"key_file"`
 	EnableClientCertValidation bool `json:"enable_client_cert_validation"`
 	BypassCAValidation bool `json:"bypass_ca_validation"`
+	RegistrationKey string `json:"registrationKey"`
+	SharedAccessSecret string `json:"shared_secret"`
 }
 
 type AppConfig struct {

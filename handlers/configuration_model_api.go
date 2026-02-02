@@ -7,8 +7,10 @@ import (
 	"strconv"
 	"strings"
 	"fmt"
+	"log"
 	"go-dsc-pull/internal/utils"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal"
 	"go-dsc-pull/internal/schema"
 	"go-dsc-pull/internal/logs"
 	jwt "github.com/golang-jwt/jwt/v5"
@@ -84,7 +86,13 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		// Décodage manuel du JWT si le middleware ne pose pas le contexte
 		tokenStr := auth[7:]
 		// Utilise la même clé que le middleware
-		secret := []byte("supersecretkey")
+		appCfg, err := internal.LoadAppConfig("config.json")
+		if err != nil {
+			log.Printf("[REGISTER][CONFIG] Error loading config: %v", err)
+			http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
+			return
+		}
+		secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
 		token, _ := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) { return secret, nil })
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 			if sub, ok := claims["sub"].(string); ok {

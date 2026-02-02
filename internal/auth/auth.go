@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"go-dsc-pull/internal"
 	"github.com/golang-jwt/jwt/v5"
 	"go-dsc-pull/internal/db"
 )
@@ -17,7 +18,12 @@ func JwtOrAPITokenAuthMiddleware(dbConn *sql.DB) func(http.Handler) http.Handler
 			auth := r.Header.Get("Authorization")
 			if strings.HasPrefix(auth, "Bearer ") {
 				tokenStr := strings.TrimPrefix(auth, "Bearer ")
-				secret := []byte("supersecretkey")
+				appCfg, err := internal.LoadAppConfig("config.json")
+				if err != nil {
+					http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
+					return
+				}
+				secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
 				jwtToken, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 						return nil, fmt.Errorf("Unexpected signing method")

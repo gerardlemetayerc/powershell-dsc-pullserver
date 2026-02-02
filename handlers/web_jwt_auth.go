@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 	"github.com/golang-jwt/jwt/v5"
+	"go-dsc-pull/internal"
+	"log"
 	"fmt"
 	"os"
 )
@@ -36,7 +38,13 @@ func WebJWTAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		// 3. Valide le JWT (clé à adapter selon ton projet)
-		secret := []byte("supersecretkey")
+		appCfg, err := internal.LoadAppConfig("config.json")
+		if err != nil {
+			log.Printf("[REGISTER][CONFIG] Error loading config: %v", err)
+			http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
+			return
+		}
+		secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
 		jwtToken, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("Unexpected signing method")
