@@ -19,6 +19,11 @@ func UpdateLastLogon(db *sql.DB, userId interface{}) error {
 	return err
 }
 
+func UpdateRole(db *sql.DB, userId interface{}, role string) error {
+	_, err := db.Exec("UPDATE users SET role=? WHERE id=?", role, userId)
+	return err
+}
+
 func LoadDBConfig(path string) (*schema.DBConfig, error) {
 	var absPath string
 	if filepath.IsAbs(path) {
