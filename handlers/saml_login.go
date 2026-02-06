@@ -56,6 +56,7 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 				for _, g := range groupVals {
 					if g == adminValue {
 						isAdmin = true
+						log.Printf("[SAML] User is in admin group: %s", g)
 					}
 					if g == userValue {
 						isUser = true
@@ -110,10 +111,11 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 
 	secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
 	expiresAt := time.Now().Add(60 * time.Minute).Unix()
-	claims := jwt.MapClaims{
-		"sub": email,
-		"exp": expiresAt,
-	}
+		claims := jwt.MapClaims{
+			"sub": email,
+			"exp": expiresAt,
+			"role": role,
+		}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString(secret)
 	if err != nil {

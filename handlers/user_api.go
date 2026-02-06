@@ -147,11 +147,12 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		       // On récupère aussi la source
-		       row := db.QueryRow("SELECT id, password_hash, source FROM users WHERE email = ? AND is_active = 1", req.Username)
-		       var id int64
-		       var hash string
-		       var source string
-			       err := row.Scan(&id, &hash, &source)
+			       row := db.QueryRow("SELECT id, password_hash, source, role FROM users WHERE email = ? AND is_active = 1", req.Username)
+			       var id int64
+			       var hash string
+			       var source string
+			       var role string
+				       err := row.Scan(&id, &hash, &source, &role)
 			       if err == sql.ErrNoRows {
 				       http.Error(w, "Utilisateur ou mot de passe incorrect", http.StatusUnauthorized)
 				       return
@@ -182,10 +183,11 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 		}
 		secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
 		expiresAt := time.Now().Add(60 * time.Minute).Unix()
-		claims := jwt.MapClaims{
-			"sub": req.Username,
-			"exp": expiresAt,
-		}
+		   claims := jwt.MapClaims{
+			   "sub": req.Username,
+			   "exp": expiresAt,
+			   "role": role,
+		   }
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		signed, err := token.SignedString(secret)
 		if err != nil {
