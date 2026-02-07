@@ -8,7 +8,7 @@ CREATE TABLE users (
     is_active BIT DEFAULT 1,
     created_at DATETIME DEFAULT GETDATE(),
     last_logon_date DATETIME,
-    role NVARCHAR(50) DEFAULT 'readonly',
+    role NVARCHAR(50) DEFAULT 'user',
     source NVARCHAR(50) DEFAULT 'local'
 );
 
