@@ -4,13 +4,26 @@ import (
 	"net/http"
 	"database/sql"
 	"go-dsc-pull/handlers"
+	"go-dsc-pull/internal/middleware"
+	"go-dsc-pull/internal/auth"
 	"path/filepath"
 	"go-dsc-pull/utils"
 	samlsp "github.com/crewjam/saml/samlsp"
+	"html/template"
 )
 
 // RegisterWebRoutes sets up all web/API endpoints on the provided mux
 func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware func(http.Handler) http.Handler, samlMiddleware http.Handler) {
+			// Admin-only middleware for user management
+			adminOnly := func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if !auth.IsAdmin(r, dbConn) {
+						http.Error(w, "Unauthorized", http.StatusUnauthorized)
+						return
+					}
+					next.ServeHTTP(w, r)
+				})
+			}
 		// Endpoint pour la liste des profils utilisateurs disponibles
 		mux.Handle("GET /api/v1/user_roles", jwtAuthMiddleware(http.HandlerFunc(handlers.UserRolesHandler())))
 	exeDir, err := utils.ExePath()
@@ -90,15 +103,41 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("/web/modules", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebModulesHandler)))
 	mux.Handle("/web/configuration_model", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebConfigurationModelHandler)))
 	mux.Handle("/templates/properties.tmpl", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebPropertiesHandler)))
-	mux.Handle("/web/users", handlers.WebJWTAuthMiddleware(http.HandlerFunc(WebUsersHandler)))
-	mux.Handle("/web/user_edit", handlers.WebJWTAuthMiddleware(http.HandlerFunc(WebUserEditHandler)))
-	mux.Handle("/web/user_password", handlers.WebJWTAuthMiddleware(http.HandlerFunc(WebUserPasswordHandler)))
+	   renderDenied := func(w http.ResponseWriter) {
+		   // Load and render access_denied.tmpl with layout, head, menu, footer
+		   exeDir, err := utils.ExePath()
+		   if err != nil {
+			   http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+			   return
+		   }
+		   baseDir := filepath.Dir(exeDir)
+		   tmpl, err := template.New("layout.tmpl").
+			   ParseFiles(
+				   filepath.Join(baseDir, "templates/layout.tmpl"),
+				   filepath.Join(baseDir, "templates/head.tmpl"),
+				   filepath.Join(baseDir, "templates/menu.tmpl"),
+				   filepath.Join(baseDir, "templates/footer.tmpl"),
+				   filepath.Join(baseDir, "templates/access_denied.tmpl"),
+			   )
+		   if err != nil {
+			   http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+			   return
+		   }
+		   data := map[string]interface{}{ "Title": "Accès refusé" }
+		   err = tmpl.ExecuteTemplate(w, "layout", data)
+		   if err != nil {
+			   http.Error(w, "Render error: "+err.Error(), http.StatusInternalServerError)
+		   }
+	   }
+	mux.Handle("/web/users", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(WebUsersHandler))))
+	mux.Handle("/web/user_edit", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(WebUserEditHandler))))
+	mux.Handle("/web/user_password", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(WebUserPasswordHandler))))
 	mux.Handle("POST /api/v1/users/{id}/password", jwtAuthMiddleware(http.HandlerFunc(handlers.ChangeUserPasswordHandler(dbConn))))
 	mux.Handle("GET /api/v1/users", jwtAuthMiddleware(http.HandlerFunc(handlers.ListUsersHandler(dbConn))))
 	mux.Handle("GET /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.GetUserHandler(dbConn))))
-	mux.Handle("POST /api/v1/users", jwtAuthMiddleware(http.HandlerFunc(handlers.CreateUserHandler(dbConn))))
-	mux.Handle("PUT /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateUserHandler(dbConn))))
-	mux.Handle("DELETE /api/v1/users/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteUserHandler(dbConn))))
+	mux.Handle("POST /api/v1/users", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.CreateUserHandler(dbConn)))))
+	mux.Handle("PUT /api/v1/users/{id}", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.UpdateUserHandler(dbConn)))))
+	mux.Handle("DELETE /api/v1/users/{id}", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.DeleteUserHandler(dbConn)))))
 	mux.Handle("POST /api/v1/users/{id}/active", jwtAuthMiddleware(http.HandlerFunc(handlers.SetUserActiveHandler(dbConn))))
 	// API tags agents
 	mux.Handle("GET /api/v1/agents/{id}/tags", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentTagsListHandler)))

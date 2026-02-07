@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"log"
-	"go-dsc-pull/internal/auth"
 	"go-dsc-pull/internal/db"
 )
 
@@ -32,10 +31,7 @@ func AgentConfigsAPIHandlerPostDelete(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodPost, http.MethodDelete:
-		if !auth.IsAdmin(r, database) {
-			http.Error(w, "Forbidden: admin only", http.StatusForbidden)
-			return
-		}
+		   // TODO: Replace with new admin check middleware if needed
 		if r.Method == http.MethodPost {
 			var req struct { ConfigurationName string `json:"configuration_name"` }
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ConfigurationName == "" {

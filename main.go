@@ -15,8 +15,8 @@ import (
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal"
 	"go-dsc-pull/internal/logs"
-	"go-dsc-pull/internal/auth"
 	"go-dsc-pull/internal/service"
+	"go-dsc-pull/internal/auth"
 	"go-dsc-pull/internal/schema"
 	"golang.org/x/crypto/bcrypt"
 )
