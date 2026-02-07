@@ -8,7 +8,7 @@ import (
 	"strings"
 	"fmt"
 	"log"
-	"go-dsc-pull/internal/utils"
+	"go-dsc-pull/internal/auth"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal"
 	"go-dsc-pull/internal/schema"
@@ -199,7 +199,7 @@ func UpdateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if !utils.IsAdmin(r, dbConn) {
+	if !auth.IsAdmin(r, dbConn) {
 		http.Error(w, "Forbidden: admin only", http.StatusForbidden)
 		return
 	}

@@ -14,16 +14,44 @@ import (
 
 // RegisterWebRoutes sets up all web/API endpoints on the provided mux
 func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware func(http.Handler) http.Handler, samlMiddleware http.Handler) {
-			// Admin-only middleware for user management
-			adminOnly := func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if !auth.IsAdmin(r, dbConn) {
-						http.Error(w, "Unauthorized", http.StatusUnauthorized)
-						return
-					}
-					next.ServeHTTP(w, r)
-				})
-			}
+			       // Admin-only middleware for user management
+			       adminOnly := func(next http.Handler) http.Handler {
+				       return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					       if !auth.IsAdmin(r, dbConn) {
+						       http.Error(w, "Unauthorized", http.StatusUnauthorized)
+						       return
+					       }
+					       next.ServeHTTP(w, r)
+				       })
+			       }
+
+			       // Render access denied page (must be defined before use)
+			       renderDenied := func(w http.ResponseWriter) {
+				       // Load and render access_denied.tmpl with layout, head, menu, footer
+				       exeDir, err := utils.ExePath()
+				       if err != nil {
+					       http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+					       return
+				       }
+				       baseDir := filepath.Dir(exeDir)
+				       tmpl, err := template.New("layout.tmpl").
+					       ParseFiles(
+						       filepath.Join(baseDir, "templates/layout.tmpl"),
+						       filepath.Join(baseDir, "templates/head.tmpl"),
+						       filepath.Join(baseDir, "templates/menu.tmpl"),
+						       filepath.Join(baseDir, "templates/footer.tmpl"),
+						       filepath.Join(baseDir, "templates/access_denied.tmpl"),
+					       )
+				       if err != nil {
+					       http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+					       return
+				       }
+				       data := map[string]interface{}{ "Title": "Access Denied" }
+				       err = tmpl.ExecuteTemplate(w, "layout", data)
+				       if err != nil {
+					       http.Error(w, "Render error: "+err.Error(), http.StatusInternalServerError)
+				       }
+			       }
 		// Endpoint pour la liste des profils utilisateurs disponibles
 		mux.Handle("GET /api/v1/user_roles", jwtAuthMiddleware(http.HandlerFunc(handlers.UserRolesHandler())))
 	exeDir, err := utils.ExePath()
@@ -42,11 +70,11 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("GET /api/v1/saml/userinfo", http.HandlerFunc(handlers.SAMLUserInfoHandler))
 	mux.Handle("GET /api/v1/saml/enabled", http.HandlerFunc(handlers.SAMLStatusHandler))
 	// SAML config management (admin only)
-	mux.Handle("GET /api/v1/saml/config", jwtAuthMiddleware(http.HandlerFunc(handlers.SAMLConfigAPIHandler)))
-	mux.Handle("PUT /api/v1/saml/config", jwtAuthMiddleware(http.HandlerFunc(handlers.SAMLConfigAPIHandler)))
-	mux.Handle("POST /api/v1/saml/upload_sp_keycert", jwtAuthMiddleware(http.HandlerFunc(handlers.SAMLUploadSPKeyCertHandler)))
+	mux.Handle("GET /api/v1/saml/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SAMLConfigAPIHandler))))
+	mux.Handle("PUT /api/v1/saml/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SAMLConfigAPIHandler))))
+	mux.Handle("POST /api/v1/saml/upload_sp_keycert", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SAMLUploadSPKeyCertHandler))))
 	// Web UI for SAML config (admin only)
-	mux.Handle("GET /web/saml_config", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebSAMLConfigHandler)))
+	mux.Handle("GET /web/saml_config", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebSAMLConfigHandler))))
 	if samlMiddleware != nil {
 		mux.Handle("/saml/", samlMiddleware)
 	}
@@ -86,49 +114,23 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("/web", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)))
 	// Custom static file handler to prevent directory listing under /web/
 	mux.Handle("/web/", http.StripPrefix("/web/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if path == "" || path == "/" {
-			handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)).ServeHTTP(w, r)
-			return
-		}
-		fullPath := filepath.Join(baseDir, "web", path)
-		info, err := handlers.StatFile(fullPath)
-		if err != nil || info.IsDir() {
-			http.NotFound(w, r)
-			return
-		}
-		http.ServeFile(w, r, fullPath)
-	})))
+		   path := r.URL.Path
+		   if path == "" || path == "/" {
+			   handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)).ServeHTTP(w, r)
+			   return
+		   }
+		   fullPath := filepath.Join(baseDir, "web", path)
+		   info, err := handlers.StatFile(fullPath)
+		   if err != nil || info.IsDir() {
+			   handlers.NotFoundHandler(w, r)
+			   return
+		   }
+		   http.ServeFile(w, r, fullPath)
+	   })))
 	mux.Handle("/web/node/", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebNodeHandler)))
 	mux.Handle("/web/modules", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebModulesHandler)))
 	mux.Handle("/web/configuration_model", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebConfigurationModelHandler)))
 	mux.Handle("/templates/properties.tmpl", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebPropertiesHandler)))
-	   renderDenied := func(w http.ResponseWriter) {
-		   // Load and render access_denied.tmpl with layout, head, menu, footer
-		   exeDir, err := utils.ExePath()
-		   if err != nil {
-			   http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
-			   return
-		   }
-		   baseDir := filepath.Dir(exeDir)
-		   tmpl, err := template.New("layout.tmpl").
-			   ParseFiles(
-				   filepath.Join(baseDir, "templates/layout.tmpl"),
-				   filepath.Join(baseDir, "templates/head.tmpl"),
-				   filepath.Join(baseDir, "templates/menu.tmpl"),
-				   filepath.Join(baseDir, "templates/footer.tmpl"),
-				   filepath.Join(baseDir, "templates/access_denied.tmpl"),
-			   )
-		   if err != nil {
-			   http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
-			   return
-		   }
-		   data := map[string]interface{}{ "Title": "Accès refusé" }
-		   err = tmpl.ExecuteTemplate(w, "layout", data)
-		   if err != nil {
-			   http.Error(w, "Render error: "+err.Error(), http.StatusInternalServerError)
-		   }
-	   }
 	mux.Handle("/web/users", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(WebUsersHandler))))
 	mux.Handle("/web/user_edit", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(WebUserEditHandler))))
 	mux.Handle("/web/user_password", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(WebUserPasswordHandler))))

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"go-dsc-pull/internal/db"
 	"net/http"
 	"strings"
 	"github.com/golang-jwt/jwt/v5"
@@ -39,25 +40,26 @@ func IsAdmin(r *http.Request, dbConn *sql.DB) bool {
 			   }
 		   }
 	   }
-	token, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
-	if err != nil {
-		return false
-	}
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || claims["sub"] == nil {
-		return false
-	}
+
+	   token, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
+	   if err != nil {
+		   return false
+	   }
+	   claims, ok := token.Claims.(jwt.MapClaims)
+	   if !ok || claims["sub"] == nil {
+		   return false
+	   }
 	   emailRaw := claims["sub"]
 	   email, ok := emailRaw.(string)
 	   if !ok || email == "" {
 		   log.Printf("[AUTH] Invalid or missing email claim: %v", emailRaw)
 		   return false
 	   }
-	row := dbConn.QueryRow("SELECT role FROM users WHERE email = ?", email)
-	var role string
-	log.Printf("[AUTH] Checking admin role for user %s (%s)", email, role)
-	if err := row.Scan(&role); err != nil {
-		return false
-	}
-	return role == "admin"
+
+	   id, role, err := db.GetUserRole(dbConn, email)
+	   log.Printf("[AUTH] Checking admin role for user %s (id=%d, role=%s)", email, id, role)
+	   if err != nil {
+		   return false
+	   }
+	   return role == "admin"
 }
