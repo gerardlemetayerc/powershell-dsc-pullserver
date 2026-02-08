@@ -47,6 +47,9 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
 
 **Important:** SAML role mapping (from group_mapping) always takes precedence over roles configured directly in the application. If a user is mapped as admin via SAML, they will have admin rights regardless of local settings.
 
+- `sp_key_file`: Path to the Service Provider's private key file. This key is used to sign SAML requests and responses, ensuring their authenticity.
+- `sp_cert_file`: Path to the Service Provider's public certificate file. This certificate is used by the Identity Provider to verify the signature of SAML requests and responses.
+
 ### Setup Steps
 
 1. Obtain the SAML metadata URL (XML) from your IdP administrator (the application must have access to it).
@@ -61,7 +64,4 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
 
 ### Security Notes
 
-- SAML authentication is enforced for all web sessions when enabled.
 - All SAML login attempts and errors are logged for auditing.
-- All sensitive routes require authentication.
-- Admins can manage user roles and tokens.
