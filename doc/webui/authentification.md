@@ -35,12 +35,12 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
 
 #### Field Descriptions
 
-	- `email`: SAML attribute for user email.
-	- `sn`: SAML attribute for surname (last name).
-	- `givenName`: SAML attribute for given name (first name).
-	- `attribute`: SAML attribute containing group or role IDs.
-	- `admin_value`: Value identifying admin group(s).
-	- `user_value`: Value identifying user group(s).
+- `email`: SAML attribute for user email.
+- `sn`: SAML attribute for surname (last name).
+- `givenName`: SAML attribute for given name (first name).
+- `attribute`: SAML attribute containing group or role IDs.
+- `admin_value`: Value identifying admin group(s).
+- `user_value`: Value identifying user group(s).
 
 **Important:** SAML role mapping (from group_mapping) always takes precedence over roles configured directly in the application. If a user is mapped as admin via SAML, they will have admin rights regardless of local settings.
 
