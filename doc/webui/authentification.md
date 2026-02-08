@@ -7,6 +7,7 @@ This page explains the authentication mechanisms available in the DSC Pull Serve
 - SAML Single Sign-On (SSO)
 
 ## SAML Configuration
+![SAML Configuration Example](../img/saml_config.jpg)
 
 SAML Single Sign-On (SSO) allows integration with enterprise identity providers (IdP) for centralized authentication.
 
@@ -31,6 +32,8 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
 	}
 }
 ```
+
+
 **Note:** This configuration can be managed either via the web interface (admin only) or by editing the config file directly. The web UI updates the config file in place.
 
 #### Field Descriptions
