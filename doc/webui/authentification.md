@@ -31,37 +31,34 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
 	}
 }
 ```
+**Note:** This configuration can be managed either via the web interface (admin only) or by editing the config file directly. The web UI updates the config file in place.
 
 #### Field Descriptions
 
-- `enabled`: Enables or disables SAML authentication (true/false).
-- `entity_id`: The unique identifier (URI) for your Service Provider (SP).
-- `idp_metadata_url`: URL to fetch the IdP's SAML metadata (XML with endpoints and certificates).
-- `sp_key_file`: Path to the private key file for the SP (used to sign SAML requests).
-- `sp_cert_file`: Path to the public certificate file for the SP (used for SAML assertions).
-- `user_mapping`: Maps SAML attributes to local user fields:
-  - `email`: SAML attribute for user email.
-  - `sn`: SAML attribute for surname (last name).
-  - `givenName`: SAML attribute for given name (first name).
-- `group_mapping`: Maps SAML group/role claims to application roles:
-  - `attribute`: SAML attribute containing group or role IDs.
-  - `admin_value`: Value identifying admin group(s).
-  - `user_value`: Value identifying user group(s).
+	- `email`: SAML attribute for user email.
+	- `sn`: SAML attribute for surname (last name).
+	- `givenName`: SAML attribute for given name (first name).
+	- `attribute`: SAML attribute containing group or role IDs.
+	- `admin_value`: Value identifying admin group(s).
+	- `user_value`: Value identifying user group(s).
+
+**Important:** SAML role mapping (from group_mapping) always takes precedence over roles configured directly in the application. If a user is mapped as admin via SAML, they will have admin rights regardless of local settings.
 
 ### Setup Steps
-- Obtain SAML metadata URL (XML) from your IdP administrator (application must have access to it)
-- Configure the Service Provider (SP) settings: entity ID, ACS URL, certificate, and private key.
-- Map SAML groups/roles to application roles (admin/user) in the configuration file.
-- Optionally, enable or disable certificate signature validation for flexibility.
+
+1. Obtain the SAML metadata URL (XML) from your IdP administrator (the application must have access to it).
+2. Configure the Service Provider (SP) settings: entity ID, ACS URL, certificate, and private key.
+3. Map SAML groups/roles to application roles (admin/user) in the configuration file.
 
 ### User Mapping
-- SAML attributes (e.g., email, group, role) are mapped to local user accounts.
+
+- SAML attributes (such as email, group, role) are mapped to local user accounts using the `user_mapping` section.
 - Admins can define mapping rules in config.json for automatic role assignment.
+- If a SAML user does not exist locally, an account can be created automatically (if enabled in the application settings).
 
 ### Security Notes
+
 - SAML authentication is enforced for all web sessions when enabled.
 - All SAML login attempts and errors are logged for auditing.
-
-## Security Notes
 - All sensitive routes require authentication.
 - Admins can manage user roles and tokens.
