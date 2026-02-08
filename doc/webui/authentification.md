@@ -49,8 +49,7 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
   - `user_value`: Value identifying user group(s).
 
 ### Setup Steps
-- Obtain SAML metadata (XML) from your IdP administrator.
-- Upload the metadata file in the web interface (SAML config section).
+- Obtain SAML metadata URL (XML) from your IdP administrator (application must have access to it)
 - Configure the Service Provider (SP) settings: entity ID, ACS URL, certificate, and private key.
 - Map SAML groups/roles to application roles (admin/user) in the configuration file.
 - Optionally, enable or disable certificate signature validation for flexibility.
