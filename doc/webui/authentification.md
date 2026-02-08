@@ -7,35 +7,8 @@ This page explains the authentication mechanisms available in the DSC Pull Serve
 - SAML Single Sign-On (SSO)
 
 ## SAML Configuration
-![SAML Configuration Example](../img/saml_config.jpg)
-![Entra Configuration Example](../img/entra_conf_example.jpg)
 
 SAML Single Sign-On (SSO) allows integration with enterprise identity providers (IdP) for centralized authentication.
-
-### Example Configuration for Azure (config.json)
-
-```json
-"saml": {
-	"enabled": true,
-	"entity_id": "https://dsc-dev.local",
-	"idp_metadata_url": "https://login.microsoftonline.com/yourtenantID/FederationMetadata/2007-06/FederationMetadata.xml?appid=appId",
-	"sp_key_file": "sp.key",
-	"sp_cert_file": "sp.crt.pem",
-	"user_mapping": {
-		"email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
-		"sn": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
-		"givenName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
-	},
-	"group_mapping": {
-		"attribute": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups",
-		"admin_value": "9f59531c-ae20-42b6-be94-a4dae3623eb0",
-		"user_value": "b79fbf4d-3ef9-4689-8143-76b194e85509"
-	}
-}
-```
-
-
-**Note:** This configuration can be managed either via the web interface (admin only) or by editing the config file directly. The web UI updates the config file in place.
 
 #### Field Descriptions
 
@@ -66,3 +39,30 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
 ### Security Notes
 
 - All SAML login attempts and errors are logged for auditing.
+
+### Example Configuration for Azure (config.json)
+
+```json
+"saml": {
+	"enabled": true,
+	"entity_id": "https://dsc-dev.local",
+	"idp_metadata_url": "https://login.microsoftonline.com/yourtenantID/FederationMetadata/2007-06/FederationMetadata.xml?appid=appId",
+	"sp_key_file": "sp.key",
+	"sp_cert_file": "sp.crt.pem",
+	"user_mapping": {
+		"email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+		"sn": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
+		"givenName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
+	},
+	"group_mapping": {
+		"attribute": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups",
+		"admin_value": "9f59531c-ae20-42b6-be94-a4dae3623eb0",
+		"user_value": "b79fbf4d-3ef9-4689-8143-76b194e85509"
+	}
+}
+```
+![SAML Configuration Example](../img/saml_config.jpg)
+![Entra Configuration Example](../img/entra_conf_example.jpg)
+
+**Note:** This configuration can be managed either via the web interface (admin only) or by editing the config file directly. The web UI updates the config file in place.
+
