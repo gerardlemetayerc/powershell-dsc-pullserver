@@ -113,10 +113,13 @@ CREATE TABLE IF NOT EXISTS node_properties (
 CREATE TABLE IF NOT EXISTS configuration_model (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    original_name TEXT,
+    previous_id INTEGER,
     upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     uploaded_by TEXT NOT NULL,
     mof_file BLOB NOT NULL,
-    last_usage TIMESTAMP
+    last_usage TIMESTAMP,
+    FOREIGN KEY (previous_id) REFERENCES configuration_model(id)
 );
 
 
