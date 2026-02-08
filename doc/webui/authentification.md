@@ -38,7 +38,7 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
 - `email`: SAML attribute for user email.
 - `sn`: SAML attribute for surname (last name).
 - `givenName`: SAML attribute for given name (first name).
-- `attribute`: SAML attribute containing group or role IDs.
+- `group_mapping::attribute`: SAML attribute containing group or role attributes value(s).
 - `admin_value`: Value identifying admin group(s).
 - `user_value`: Value identifying user group(s).
 
