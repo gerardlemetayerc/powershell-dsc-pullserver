@@ -40,7 +40,7 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
 
 - All SAML login attempts and errors are logged for auditing.
 
-### Example Configuration for Azure (config.json)
+### Example Configuration for Entra (config.json)
 
 ```json
 "saml": {
