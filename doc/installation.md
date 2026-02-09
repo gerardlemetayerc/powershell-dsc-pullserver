@@ -22,7 +22,8 @@ This page explains how to install and deploy the Go DSC Pull Server.
 
 2. **Configure the application:**
     - Edit `config.json` for database, SAML, and web UI settings.
-    - See example configuration files:
+   - See example configuration files:
+   - For SAML configuration details, see [SAML configuration documentation](webui/authentification.md).
        - [config_sqlite.json](example/config/config_sqlite.json) (SQLite, no SAML)
        - [config_mssql.json](example/config/config_mssql.json) (MSSQL, no SAML)
        - [config_nosaml.json](example/config/config_nosaml.json) (SQLite, SAML disabled)
@@ -54,6 +55,8 @@ This page explains how to install and deploy the Go DSC Pull Server.
    - For MSSQL: run `db/schema_mssql.sql` to create tables.
    - For SQLite: run `db/schema_sqlite.sql`.
    - The server can also automatically load and initialize the database schema on start if the database is empty (check logs for confirmation).
+
+
 
 6. **Certificate management:**
    - Use a trusted certificate for production.
