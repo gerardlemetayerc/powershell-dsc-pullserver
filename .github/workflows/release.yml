@@ -29,15 +29,11 @@ jobs:
           xcopy web release\web /E /I
           xcopy templates release\templates /E /I
 
-      - name: Zip release
-        run: |
-          Compress-Archive -Path release\* -DestinationPath DSC-Admin-Console.zip
-
-      - name: Upload release artifact
+      - name: Upload release folder artifact
         uses: actions/upload-artifact@v6
         with:
           name: DSC-Admin-Console
-          path: DSC-Admin-Console.zip
+          path: release/
 
   zip-powershell:
     runs-on: windows-latest
