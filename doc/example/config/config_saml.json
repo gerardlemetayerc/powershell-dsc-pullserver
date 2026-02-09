@@ -4,7 +4,7 @@
     "driver": "mssql",
     "server": "localhost",
     "user": "sa",
-    "password": "Soleil123!",
+    "password": "YourStrongPassword",
     "port": 1433
   },
   "dsc_pullserver": {
@@ -16,10 +16,17 @@
     "port": 8484,
     "registrationKey": "AnyString"
   },
+  "web_ui": {
+    "cert_file": "dsc-dev.local.crt",
+    "enable_https": true,
+    "key_file": "dsc-dev.local.key",
+    "shared_secret": "example-shared-secret",
+    "port": 443
+  },
   "saml": {
     "enabled": true,
     "entity_id": "https://dsc-dev.local",
-    "idp_metadata_url": "https://login.microsoftonline.com/acee6c11-4aea-4377-8960-8261756492fd/FederationMetadata/2007-06/FederationMetadata.xml?appid=57a31120-f9fb-468f-b078-8c0adbbcd162",
+    "idp_metadata_url": "https://login.microsoftonline.com/yourtenantID/FederationMetadata/2007-06/FederationMetadata.xml?appid=appId",
     "sp_key_file": "sp.key",
     "sp_cert_file": "sp.crt.pem",
     "user_mapping": {
@@ -32,12 +39,5 @@
       "admin_value": "9f59531c-ae20-42b6-be94-a4dae3623eb0",
       "user_value": "b79fbf4d-3ef9-4689-8143-76b194e85509"
     }
-  },
-  "web_ui": {
-    "cert_file": "dsc-dev.local.crt",
-    "enable_https": true,
-    "key_file": "dsc-dev.local.key",
-    "shared_secret": "pQw8vZ3rT6sJkL2xQ9eBfG7hN1uVtX4yC5zR8aW0sD3mPqE6bH0jKfL9nS2tU7vY1",
-    "port": 443
   }
 }

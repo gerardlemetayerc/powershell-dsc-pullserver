@@ -133,6 +133,6 @@ CREATE TABLE IF NOT EXISTS users (
     is_active BOOLEAN DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_logon_date TIMESTAMP,
-    role TEXT DEFAULT 'readonly',
+    role TEXT DEFAULT 'user',
     source TEXT DEFAULT 'local'
 );

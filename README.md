@@ -14,7 +14,7 @@ Detailed documentation is organized into two main sections:
 
 ## Quick Navigation
 
-- [Installation](doc/dscpull/installation.md)
+- [Installation](doc/installation.md)
 - [Node Registration](doc/dscpull/enregistrement.md)
 - [Security](doc/dscpull/securite.md)
 - [Web Authentication](doc/webui/authentification.md)

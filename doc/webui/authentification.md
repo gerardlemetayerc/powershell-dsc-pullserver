@@ -43,25 +43,29 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
 ### Example Configuration for Entra (config.json)
 
 ```json
-"saml": {
-	"enabled": true,
-	"entity_id": "https://dsc-dev.local",
-	"idp_metadata_url": "https://login.microsoftonline.com/yourtenantID/FederationMetadata/2007-06/FederationMetadata.xml?appid=appId",
-	"sp_key_file": "sp.key",
-	"sp_cert_file": "sp.crt.pem",
-	"user_mapping": {
-		"email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
-		"sn": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
-		"givenName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
-	},
-	"group_mapping": {
-		"attribute": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups",
-		"admin_value": "9f59531c-ae20-42b6-be94-a4dae3623eb0",
-		"user_value": "b79fbf4d-3ef9-4689-8143-76b194e85509"
-	}
+{
+    "saml": {
+        "enabled": true,
+        "entity_id": "https://dsc-dev.local",
+        "idp_metadata_url": "https://login.microsoftonline.com/yourtenantID/FederationMetadata/2007-06/FederationMetadata.xml?appid=appId",
+        "sp_key_file": "sp.key",
+        "sp_cert_file": "sp.crt.pem",
+        "user_mapping": {
+            "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+            "sn": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
+            "givenName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
+        },
+        "group_mapping": {
+            "attribute": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups",
+            "admin_value": "9f59531c-ae20-42b6-be94-a4dae3623eb0",
+            "user_value": "b79fbf4d-3ef9-4689-8143-76b194e85509"
+        }
+    }
 }
 ```
+**Configuration on application side**
 ![SAML Configuration Example](../img/saml_config.jpg)
+**Configuration on azure side**
 ![Entra Configuration Example](../img/entra_conf_example.jpg)
 
 **Note:** This configuration can be managed either via the web interface (admin only) or by editing the config file directly. The web UI updates the config file in place.
