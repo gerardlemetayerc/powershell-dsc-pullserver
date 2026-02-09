@@ -1,11 +1,12 @@
-# Documentation Serveur DSC Pull
+# DSC Pull Server Documentation
 
-Cette rubrique détaille le fonctionnement, l'installation et la sécurité du serveur DSC Pull.
+This section details the operation, installation, and security of the DSC Pull Server.
 
-## Sommaire
-- [Installation](installation.md)
-- [Enregistrement des noeuds](enregistrement.md)
-- [Appel des configurations](configurations.md)
-- [Sécurité](securite.md)
+## Table of Contents
+	- [Configuration](configuration.md)
+	- Edit the `config.json` file to set up the database, web access, SAML/JWT authentication, and certificate paths according to your environment.
+	- [Node Registration](enregistrement.md)
+	- [Configuration Calls](configurations.md)
+	- [Security](securite.md)
 
-Ajoutez ici des guides techniques, procédures, et rappels sur le protocole DSC.
+Add technical guides, procedures, and reminders about the DSC protocol here.

@@ -64,9 +64,11 @@ SAML Single Sign-On (SSO) allows integration with enterprise identity providers 
 }
 ```
 **Configuration on application side**
+
 ![SAML Configuration Example](../img/saml_config.jpg)
 
 **Configuration on azure side**
+
 ![Entra Configuration Example](../img/entra_conf_example.jpg)
 
 **Note:** This configuration can be managed either via the web interface (admin only) or by editing the config file directly. The web UI updates the config file in place.
