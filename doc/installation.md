@@ -2,20 +2,31 @@
 
 This page explains how to install and deploy the Go DSC Pull Server.
 
-## Prerequisites
-- Go (latest stable version)
-- Microsoft SQL Server or SQLite
-- PowerShell (for module usage)
-- SSL certificate and private key (for HTTPS)
 
 ## Steps
 
 1. **Download the latest release:**
    - Go to the [GitHub Releases page](https://github.com/your-org/go-dsc-pull/releases) and download the pre-built executable for your platform.
-   - Extract the archive and place the executable in your desired directory.
+   - Extract the archive. Make sure to keep the `web/` and `templates/` directories, which are required for the web interface and are included in the release zip.
+   - Place the executable and all required directories in your desired location.
+
+   **Expected directory structure:**
+   ```
+   go-dsc-pull/
+   ├── dsc-pull-server.exe
+   ├── config.json
+   ├── web/
+   ├── templates/
+   ├── db/
+   ```
 
 2. **Configure the application:**
-   - Edit `config.json` for database, SAML, and web UI settings.
+    - Edit `config.json` for database, SAML, and web UI settings.
+    - See example configuration files:
+       - [config_sqlite.json](example/config/config_sqlite.json) (SQLite, no SAML)
+       - [config_mssql.json](example/config/config_mssql.json) (MSSQL, no SAML)
+       - [config_nosaml.json](example/config/config_nosaml.json) (SQLite, SAML disabled)
+       - [config_saml.json](example/config/config_saml.json) (MSSQL, SAML enabled)
    - Place your SSL certificate and key files in the specified paths.
 
 3. **Deploy the server:**
@@ -42,13 +53,14 @@ This page explains how to install and deploy the Go DSC Pull Server.
 5. **Database setup:**
    - For MSSQL: run `db/schema_mssql.sql` to create tables.
    - For SQLite: run `db/schema_sqlite.sql`.
+   - The server can also automatically load and initialize the database schema on start if the database is empty (check logs for confirmation).
 
 6. **Certificate management:**
    - Use a trusted certificate for production.
    - You can disable client certificate validation in `config.json` for testing.
 
 7. **Web UI access:**
-   - Open your browser and go to `https://your-server:443` (or the port specified).
+   - Open your browser and go to `https://your-server:443/web` (or the port specified).
 
 8. **PowerShell module:**
    - Import the module from `powershell/DSCPullServer/`.
@@ -66,5 +78,4 @@ This page explains how to install and deploy the Go DSC Pull Server.
 
 ## Security Notes
 - Always use HTTPS in production.
-- Configure SAML or JWT authentication for secure access.
 - Restrict admin access and review logs regularly.
