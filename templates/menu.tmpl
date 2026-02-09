@@ -18,7 +18,7 @@
     </ul>
 </nav>
 <script>
-// Affiche le nom d'utilisateur extrait du JWT (claim sub)
+// Affiche le nom d'utilisateur extrait du JWT (claim sub) et gère le menu admin
 function parseJwt (token) {
     try {
         return JSON.parse(atob(token.split('.')[1]));
@@ -27,11 +27,20 @@ function parseJwt (token) {
 const token = localStorage.getItem('jwt_token');
 if (token) {
     const payload = parseJwt(token);
-    if (payload && payload.sub) {
-        document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {
+        if (payload && payload.sub) {
             document.getElementById('userName').textContent = payload.sub;
-        });
-    }
+        }
+        // Affiche ou masque le menu admin selon le rôle
+        var adminMenu = document.getElementById('adminMenu');
+        if (adminMenu) {
+            if (payload && payload.role === 'admin') {
+                adminMenu.style.display = '';
+            } else {
+                adminMenu.style.display = 'none';
+            }
+        }
+    });
 }
 // Déconnexion
 document.addEventListener('DOMContentLoaded', function() {
@@ -84,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <p>Configurations</p>
                     </a>
                 </li>
-                <li class="nav-item has-treeview">
+                <li class="nav-item has-treeview" id="adminMenu" style="display:none;">
                     <a href="#" class="nav-link">
                         <i class="nav-icon fas fa-cogs"></i>
                         <p>

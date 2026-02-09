@@ -1,3 +1,14 @@
+-- Migration: add original_name and previous_id columns to configuration_model if table already exists
+IF EXISTS (SELECT * FROM sysobjects WHERE name='configuration_model' AND xtype='U')
+BEGIN
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'configuration_model' AND COLUMN_NAME = 'original_name')
+        ALTER TABLE configuration_model ADD original_name NVARCHAR(128) NULL;
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'configuration_model' AND COLUMN_NAME = 'previous_id')
+        ALTER TABLE configuration_model ADD previous_id INT NULL;
+    -- Add FK constraint if not exists
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE WHERE TABLE_NAME = 'configuration_model' AND COLUMN_NAME = 'previous_id')
+        ALTER TABLE configuration_model ADD CONSTRAINT FK_configuration_model_previous_id FOREIGN KEY (previous_id) REFERENCES configuration_model(id);
+END
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
 CREATE TABLE users (
     id INT IDENTITY(1,1) PRIMARY KEY,
@@ -8,7 +19,7 @@ CREATE TABLE users (
     is_active BIT DEFAULT 1,
     created_at DATETIME DEFAULT GETDATE(),
     last_logon_date DATETIME,
-    role NVARCHAR(50) DEFAULT 'readonly',
+    role NVARCHAR(50) DEFAULT 'user',
     source NVARCHAR(50) DEFAULT 'local'
 );
 
@@ -119,10 +130,13 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='configuration_model' AND xty
 CREATE TABLE configuration_model (
     id INT IDENTITY(1,1) PRIMARY KEY,
     name NVARCHAR(128) NOT NULL,
+    original_name NVARCHAR(128) NULL,
+    previous_id INT NULL,
     upload_date DATETIME DEFAULT GETDATE(),
     uploaded_by NVARCHAR(128) NOT NULL,
     mof_file VARBINARY(MAX) NOT NULL,
-    last_usage DATETIME
+    last_usage DATETIME,
+    FOREIGN KEY (previous_id) REFERENCES configuration_model(id)
 );
 
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='agent_tags' AND xtype='U')

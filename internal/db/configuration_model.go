@@ -13,26 +13,37 @@ import (
 // mofFile: contenu du fichier MOF (BLOB)
 // uploadDate: date d'upload
 func CreateConfigurationModel(db *sql.DB, cm *schema.ConfigurationModel) error {
-	_, err := db.Exec(`INSERT INTO configuration_model (name, uploaded_by, mof_file) VALUES (?, ?, ?)`, cm.Name, cm.UploadedBy, cm.MofFile)
+	_, err := db.Exec(`INSERT INTO configuration_model (name, uploaded_by, mof_file, original_name) VALUES (?, ?, ?, ?)`, cm.Name, cm.UploadedBy, cm.MofFile, cm.OriginalName)
 	return err
 }
 
 func GetConfigurationModel(db *sql.DB, id int64) (*schema.ConfigurationModel, error) {
-	row := db.QueryRow(`SELECT id, name, uploaded_by, mof_file, upload_date, last_usage FROM configuration_model WHERE id = ?`, id)
+	row := db.QueryRow(`SELECT id, name, original_name, previous_id, uploaded_by, mof_file, upload_date, last_usage FROM configuration_model WHERE id = ?`, id)
 	var cm schema.ConfigurationModel
 	var uploadDate string
 	var lastUsage string
-	if err := row.Scan(&cm.ID, &cm.Name, &cm.UploadedBy, &cm.MofFile, &uploadDate, &lastUsage); err != nil {
+	var originalName sql.NullString
+	var previousID sql.NullInt64
+	if err := row.Scan(&cm.ID, &cm.Name, &originalName, &previousID, &cm.UploadedBy, &cm.MofFile, &uploadDate, &lastUsage); err != nil {
 		return nil, err
 	}
-	// Gestion robuste du parsing de date (supporte format SQLite ISO8601 ou classique)
+	if originalName.Valid {
+		cm.OriginalName = &originalName.String
+	} else {
+		cm.OriginalName = nil
+	}
+	if previousID.Valid {
+		cm.PreviousID = &previousID.Int64
+	} else {
+		cm.PreviousID = nil
+	}
 	cm.UploadDate = utils.ParseTimeFlexible(uploadDate)
 	cm.LastUsage = utils.ParseTimeFlexible(lastUsage)
 	return &cm, nil
 }
 
 func ListConfigurationModels(db *sql.DB) ([]schema.ConfigurationModel, error) {
-	rows, err := db.Query(`SELECT id, name, uploaded_by, mof_file, upload_date, last_usage FROM configuration_model ORDER BY upload_date DESC`)
+	rows, err := db.Query(`SELECT id, name, original_name, previous_id, uploaded_by, mof_file, upload_date, last_usage FROM configuration_model ORDER BY upload_date DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -42,8 +53,20 @@ func ListConfigurationModels(db *sql.DB) ([]schema.ConfigurationModel, error) {
 		var cm schema.ConfigurationModel
 		var uploadDate string
 		var lastUsage sql.NullString
-		if err := rows.Scan(&cm.ID, &cm.Name, &cm.UploadedBy, &cm.MofFile, &uploadDate, &lastUsage); err != nil {
+		var originalName sql.NullString
+		var previousID sql.NullInt64
+		if err := rows.Scan(&cm.ID, &cm.Name, &originalName, &previousID, &cm.UploadedBy, &cm.MofFile, &uploadDate, &lastUsage); err != nil {
 			return nil, err
+		}
+		if originalName.Valid {
+			cm.OriginalName = &originalName.String
+		} else {
+			cm.OriginalName = nil
+		}
+		if previousID.Valid {
+			cm.PreviousID = &previousID.Int64
+		} else {
+			cm.PreviousID = nil
 		}
 		cm.UploadDate = utils.ParseTimeFlexible(uploadDate)
 		if lastUsage.Valid && lastUsage.String != "" {
