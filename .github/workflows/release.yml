@@ -34,7 +34,7 @@ jobs:
           Compress-Archive -Path release\* -DestinationPath DSC-Admin-Console.zip
 
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: DSC-Admin-Console
           path: DSC-Admin-Console.zip
@@ -50,7 +50,7 @@ jobs:
           Compress-Archive -Path powershell\DSCPullServer\* -DestinationPath DSCPullServer.zip
 
       - name: Upload PowerShell artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: DSCPullServer
           path: DSCPullServer.zip
