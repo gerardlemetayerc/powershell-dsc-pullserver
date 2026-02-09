@@ -85,11 +85,11 @@ Set-DscLocalConfigurationManager -Path ./PullLCMConfig
 > Note: Using HTTP is only suitable for testing or isolated environments. Always use HTTPS in production for security.
 
 3. **Certificate requirements:**
-   - If client certificate validation is enabled, ensure the agent presents a valid certificate.
-   - The server may require HTTPS and certificate validation depending on your config.json settings.
+- If client certificate validation is enabled, ensure the agent presents a valid certificate.
+- The server may require HTTPS and certificate validation depending on your config.json settings.
 
 4. **Successful registration:**
-   - Upon successful registration, the agent will appear in the web interface and can receive configurations.
+- Upon successful registration, the agent will appear in the web interface and can receive configurations.
 
 ## Troubleshooting
 
