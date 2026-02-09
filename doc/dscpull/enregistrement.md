@@ -7,6 +7,8 @@ This page explains how to register nodes (agents) with the DSC Pull Server.
 1. **Obtain the registration key:**
    - The registration key is defined in the `config.json` file under the `dsc_pullserver` section (option: `registrationKey`).
 
+   > You can pre-register an agent using the web interface or API before configuring the LCM on the agent side. This allows you to add tags, link a configuration in advance, or set other metadata for the agent.
+
 2. **Agent configuration:**
    - Configure your DSC agent to use the server URL and provide the registration key during registration.
       - Example agent configuration (LCM) for DSC Pull:
