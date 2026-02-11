@@ -1,5 +1,5 @@
 $(function() {
-    // Récupère l'ID depuis l'URL
+    // Get the ID from the URL
     function getNameFromUrl() {
         var match = window.location.pathname.match(/configuration_model\/([^\/]+)/);
         return match ? decodeURIComponent(match[1]) : null;
@@ -7,22 +7,22 @@ $(function() {
     var name = getNameFromUrl();
     if (!name) return;
 
-    // Charge le détail de la configuration
+    // Load configuration details
     $.getJSON('/api/v1/configuration_models/' + encodeURIComponent(name) + '/detail', function(data) {
         var html = '';
         html += '<h3>' + data.name + '</h3>';
         html += '<p><b>Uploaded by:</b> ' + data.uploaded_by + ' | <b>Date:</b> ' + (data.upload_date ? new Date(data.upload_date).toLocaleString() : '') + '</p>';
-        html += '<a class="btn btn-primary" href="/api/v1/configuration_models/' + encodeURIComponent(data.name) + '/download">Télécharger le MOF</a>';
-        html += '<hr><h4>Historique des versions</h4>';
+        html += '<a class="btn btn-primary" href="/api/v1/configuration_models/' + encodeURIComponent(data.name) + '/download">Download MOF</a>';
+        html += '<hr><h4>Version history</h4>';
         html += '<ul>';
         data.versions.forEach(function(v) {
             html += '<li><a href="/web/configuration_model/' + encodeURIComponent(v.name) + '">' + v.name + '</a> (' + (v.upload_date ? new Date(v.upload_date).toLocaleString() : '') + ')</li>';
         });
         html += '</ul>';
-        // Affichage des noeuds liés
-        html += '<hr><h4>Noeuds liés à cette configuration</h4>';
+        // Linked nodes display
+        html += '<hr><h4>Nodes linked to this configuration</h4>';
         if(data.linked_nodes && data.linked_nodes.length) {
-            html += '<div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>Agent ID</th><th>Nom du noeud</th><th>État</th><th>Dernière communication</th></tr></thead><tbody>';
+            html += '<div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>Agent ID</th><th>Node name</th><th>Status</th><th>Last communication</th></tr></thead><tbody>';
             data.linked_nodes.forEach(function(n) {
                 html += '<tr>';
                 html += '<td>' + n.agent_id + '</td>';
@@ -33,29 +33,28 @@ $(function() {
             });
             html += '</tbody></table></div>';
         } else {
-            html += '<p>Aucun noeud lié.</p>';
+            html += '<p>No linked nodes.</p>';
         }
 
-        // Affichage des modules utilisés
-        html += '<hr><h4>Modules utilisés</h4>';
+        // Used modules display
+        html += '<hr><h4>Used modules</h4>';
         if(data.modules && data.modules.length) {
-            html += '<div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>Nom</th><th>Version requise</th><th>Version disponible</th><th></th></tr></thead><tbody>';
+            html += '<div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>Name</th><th>Required version</th><th>Available version</th></tr></thead><tbody>';
             data.modules.forEach(function(m, idx) {
                 var modId = 'modver_' + idx;
                 html += '<tr>';
                 html += '<td>' + (m.name || '') + '</td>';
                 html += '<td>' + (m.version || '') + '</td>';
-                html += '<td id="' + modId + '"><span class="text-muted">Vérification...</span></td>';
-                html += '<td>' + (m.dependencies && m.dependencies.length ? m.dependencies.join(', ') : '') + '</td>';
+                html += '<td id="' + modId + '"><span class="text-muted">Checking...</span></td>';
                 html += '</tr>';
             });
             html += '</tbody></table></div>';
         } else {
-            html += '<p>Aucun module détecté.</p>';
+            html += '<p>No modules detected.</p>';
         }
         $('#config-detail-container').html(html);
 
-        // Vérification des versions de modules
+        // Module version check
         if(data.modules && data.modules.length) {
             data.modules.forEach(function(m, idx) {
                 var modId = 'modver_' + idx;
@@ -63,12 +62,12 @@ $(function() {
                 var url = '/api/v1/modules/' + encodeURIComponent(m.name);
                 if(m.version) url += '?latest=1';
                 $.getJSON(url, function(resp) {
-                    // resp doit contenir {available: bool, version: string}
+                    // resp should contain {available: bool, version: string}
                     var cell = $('#' + modId);
                     if(resp && resp.available) {
                         var ok = true;
                         if(m.version && resp.version) {
-                            // Compare les versions (simple split)
+                            // Simple version split/compare
                             var req = m.version.split('.').map(Number);
                             var got = resp.version.split('.').map(Number);
                             for(var i=0; i<req.length; ++i) {
@@ -78,10 +77,10 @@ $(function() {
                         }
                         cell.html('<span style="color:'+(ok?'green':'red')+'">' + resp.version + '</span>');
                     } else {
-                        $('#' + modId).html('<span style="color:red">Non disponible</span>');
+                        $('#' + modId).html('<span style="color:red">Not available</span>');
                     }
                 }).fail(function() {
-                    $('#' + modId).html('<span style="color:red">Erreur</span>');
+                    $('#' + modId).html('<span style="color:red">Error</span>');
                 });
             });
         }

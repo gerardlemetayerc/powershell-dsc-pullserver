@@ -55,11 +55,15 @@
                 <div class="card-header bg-info text-white text-center p-2" style="font-size:1em;">
                     Configuration Status Overview
                 </div>
-                <div class="card-body" style="max-width:180px; margin:auto;">
-                    <canvas id="agents-pie" width="120" height="120"></canvas>
-                    <div class="d-flex justify-content-center align-items-center mt-3" id="agents-pie-legend">
-                        <span id="legend-ok" class="legend-selectable active" style="cursor:pointer;display:inline-flex;align-items:center;margin-right:20px;"><span style="display:inline-block;width:22px;height:14px;background:#28a745;margin-right:6px;"></span>Compliant</span>
-                        <span id="legend-err" class="legend-selectable active" style="cursor:pointer;display:inline-flex;align-items:center;"><span style="display:inline-block;width:22px;height:14px;background:#dc3545;margin-right:6px;"></span>Failed</span>
+                <div class="card-body" style="min-width:300px;max-width:300px; margin:auto;">
+                    <div style="width:100%;display:flex;flex-direction:column;align-items:center;">
+                        <canvas id="agents-pie" style="max-width:180px;width:100%;height:auto;" width="160" height="160"></canvas>
+                        <div class="d-flex flex-wrap justify-content-center align-items-center mt-3" id="agents-pie-legend" style="gap:8px;font-size:0.95em;line-height:1.2;">
+                            <span id="legend-ok" class="legend-selectable active" style="cursor:pointer;display:inline-flex;align-items:center;"><span style="display:inline-block;width:18px;height:12px;background:#28a745;margin-right:5px;"></span>Compliant</span>
+                            <span id="legend-err" class="legend-selectable active" style="cursor:pointer;display:inline-flex;align-items:center;"><span style="display:inline-block;width:18px;height:12px;background:#dc3545;margin-right:5px;"></span>Failed</span>
+                            <span id="legend-pending-enroll" class="legend-selectable active" style="cursor:pointer;display:inline-flex;align-items:center;"><span style="display:inline-block;width:18px;height:12px;background:#6c757d;margin-right:5px;"></span>Pending Enroll</span>
+                            <span id="legend-pending-apply" class="legend-selectable active" style="cursor:pointer;display:inline-flex;align-items:center;"><span style="display:inline-block;width:18px;height:12px;background:#ffc107;margin-right:5px;"></span>Pending Apply</span>
+                        </div>
                     </div>
                 </div>
             </div>

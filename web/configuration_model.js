@@ -9,7 +9,7 @@ $(function() {
         e.preventDefault();
         var formData = new FormData(this);
         $.ajax({
-            url: '/api/v1/configuration_models',
+            url: '/api/v1/configuration_models?current=1',
             type: 'POST',
             data: formData,
             processData: false,
@@ -33,7 +33,7 @@ $(function() {
     }
 
     function loadConfigModels() {
-        $.getJSON('/api/v1/configuration_models', function(data) {
+        $.getJSON('/api/v1/configuration_models?current=1', function(data) {
             if ($.fn.DataTable.isDataTable('#config-models-table')) {
                 $('#config-models-table').DataTable().clear().destroy();
             }
@@ -48,6 +48,7 @@ $(function() {
                     '<td>' + uploadDate + '</td>' +
                     '<td>' + lastUsage + '</td>' +
                     '<td>' +
+                        '<button class="btn btn-info btn-sm btn-detail-config-model" data-id="' + model.name + '">Détail</button> ' +
                         '<button class="btn btn-danger btn-sm delete-config-model" data-id="' + model.id + '">Delete</button>' +
                     '</td>' +
                 '</tr>';
