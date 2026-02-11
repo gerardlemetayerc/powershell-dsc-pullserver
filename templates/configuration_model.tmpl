@@ -59,4 +59,10 @@
     </div>
 </div>
 <script src="/web/configuration_model.js"></script>
+<script>
+$(document).on('click', '.btn-detail-config-model', function() {
+    var id = $(this).data('id');
+    window.location.href = '/web/configuration_model/' + id;
+});
+</script>
 {{end}}

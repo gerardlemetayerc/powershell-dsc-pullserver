@@ -1,10 +1,71 @@
+// GET /api/v1/modules/{name}
+// GET /api/v1/modules/{name}?latest=1
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
+	"database/sql"
 	"net/http"
+	"log"
+	"strings"
+	"go-dsc-pull/internal/db"
 )
+
+func GetModuleVersionHandler(w http.ResponseWriter, r *http.Request) {
+	dbCfg, err := db.LoadDBConfig("config.json")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	dbConn, err := db.OpenDB(dbCfg)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer dbConn.Close()
+
+	// Récupère le nom du module depuis l'URL
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 5 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	name := parts[len(parts)-1]
+	// Nettoie le nom du module pour éviter les soucis de caractères parasites
+	name = strings.Trim(name, " \"'{}[];:")
+	latest := r.URL.Query().Get("latest") == "1"
+
+	       // Si latest=1, retourne la version la plus récente
+	       var version string
+	       var found bool
+	       query := ""
+	       if strings.Contains(strings.ToLower(dbCfg.Driver), "sqlserver") || strings.Contains(strings.ToLower(dbCfg.Driver), "mssql") {
+		       query = "SELECT TOP 1 version FROM modules WHERE name = ? ORDER BY version DESC"
+	       } else {
+		       query = "SELECT version FROM modules WHERE name = ? ORDER BY version DESC LIMIT 1"
+	       }
+	       if latest {
+		       row := dbConn.QueryRow(query, name)
+		       err := row.Scan(&version)
+		       found = (err == nil)
+	       } else if v := r.URL.Query().Get("version"); v != "" {
+		       row := dbConn.QueryRow("SELECT version FROM modules WHERE name = ? AND version = ?", name, v)
+		       err := row.Scan(&version)
+		       found = (err == nil)
+	       } else {
+		       row := dbConn.QueryRow(query, name)
+		       err := row.Scan(&version)
+		       found = (err == nil)
+	       }
+	log.Printf("[GetModuleVersionHandler] name=%s latest=%v found=%v version=%s", name, latest, found, version);
+	resp := map[string]interface{}{
+		"available": found,
+		"version": version,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
 
 type ModuleInfo struct {
 	ID         int    `json:"id"`
