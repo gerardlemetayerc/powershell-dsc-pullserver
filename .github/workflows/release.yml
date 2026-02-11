@@ -61,11 +61,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Download Admin Console artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: DSC-Admin-Console
       - name: Download PowerShell artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: DSCPullServer
       - name: Create GitHub Release
