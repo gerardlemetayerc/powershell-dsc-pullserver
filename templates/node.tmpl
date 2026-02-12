@@ -12,8 +12,16 @@
     <div class="container-fluid">
         <div class="card">
             <div class="card-body">
-                <h3>LCM Agent information</h3>
-                <div id="agent-info-block"></div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3>LCM Agent information</h3>
+                    <button id="delete-node-btn" class="btn btn-danger btn-sm">Supprimer ce noeud</button>
+                </div>
+                <div id="agent-info-block">
+                    <div><strong>Name:</strong> <span id="agent-name"></span></div>
+                    <div><strong>Certificate expiration:</strong> <span id="agent-thumbprint"></span></div>
+                    <div><strong>Last Communication:</strong> <span id="agent-lastcomm"></span></div>
+                    <div id="agent-config-block"></div>
+                </div>
                 <hr>
                 <h3>Tags</h3>
                 <div id="agent-tags-block"></div>

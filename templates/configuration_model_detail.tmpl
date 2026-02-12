@@ -1,0 +1,24 @@
+{{define "content"}}
+<section class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1>Configuration Details</h1>
+            </div>
+            <div class="col-sm-6 text-right">
+                <a href="/web/configuration_model" class="btn btn-secondary">Back to list</a>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="content">
+    <div class="container-fluid">
+        <div class="card">
+            <div class="card-body" id="config-detail-container">
+                <!-- Details will be loaded by JS -->
+            </div>
+        </div>
+    </div>
+</section>
+<script src="/web/configuration_model_detail.js"></script>
+{{end}}

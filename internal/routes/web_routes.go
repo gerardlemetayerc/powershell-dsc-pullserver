@@ -79,7 +79,7 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 		mux.Handle("/saml/", samlMiddleware)
 	}
 	// API REST endpoints (agents, configs, reports, modules, properties, configuration_models, users, login)
-	mux.Handle("GET /api/v1/agents", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentAPIHandler)))
+	mux.Handle("GET /api/v1/agents", jwtAuthMiddleware(http.HandlerFunc(handlers.GetAgentsHandler)))
 	mux.Handle("POST /api/v1/agents/preenroll", jwtAuthMiddleware(http.HandlerFunc(handlers.PreEnrollAgentHandler)))
 	mux.Handle("GET /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandler)))
 	mux.Handle("POST /api/v1/agents/{id}/configs", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentConfigsAPIHandlerPostDelete)))
@@ -145,5 +145,10 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("GET /api/v1/agents/{id}/tags", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentTagsListHandler)))
 	mux.Handle("PUT /api/v1/agents/{id}/tags", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentTagsSetHandler)))
 	mux.Handle("DELETE /api/v1/agents/{id}/tags", jwtAuthMiddleware(http.HandlerFunc(handlers.AgentTagsDeleteHandler)))
-
+	// Détail configuration (API et Web)
+	mux.Handle("GET /api/v1/configuration_models/{id}/detail", jwtAuthMiddleware(http.HandlerFunc(handlers.GetConfigurationModelDetailHandler)))
+	mux.Handle("GET /api/v1/configuration_models/{id}/download", jwtAuthMiddleware(http.HandlerFunc(handlers.DownloadConfigurationModelHandler)))
+	mux.Handle("/web/configuration_model/", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebConfigurationModelDetailHandler)))
+	mux.Handle("GET /api/v1/modules/{name}", jwtAuthMiddleware(http.HandlerFunc(handlers.GetModuleVersionHandler)))
+	mux.Handle("DELETE /api/v1/agents/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteNodeHandler)))
 }

@@ -2,7 +2,6 @@ package db
 
 import (
 	"database/sql"
-	"time"
 	"go-dsc-pull/internal/schema"
 	"go-dsc-pull/internal/utils"
 )
@@ -37,8 +36,14 @@ func GetConfigurationModel(db *sql.DB, id int64) (*schema.ConfigurationModel, er
 	} else {
 		cm.PreviousID = nil
 	}
-	cm.UploadDate = utils.ParseTimeFlexible(uploadDate)
-	cm.LastUsage = utils.ParseTimeFlexible(lastUsage)
+	       t := utils.ParseTimeFlexible(uploadDate)
+	       cm.UploadDate = t
+	       if lastUsage != "" {
+		       t2 := utils.ParseTimeFlexible(lastUsage)
+		       cm.LastUsage = &t2
+	       } else {
+		       cm.LastUsage = nil
+	       }
 	return &cm, nil
 }
 
@@ -68,12 +73,14 @@ func ListConfigurationModels(db *sql.DB) ([]schema.ConfigurationModel, error) {
 		} else {
 			cm.PreviousID = nil
 		}
-		cm.UploadDate = utils.ParseTimeFlexible(uploadDate)
-		if lastUsage.Valid && lastUsage.String != "" {
-			cm.LastUsage = utils.ParseTimeFlexible(lastUsage.String)
-		} else {
-			cm.LastUsage = time.Time{}
-		}
+		       t := utils.ParseTimeFlexible(uploadDate)
+		       cm.UploadDate = t
+		       if lastUsage.Valid && lastUsage.String != "" {
+			       t2 := utils.ParseTimeFlexible(lastUsage.String)
+			       cm.LastUsage = &t2
+		       } else {
+			       cm.LastUsage = nil
+		       }
 		list = append(list, cm)
 	}
 	return list, nil

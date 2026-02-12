@@ -1,3 +1,33 @@
+function renderNodeActionBlock() {
+    const nodeId = getNodeIdFromUrl();
+    if(!nodeId) return '';
+    return '<button id="delete-node-btn" class="btn btn-danger btn-sm">Supprimer ce noeud</button>';
+}
+
+function showNodeMessage(msg, type) {
+    // type: 'success' | 'error' | 'info'
+    let color = type === 'success' ? '#d4edda' : (type === 'error' ? '#f8d7da' : '#e2e3e5');
+    let txtColor = type === 'success' ? '#155724' : (type === 'error' ? '#721c24' : '#383d41');
+    $('#node-message-block').html('<div style="background:'+color+';color:'+txtColor+';padding:8px 12px;border-radius:4px;margin-bottom:8px;">'+msg+'</div>');
+}
+
+$(document).on('click', '#delete-node-btn', function() {
+    const nodeId = getNodeIdFromUrl();
+    if(!nodeId) return;
+    if(confirm('Êtes-vous sûr de vouloir supprimer ce noeud ? Cette action supprimera aussi ses tags et historiques de rapport.')) {
+        $.ajax({
+            url: '/api/v1/agents/' + encodeURIComponent(nodeId),
+            type: 'DELETE',
+            success: function() {
+                showNodeMessage('Noeud supprimé.', 'success');
+                setTimeout(function(){ window.location.href = '/web'; }, 1200);
+            },
+            error: function(xhr) {
+                showNodeMessage('Erreur lors de la suppression du noeud: ' + (xhr.responseText || xhr.status), 'error');
+            }
+        });
+    }
+});
 // node.js (frontend) pour page /web/node/{id}
 
 function getNodeIdFromUrl() {
@@ -41,11 +71,13 @@ function renderAgentTags() {
     return html;
 }
 
-function renderAgentInfo() {
+function fillAgentInfo() {
     if (!state.agent) {
-        return `<p><strong>Name:</strong> <span id="agent-name">Error loading</span>
-                <div><strong>Thumbprint:</strong> <span id="agent-thumbprint"></span></div>
-                <div><strong>Last Communication:</strong> <span id="agent-lastcomm"></span></div>`;
+        $('#agent-name').text('Error loading');
+        $('#agent-thumbprint').text('');
+        $('#agent-lastcomm').text('');
+        $('#agent-config-block').html('');
+        return;
     }
     let certExpRaw = state.agent.certificate_notafter || '';
     let certExp = certExpRaw;
@@ -53,7 +85,6 @@ function renderAgentInfo() {
     if (certExpRaw) {
         let expDate = new Date(certExpRaw);
         if (!isNaN(expDate.getTime())) {
-            // Format: YYYY-MM-DD HH:mm:ss
             let y = expDate.getFullYear();
             let m = (expDate.getMonth()+1).toString().padStart(2,'0');
             let d = expDate.getDate().toString().padStart(2,'0');
@@ -81,17 +112,16 @@ function renderAgentInfo() {
             lastComm = `${y}-${m}-${d} ${h}:${min}:${s}`;
         }
     }
-    let configHtml = '';
+    $('#agent-name').text(state.agent.node_name || '');
+    $('#agent-thumbprint').text(certExp + daysLeft);
+    $('#agent-lastcomm').text(lastComm);
     if (Array.isArray(state.agent.configurations) && state.agent.configurations.length > 0) {
-        configHtml = `<div><strong>Configuration${state.agent.configurations.length > 1 ? 's' : ''} associée${state.agent.configurations.length > 1 ? 's' : ''} :</strong> ` +
-            state.agent.configurations.map(c => `<span class="badge badge-info mr-1">${c}</span>`).join(' ') + '</div>';
+        let html = `<strong>Configuration${state.agent.configurations.length > 1 ? 's' : ''} associée${state.agent.configurations.length > 1 ? 's' : ''} :</strong> ` +
+            state.agent.configurations.map(c => `<span class="badge badge-info mr-1">${c}</span>`).join(' ');
+        $('#agent-config-block').html(html);
+    } else {
+        $('#agent-config-block').html('');
     }
-    return `<p>
-                <div><strong>Name:</strong> <span id="agent-name">${state.agent.node_name || ''}</span></div>
-                <div><strong>Certificate expiration:</strong> <span id="agent-thumbprint">${certExp}${daysLeft}</span></div>
-                <div><strong>Last Communication:</strong> <span id="agent-lastcomm">${lastComm}</span></div>
-                ${configHtml}
-            </p>`;
 }
 
 function renderSelectedReport() {
@@ -287,31 +317,16 @@ function renderReportsDropdown() {
 }
 
 function renderAll() {
-    $('#agent-info-block').html(renderAgentInfo());
+    fillAgentInfo();
     $('#agent-tags-block').html(renderAgentTags());
     $('#reports-dropdown-block').html(renderReportsDropdown());
     $('#last-report-block').html(renderSelectedReport());
+    $('#node-action-block').html(renderNodeActionBlock());
 }
 
 $(document).ready(function() {
     const agentId = getNodeIdFromUrl();
-    // Ajoute dynamiquement tous les blocs, y compris tags
-    $('.card-body').html(`
-        <h3>Agent Information</h3>
-        <div id="agent-info-block"></div>
-        <hr>
-        <h3>Tags</h3>
-        <div id="agent-tags-block"></div>
-        <form id="add-tag-form" class="form-inline mb-2">
-            <input type="text" class="form-control mr-2" id="tag-key" placeholder="Clé (ex: environnement)" required style="max-width:180px;">
-            <input type="text" class="form-control mr-2" id="tag-value" placeholder="Valeur (ex: production)" required style="max-width:180px;">
-            <button type="submit" class="btn btn-primary">Ajouter</button>
-        </form>
-        <hr>
-        <h3>DSC Report</h3>
-        <div id="reports-dropdown-block" style="margin-bottom:1em;"></div>
-        <div id="last-report-block"></div>
-    `);
+    // Ne pas réécrire le HTML, juste remplir les valeurs
     renderAll();
     if (!agentId) {
         state.error = 'Agent ID not found in URL';

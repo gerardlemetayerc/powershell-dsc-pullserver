@@ -4,29 +4,28 @@ import (
 	"encoding/json"
 	"net/http"
 	"log"
+	"strings"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+
 )
 
-// AgentAPIHandler retourne la liste des agents (table agents)
-func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
-	       if r.Method != http.MethodGet {
-		       http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		       return
-	       }
-	       dbCfg, err := db.LoadDBConfig("config.json")
-	       if err != nil {
-		       log.Printf("[API][DB] Erreur chargement config DB: %v", err)
-		       http.Error(w, "DB config error", http.StatusInternalServerError)
-		       return
-	       }
-	       database, err := db.OpenDB(dbCfg)
-	       if err != nil {
-		       log.Printf("[API][DB] Erreur ouverture DB: %v", err)
-		       http.Error(w, "DB open error", http.StatusInternalServerError)
-		       return
-	       }
-	       defer database.Close()
+// GET /api/v1/agents
+func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
+	// Chargement de la config DB
+	dbCfg, err := db.LoadDBConfig("config.json")
+	if err != nil {
+		log.Printf("[API][DB] Erreur chargement config DB: %v", err)
+		http.Error(w, "DB config error", http.StatusInternalServerError)
+		return
+	}
+	database, err := db.OpenDB(dbCfg)
+	if err != nil {
+		log.Printf("[API][DB] Erreur ouverture DB: %v", err)
+		http.Error(w, "DB open error", http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
 
 	       // Support de l'option ?count=1
 	       if r.URL.Query().Get("count") == "1" {
@@ -101,4 +100,37 @@ func AgentAPIHandler(w http.ResponseWriter, r *http.Request) {
 			   }
 		       w.Header().Set("Content-Type", "application/json")
 		       _ = json.NewEncoder(w).Encode(agents)
+}
+
+// DELETE /api/v1/agents/{id}
+func DeleteNodeHandler(w http.ResponseWriter, r *http.Request) {
+       dbCfg, err := db.LoadDBConfig("config.json")
+       if err != nil {
+	       w.WriteHeader(http.StatusInternalServerError)
+	       return
+       }
+       dbConn, err := db.OpenDB(dbCfg)
+       if err != nil {
+	       w.WriteHeader(http.StatusInternalServerError)
+	       return
+       }
+       defer dbConn.Close()
+       // Récupère l'id du noeud
+       parts := strings.Split(r.URL.Path, "/")
+       if len(parts) < 5 {
+	       w.WriteHeader(http.StatusBadRequest)
+	       return
+       }
+       id := parts[len(parts)-1]
+       // Supprime les tags
+       _, _ = dbConn.Exec("DELETE FROM agent_tags WHERE agent_id = ?", id)
+       // Supprime les rapports
+       _, _ = dbConn.Exec("DELETE FROM dsc_report WHERE agent_id = ?", id)
+       // Supprime le noeud
+       _, err = dbConn.Exec("DELETE FROM agents WHERE agent_id = ?", id)
+       if err != nil {
+	       w.WriteHeader(http.StatusInternalServerError)
+	       return
+       }
+       w.WriteHeader(http.StatusOK)
 }

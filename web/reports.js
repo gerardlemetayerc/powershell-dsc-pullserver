@@ -22,23 +22,17 @@ $(document).ready(function() {
                 render: function(data, type, row) {
                     if (row.state) {
                         switch (row.state.toLowerCase()) {
-                            case 'waiting_for_registration':
-                                return `<span class="badge bg-secondary" style="min-width:100px;">Pending Enroll</span>`;
-                            case 'pending_apply':
-                                return `<span class="badge bg-warning" style="min-width:100px;">Pending Apply</span>`;
                             case 'success':
                                 return `<span class="badge bg-success" style="min-width:60px;">OK</span>`;
+                            case 'waiting_for_registration':
+                                return `<span class="badge bg-secondary" style="min-width:100px;">Pending Enroll</span>`;
                             case 'failure':
                                 return `<span class="badge bg-danger" style="min-width:60px;">Failed</span>`;
                             default:
                                 return `<span class="badge bg-info" style="min-width:80px;">${row.state}</span>`;
                         }
-                    }
-                    // fallback legacy
-                    if (data === false || data === 0 || data === 'false') {
-                        return `<span class="badge bg-success" style="min-width:60px;">OK</span>`;
                     } else {
-                        return `<span class="badge bg-danger" style="min-width:60px;">Failed</span>`;
+                        return `<span class="badge bg-info" style="min-width:80px;">Unknown</span>`;
                     }
                 }
             },
@@ -57,28 +51,37 @@ $(document).ready(function() {
     $.getJSON('/api/v1/agents', function(agents) {
         // Affiche le nombre total d'agents
         $('#total-agents').text(agents.length);
-        // Calcule le nombre d'agents OK/Erreur
-        let ok = 0, err = 0;
+        // Calcule le nombre d'agents par état principal
+        let ok = 0, err = 0, pendingEnroll = 0, pendingApply = 0;
         agents.forEach(a => {
-            if (a.state && a.state.toLowerCase() === 'waiting_for_registration') {
-                // ignore, not counted as OK or Error
-            } else if (a.state && a.state.toLowerCase() === 'pending_apply') {
-                // ignore, not counted as OK or Error
-            } else if (a.has_error_last_report) {
-                err++;
-            } else {
-                ok++;
+            if (!a.state) return;
+            switch (a.state.toLowerCase()) {
+                case 'success':
+                    ok++;
+                    break;
+                case 'failure':
+                    err++;
+                    break;
+                case 'waiting_for_registration':
+                    pendingEnroll++;
+                    break;
+                case 'pending_apply':
+                    pendingApply++;
+                    break;
+                default:
+                    // ignore or handle as needed
+                    break;
             }
         });
-        // Affiche le camembert
+        // Affiche le camembert avec 4 catégories
         const ctx = document.getElementById('agents-pie').getContext('2d');
         const chart = new Chart(ctx, {
             type: 'pie',
             data: {
-                labels: ['OK', 'Erreur'],
+                labels: ['OK', 'Failed', 'Pending Enroll', 'Pending Apply'],
                 datasets: [{
-                    data: [ok, err],
-                    backgroundColor: ['#28a745', '#dc3545'],
+                    data: [ok, err, pendingEnroll, pendingApply],
+                    backgroundColor: ['#28a745', '#dc3545', '#6c757d', '#ffc107'],
                 }]
             },
             options: {
@@ -93,7 +96,9 @@ $(document).ready(function() {
         function updatePieVisibility() {
             let showOk = $('#legend-ok').hasClass('active');
             let showErr = $('#legend-err').hasClass('active');
-            let newData = [showOk ? ok : 0, showErr ? err : 0];
+            let showPendingEnroll = $('#legend-pending-enroll').hasClass('active');
+            let showPendingApply = $('#legend-pending-apply').hasClass('active');
+            let newData = [showOk ? ok : 0, showErr ? err : 0, showPendingEnroll ? pendingEnroll : 0, showPendingApply ? pendingApply : 0];
             chart.data.datasets[0].data = newData;
             chart.update();
         }
@@ -102,6 +107,14 @@ $(document).ready(function() {
             updatePieVisibility();
         });
         $('#legend-err').on('click', function() {
+            $(this).toggleClass('active');
+            updatePieVisibility();
+        });
+        $('#legend-pending-enroll').on('click', function() {
+            $(this).toggleClass('active');
+            updatePieVisibility();
+        });
+        $('#legend-pending-apply').on('click', function() {
             $(this).toggleClass('active');
             updatePieVisibility();
         });

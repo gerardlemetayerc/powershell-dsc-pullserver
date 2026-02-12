@@ -14,6 +14,7 @@ import (
 	"go-dsc-pull/internal"
 	"go-dsc-pull/internal/schema"
 	"go-dsc-pull/internal/logs"
+	"go-dsc-pull/internal/utils"
 	jwt "github.com/golang-jwt/jwt/v5"
 )
 
@@ -148,7 +149,9 @@ func GetConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer dbConn.Close()
-	idStr := r.URL.Query().Get("id")
+	// Extract id from URL path: /api/v1/configuration_models/{id}
+	parts := strings.Split(r.URL.Path, "/")
+	idStr := parts[len(parts)-1]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -165,41 +168,85 @@ func GetConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/configuration_models
 func ListConfigurationModelsHandler(w http.ResponseWriter, r *http.Request) {
-		dbCfg, err := db.LoadDBConfig("config.json")
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		dbConn, err := db.OpenDB(dbCfg)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		defer dbConn.Close()
+		       dbCfg, err := db.LoadDBConfig("config.json")
+		       if err != nil {
+			       w.WriteHeader(http.StatusInternalServerError)
+			       return
+		       }
+		       dbConn, err := db.OpenDB(dbCfg)
+		       if err != nil {
+			       w.WriteHeader(http.StatusInternalServerError)
+			       return
+		       }
+		       defer dbConn.Close()
 
-		// Support de l'option ?count=1
-		if r.URL.Query().Get("count") == "1" {
-			row := dbConn.QueryRow("SELECT COUNT(*) FROM configuration_model")
-			var count int
-			if err := row.Scan(&count); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]int{"count": count})
-			return
-		}
+		       // Support de l'option ?count=1
+		       if r.URL.Query().Get("count") == "1" {
+			       row := dbConn.QueryRow("SELECT COUNT(*) FROM configuration_model")
+			       var count int
+			       if err := row.Scan(&count); err != nil {
+				       w.WriteHeader(http.StatusInternalServerError)
+				       return
+			       }
+			       w.Header().Set("Content-Type", "application/json")
+			       json.NewEncoder(w).Encode(map[string]int{"count": count})
+			       return
+		       }
 
-		list, err := db.ListConfigurationModels(dbConn)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if list == nil {
-			list = make([]schema.ConfigurationModel, 0)
-		}
-		json.NewEncoder(w).Encode(list)
+			       // Support de l'option ?current=1 pour ne retourner que la dernière version de chaque configuration (original_name = name)
+			       if r.URL.Query().Get("current") == "1" {
+					   query := `SELECT id, name, original_name, previous_id, upload_date, uploaded_by, mof_file, last_usage FROM configuration_model WHERE original_name = name`
+					   rows, err := dbConn.Query(query)
+				       if err != nil {
+					       w.WriteHeader(http.StatusInternalServerError)
+					       return
+				       }
+				       defer rows.Close()
+				       var list []schema.ConfigurationModel
+					       for rows.Next() {
+						       var cm schema.ConfigurationModel
+						       var origName sql.NullString
+						       var prevID sql.NullInt64
+						       var lastUsage sql.NullTime
+						       err := rows.Scan(&cm.ID, &cm.Name, &origName, &prevID, &cm.UploadDate, &cm.UploadedBy, &cm.MofFile, &lastUsage)
+						       if err != nil {
+							       w.WriteHeader(http.StatusInternalServerError)
+							       return
+						       }
+						       if origName.Valid {
+							       cm.OriginalName = &origName.String
+						       }
+						       if prevID.Valid {
+							       v := prevID.Int64
+							       cm.PreviousID = &v
+						       }
+						       if lastUsage.Valid {
+							       t := lastUsage.Time
+							       cm.LastUsage = &t
+						       } else {
+							       cm.LastUsage = nil
+						       }
+						       list = append(list, cm)
+					       }
+				       w.Header().Set("Content-Type", "application/json")
+				       if list == nil {
+					       list = make([]schema.ConfigurationModel, 0)
+				       }
+				       json.NewEncoder(w).Encode(list)
+				       return
+			       }
+
+		       // Sinon, comportement normal (toutes les versions)
+		       list, err := db.ListConfigurationModels(dbConn)
+		       if err != nil {
+			       w.WriteHeader(http.StatusInternalServerError)
+			       return
+		       }
+		       w.Header().Set("Content-Type", "application/json")
+		       if list == nil {
+			       list = make([]schema.ConfigurationModel, 0)
+		       }
+		       json.NewEncoder(w).Encode(list)
 }
 
 // PUT /api/v1/configuration_models/{id}
@@ -215,12 +262,14 @@ func UpdateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer dbConn.Close()
-	idStr := r.URL.Query().Get("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
+		       // Extract id from URL path: /api/v1/configuration_models/{id}
+		       parts := strings.Split(r.URL.Path, "/")
+		       idStr := parts[len(parts)-1]
+		       id, err := strconv.ParseInt(idStr, 10, 64)
+		       if err != nil {
+			       w.WriteHeader(http.StatusBadRequest)
+			       return
+		       }
 	if !auth.IsAdmin(r, dbConn) {
 		http.Error(w, "Forbidden: admin only", http.StatusForbidden)
 		return
@@ -260,7 +309,9 @@ func DeleteConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer dbConn.Close()
-	idStr := r.URL.Query().Get("id")
+	// Extract id from URL path: /api/v1/configuration_models/{id}
+	parts := strings.Split(r.URL.Path, "/")
+	idStr := parts[len(parts)-1]
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -293,4 +344,200 @@ func DeleteConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// GET /api/v1/configuration_models/{id}/detail
+func GetConfigurationModelDetailHandler(w http.ResponseWriter, r *http.Request) {
+	dbCfg, err := db.LoadDBConfig("config.json")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	dbConn, err := db.OpenDB(dbCfg)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer dbConn.Close()
+	// Extract name from URL path: /api/v1/configuration_models/{name}/detail
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 5 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	name := parts[len(parts)-2]
+			       
+	// Récupère la config courante par nom
+	// MSSQL: utilise TOP 1, SQLite: utilise LIMIT 1
+	query := ""
+	if strings.Contains(strings.ToLower(dbCfg.Driver), "sqlserver") || strings.Contains(strings.ToLower(dbCfg.Driver), "mssql") {
+		query = `SELECT TOP 1 id, name, original_name, previous_id, upload_date, uploaded_by, mof_file, last_usage FROM configuration_model WHERE name = ? ORDER BY upload_date DESC`
+	} else {
+		query = `SELECT id, name, original_name, previous_id, upload_date, uploaded_by, mof_file, last_usage FROM configuration_model WHERE name = ? ORDER BY upload_date DESC LIMIT 1`
+	}
+	row := dbConn.QueryRow(query, name)
+	var cm schema.ConfigurationModel
+	var origName sql.NullString
+	var prevID sql.NullInt64
+	var uploadDate string
+	var lastUsage sql.NullTime
+	err = row.Scan(&cm.ID, &cm.Name, &origName, &prevID, &uploadDate, &cm.UploadedBy, &cm.MofFile, &lastUsage)
+	if err != nil {
+		log.Printf("[CONFIG DETAIL] Configuration '%s' not found: %v", name, err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if origName.Valid {
+		cm.OriginalName = &origName.String
+	}
+	if prevID.Valid {
+		v := prevID.Int64
+		cm.PreviousID = &v
+	}
+
+	cm.UploadDate = utils.ParseTimeFlexible(uploadDate)
+	if lastUsage.Valid {
+		t := lastUsage.Time
+		cm.LastUsage = &t
+	} else {
+		cm.LastUsage = nil
+	}
+	// Historique des versions (même original_name)
+	var versions []schema.ConfigurationModel
+	       if cm.OriginalName != nil {
+		       rows, err := dbConn.Query(`SELECT id, name, original_name, previous_id, upload_date, uploaded_by, mof_file, last_usage FROM configuration_model WHERE original_name = ? ORDER BY upload_date DESC`, *cm.OriginalName)
+		       if err == nil {
+			       defer rows.Close()
+			       for rows.Next() {
+				       var v schema.ConfigurationModel
+				       var origName sql.NullString
+				       var prevID sql.NullInt64
+				       var uploadDate string
+				       var lastUsage sql.NullTime
+				       err := rows.Scan(&v.ID, &v.Name, &origName, &prevID, &uploadDate, &v.UploadedBy, &v.MofFile, &lastUsage)
+				       if err == nil {
+					       if origName.Valid {
+						       v.OriginalName = &origName.String
+					       }
+					       if prevID.Valid {
+						       vv := prevID.Int64
+						       v.PreviousID = &vv
+					       }
+									   v.UploadDate = utils.ParseTimeFlexible(uploadDate)
+					       if lastUsage.Valid {
+						       t := lastUsage.Time
+						       v.LastUsage = &t
+					       }
+					       versions = append(versions, v)
+				       }
+			       }
+		       }
+	       }
+	       // Extraction des modules/dépendances (simple: parse le MOF pour "ModuleName = ...")
+		       modules := []map[string]interface{}{}
+		       if cm.MofFile != nil {
+			       mofStr := string(cm.MofFile)
+			       modMap := map[string]map[string]interface{}{}
+			       for _, line := range strings.Split(mofStr, "\n") {
+				       line = strings.TrimSpace(line)
+				       // Nettoie les caractères parasites
+				       line = strings.ReplaceAll(line, ";", "")
+				       if strings.HasPrefix(line, "ModuleName = ") {
+					       name := strings.Trim(line[len("ModuleName = "):], " \"'{}[];")
+					       if _, ok := modMap[name]; !ok && name != "" {
+						       modMap[name] = map[string]interface{}{ "name": name }
+					       }
+				       }
+				       if strings.HasPrefix(line, "ModuleVersion = ") {
+					       ver := strings.Trim(line[len("ModuleVersion = "):], " \"'{}[];")
+					       for _, m := range modMap {
+						       if m["version"] == nil && ver != "" {
+							       m["version"] = ver
+						       }
+					       }
+				       }
+				       if strings.HasPrefix(line, "RequiredModules = ") {
+					       deps := strings.Trim(line[len("RequiredModules = "):], " {}\"'[];")
+					       depList := []string{}
+					       for _, d := range strings.Split(deps, ",") {
+						       d = strings.Trim(d, " \"'{}[];")
+						       if d != "" {
+							       depList = append(depList, d)
+						       }
+					       }
+					       for _, m := range modMap {
+						       m["dependencies"] = depList
+					       }
+				       }
+			       }
+			       for _, m := range modMap {
+				       modules = append(modules, m)
+			       }
+		       }
+
+	       // Ajout des noeuds liés à la configuration (agents)
+	       linkedNodes := []map[string]interface{}{}
+	       rows, err := dbConn.Query(`SELECT a.agent_id, a.node_name, a.state, a.last_communication FROM agents a INNER JOIN agent_configurations ac ON a.agent_id = ac.agent_id WHERE ac.configuration_name = ?`, cm.Name)
+	       if err == nil {
+		       defer rows.Close()
+		       for rows.Next() {
+			       var agentID, nodeName, state, lastComm string
+			       if err := rows.Scan(&agentID, &nodeName, &state, &lastComm); err == nil {
+				       linkedNodes = append(linkedNodes, map[string]interface{}{
+					       "agent_id": agentID,
+					       "node_name": nodeName,
+					       "state": state,
+					       "last_communication": lastComm,
+				       })
+			       }
+		       }
+	       }
+
+	       resp := map[string]interface{}{
+		       "id": cm.ID,
+		       "name": cm.Name,
+		       "uploaded_by": cm.UploadedBy,
+		       "upload_date": cm.UploadDate,
+		       "last_usage": cm.LastUsage,
+		       "versions": versions,
+		       "modules": modules,
+		       "linked_nodes": linkedNodes,
+	       }
+	       w.Header().Set("Content-Type", "application/json")
+	       json.NewEncoder(w).Encode(resp)
+}
+
+// GET /api/v1/configuration_models/{id}/download
+func DownloadConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
+	dbCfg, err := db.LoadDBConfig("config.json")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	dbConn, err := db.OpenDB(dbCfg)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer dbConn.Close()
+		       // Extract id from URL path: /api/v1/configuration_models/{id}/download
+		       parts := strings.Split(r.URL.Path, "/")
+		       if len(parts) < 5 {
+			       w.WriteHeader(http.StatusBadRequest)
+			       return
+		       }
+		       idStr := parts[len(parts)-2]
+		       id, err := strconv.ParseInt(idStr, 10, 64)
+		       if err != nil {
+			       w.WriteHeader(http.StatusBadRequest)
+			       return
+		       }
+	cm, err := db.GetConfigurationModel(dbConn, id)
+	if err != nil || cm.MofFile == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.mof\"", cm.Name))
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write(cm.MofFile)
 }

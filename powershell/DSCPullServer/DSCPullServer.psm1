@@ -62,9 +62,29 @@ function Add-DSCPullServerConfiguration {
     }
     $uri = "$($script:DSCPullServerSession.ServerUrl)/api/v1/configuration_models/upload"
     $headers = @{ Authorization = "$($script:DSCPullServerSession.AuthType) $($script:DSCPullServerSession.Token)" }
-    $file = Get-Item $Path
-    $form = @{ file = $file }
-    Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Form $form
+    if ($PSVersionTable.PSVersion.Major -ge 7) {
+        $file = Get-Item $Path
+        $form = @{ file = $file }
+        Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Form $form
+    } else {
+        # Compatible Windows PowerShell 5.1 : upload multipart
+        Add-Type -AssemblyName System.Net.Http
+        $client = New-Object System.Net.Http.HttpClient
+        $multipart = New-Object System.Net.Http.MultipartFormDataContent
+        $fileStream = [System.IO.File]::OpenRead($Path)
+        $fileName = [System.IO.Path]::GetFileName($Path)
+        $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+        $fileContent.Headers.Add('Content-Disposition', "form-data; name=\"file\"; filename=\"$fileName\"")
+        $multipart.Add($fileContent, 'file', $fileName)
+        foreach ($k in $headers.Keys) { $client.DefaultRequestHeaders.Add($k, $headers[$k]) }
+        $response = $client.PostAsync($uri, $multipart).Result
+        $fileStream.Close()
+        if (-not $response.IsSuccessStatusCode) {
+            $body = $response.Content.ReadAsStringAsync().Result
+            throw "Erreur HTTP $($response.StatusCode): $body"
+        }
+        $response.Content.ReadAsStringAsync().Result
+    }
 }
 
 function Remove-DSCPullServerConfiguration {
