@@ -152,8 +152,8 @@ function renderSelectedReport() {
     function renderResourceTable(resources, title) {
         if (!Array.isArray(resources) || resources.length === 0) return '';
         let cols = Object.keys(resources[0] || {});
-        // Retire la colonne StartDate, ModuleVersion et ResourceId si présentes
-        cols = cols.filter(c => c !== 'StartDate' && c !== 'ModuleVersion' && c !== 'ResourceId');
+        // Retire la colonne StartDate, ModuleVersion, ResourceId et SourceInfo si présentes
+        cols = cols.filter(c => c !== 'StartDate' && c !== 'ModuleVersion' && c !== 'ResourceId' && c !== 'SourceInfo');
         let html = `<p><strong>${title}</strong></p><table style="width:100%" class="table table-bordered table-sm"><thead><tr>`;
         html += cols.map(c => `<th>${c}</th>`).join('');
         html += '</tr></thead><tbody>';

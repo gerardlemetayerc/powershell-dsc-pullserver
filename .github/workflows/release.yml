@@ -1,4 +1,6 @@
 name: Build and Release DSC Admin Console
+permissions:
+  contents: write
 
 on:
   push:
@@ -29,11 +31,14 @@ jobs:
           xcopy web release\web /E /I
           xcopy templates release\templates /E /I
 
+      - name: Zip Admin Console
+        run: |
+          Compress-Archive -Path release/* -DestinationPath DSC-Admin-Console.zip
       - name: Upload release folder artifact
         uses: actions/upload-artifact@v6
         with:
           name: DSC-Admin-Console
-          path: release/
+          path: DSC-Admin-Console.zip
 
   zip-powershell:
     runs-on: windows-latest
@@ -50,3 +55,44 @@ jobs:
         with:
           name: DSCPullServer
           path: DSCPullServer.zip
+
+  release:
+    needs: [build-windows, zip-powershell]
+    runs-on: windows-latest
+    steps:
+      - name: Download Admin Console artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: DSC-Admin-Console
+      - name: Download PowerShell artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: DSCPullServer
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+      - name: Upload Admin Console asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: DSC-Admin-Console.zip
+          asset_name: DSC-Admin-Console.zip
+          asset_content_type: application/zip
+      - name: Upload PowerShell asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: DSCPullServer.zip
+          asset_name: DSCPullServer.zip
+          asset_content_type: application/zip
