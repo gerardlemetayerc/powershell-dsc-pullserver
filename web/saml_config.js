@@ -47,6 +47,11 @@ $(function() {
             $form.find('[name="sp_key_file"]').val(cfg.sp_key_file || '');
             $form.find('[name="idp_metadata_url"]').val(cfg.idp_metadata_url || '');
             claims = (cfg.user_mapping && typeof cfg.user_mapping === 'object') ? {...cfg.user_mapping} : {};
+            // Group mapping
+            const group = (cfg.group_mapping && typeof cfg.group_mapping === 'object') ? cfg.group_mapping : {};
+            $('#group-attribute').val(group.attribute || '');
+            $('#group-admin-value').val(group.admin_value || '');
+            $('#group-user-value').val(group.user_value || '');
             renderClaimsTable();
             toggleFields(!!cfg.enabled);
         })
@@ -70,13 +75,19 @@ $(function() {
     });
     $form.on('submit', function(e) {
         e.preventDefault();
+        const group_mapping = {
+            attribute: $('#group-attribute').val(),
+            admin_value: $('#group-admin-value').val(),
+            user_value: $('#group-user-value').val()
+        };
         const data = {
             enabled: $form.find('[name="enabled"]').prop('checked'),
             entity_id: $form.find('[name="entity_id"]').val(),
             sp_cert_file: $form.find('[name="sp_cert_file"]').val(),
             sp_key_file: $form.find('[name="sp_key_file"]').val(),
             idp_metadata_url: $form.find('[name="idp_metadata_url"]').val(),
-            user_mapping: claims
+            user_mapping: claims,
+            group_mapping: group_mapping
         };
         $.ajax({
             url: '/api/v1/saml/config',

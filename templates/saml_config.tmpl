@@ -47,7 +47,7 @@
             <span id="sp-upload-status" class="ml-3"></span>
           </div>
           <div class="form-group saml-fields">
-            <label>Claims mapping</label>
+            <label>User claims mapping</label>
             <table class="table table-bordered" id="claims-table">
               <thead>
                 <tr><th>Field</th><th>SAML Claim URI</th></tr>
@@ -68,6 +68,28 @@
               </tbody>
             </table>
             <!-- Ajout/suppression de claims additionnels désactivé -->
+          </div>
+          <div class="form-group saml-fields">
+            <label>Group claim mapping</label>
+            <table class="table table-bordered" id="group-claims-table">
+              <thead>
+                <tr><th>Field</th><th>Value</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Attribute</td>
+                  <td><input type="text" class="form-control group-claim-input" data-group-claim="attribute" id="group-attribute" placeholder="Attribute (e.g. memberOf)"></td>
+                </tr>
+                <tr>
+                  <td>Admin value</td>
+                  <td><input type="text" class="form-control group-claim-input" data-group-claim="admin_value" id="group-admin-value" placeholder="Admin value (e.g. CN=Admins)"></td>
+                </tr>
+                <tr>
+                  <td>User value</td>
+                  <td><input type="text" class="form-control group-claim-input" data-group-claim="user_value" id="group-user-value" placeholder="User value (e.g. CN=Users)"></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
           <button type="submit" class="btn btn-primary">Save</button>
           <span id="saml-config-status" class="ml-3"></span>
