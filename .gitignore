@@ -10,3 +10,4 @@
 saml_keycert_archive/*
 config.json
 config/*
+examples/*
