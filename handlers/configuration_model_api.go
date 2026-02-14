@@ -82,8 +82,8 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 
 		// 2. Tenter la création de la configuration, et indiquer si besoin l'ID de la précédente configuration (celle modifiée précédemment) si besoin dans le champ prévu à cet effet
 		uploadedBy := "?"
-		if r.Context().Value("user") != nil {
-			if sub, ok := r.Context().Value("user").(string); ok {
+		if r.Context().Value("userId") != nil {
+			if sub, ok := r.Context().Value("userId").(string); ok {
 				uploadedBy = sub
 			}
 		} else if auth := r.Header.Get("Authorization"); len(auth) > 7 {
@@ -123,6 +123,13 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Audit création
+		appCfg, errCfg := internal.LoadAppConfig("config.json")
+		if errCfg == nil {
+			driverName := appCfg.Database.Driver
+			_ = db.InsertAudit(dbConn, driverName, uploadedBy, "create", "configuration_model", "Created configuration: "+name, "")
+		}
+
 		// Met à jour le statut des agents liés à cette configuration
 		var res sql.Result
 		res, err = dbConn.Exec("UPDATE agents SET state = 'pending_apply' WHERE agent_id IN (SELECT agent_id FROM agent_configurations WHERE configuration_name = ?)", name)
@@ -133,7 +140,7 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 			msg := fmt.Sprintf("[INFO] New configuration uploaded, impacted nodes: %d", n)
 			logs.WriteLogFile(msg)
 		}
-	w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusCreated)
 }
 
 // GET /api/v1/configuration_models/{id}
@@ -309,12 +316,19 @@ func DeleteConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer dbConn.Close()
-	// Extract id from URL path: /api/v1/configuration_models/{id}
+	// Récupère l'id soit dans le chemin, soit en paramètre
+	var idStr string
 	parts := strings.Split(r.URL.Path, "/")
-	idStr := parts[len(parts)-1]
+	if len(parts) > 0 {
+		idStr = parts[len(parts)-1]
+	}
+	if idStr == "" || idStr == "configuration_models" {
+		idStr = r.URL.Query().Get("id")
+	}
 	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+	if err != nil || id <= 0 {
 		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Invalid configuration id"))
 		return
 	}
 	// Récupère le nom de la configuration
@@ -342,6 +356,19 @@ func DeleteConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+	// Audit suppression
+	appCfg, err := internal.LoadAppConfig("config.json")
+	if err == nil {
+		driverName := appCfg.Database.Driver
+		// Récupère l'utilisateur
+		user := "?"
+		if r.Context().Value("userId") != nil {
+			if sub, ok := r.Context().Value("userId").(string); ok {
+				user = sub
+			}
+		}
+		_ = db.InsertAudit(dbConn, driverName, user, "delete", "configuration_model", "Deleted configuration: "+configName, "")
 	}
 	w.WriteHeader(http.StatusOK)
 }

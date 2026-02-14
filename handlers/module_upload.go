@@ -11,7 +11,9 @@ import (
 	"net/http"
 	"strings"
 	"path/filepath"
+	"go-dsc-pull/internal/global"
 	"go-dsc-pull/internal/auth"
+	internaldb "go-dsc-pull/internal/db"
 )
 
 // Helper: extract module name/version from .psd1
@@ -62,31 +64,42 @@ func ModuleUploadHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		// Si le fichier uploadé est un .zip DSC natif, on le stocke tel quel
-		if strings.HasSuffix(strings.ToLower(r.MultipartForm.File["nupkg"][0].Filename), ".zip") {
-			zipName := r.MultipartForm.File["nupkg"][0].Filename
-			base := strings.TrimSuffix(zipName, ".zip")
-			name := base
-			version := ""
-			if strings.Contains(base, "_") {
-				parts := strings.SplitN(base, "_", 2)
-				name = parts[0]
-				version = parts[1]
+			   if strings.HasSuffix(strings.ToLower(r.MultipartForm.File["nupkg"][0].Filename), ".zip") {
+				   zipName := r.MultipartForm.File["nupkg"][0].Filename
+				   base := strings.TrimSuffix(zipName, ".zip")
+				   name := base
+				   version := ""
+				   if strings.Contains(base, "_") {
+					   parts := strings.SplitN(base, "_", 2)
+					   name = parts[0]
+					   version = parts[1]
+				   }
+				   // (Suppression de la sauvegarde temporaire du zip)
+				   log.Printf("[DEBUG] Zip size: %d", len(nupkgBytes))
+				   log.Printf("[DEBUG] name: %s, version: %s", name, version)
+				   log.Printf("[DEBUG] Checksum...")
+				   sha := sha256.Sum256(nupkgBytes)
+				   checksum := strings.ToUpper(fmt.Sprintf("%x", sha[:]))
+				   log.Printf("[DEBUG] DB insert...")
+			   		_, err := db.Exec(`INSERT INTO modules (name, version, checksum, zip_blob) VALUES (?, ?, ?, ?)`, name, version, checksum, nupkgBytes)
+				   // Audit log for zip upload
+				  if( err == nil) {
+					user := "?"
+					if r.Context().Value("userId") != nil {
+						if sub, ok := r.Context().Value("userId").(string); ok {
+							user = sub
+						}
+					}
+					// Try to load driver name for audit
+					driverName := global.AppConfig.Database.Driver
+					if driverName != "" {
+						// Insert audit log
+						_, _ = db.Exec(`INSERT INTO audit (user, action, object, details, extra, timestamp) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`, user, "create", "module", fmt.Sprintf("Ajout module: %s v%s (zip)", name, version), "")
+					}
+					fmt.Fprintf(w, "Module %s v%s uploaded and processed as zip.\n", name, version)
+					return
+				}
 			}
-			// (Suppression de la sauvegarde temporaire du zip)
-			log.Printf("[DEBUG] Zip size: %d", len(nupkgBytes))
-			log.Printf("[DEBUG] name: %s, version: %s", name, version)
-			log.Printf("[DEBUG] Checksum...")
-			sha := sha256.Sum256(nupkgBytes)
-			checksum := strings.ToUpper(fmt.Sprintf("%x", sha[:]))
-			log.Printf("[DEBUG] DB insert...")
-			_, err = db.Exec(`INSERT INTO modules (name, version, checksum, zip_blob) VALUES (?, ?, ?, ?)`, name, version, checksum, nupkgBytes)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("DB error: %v", err), http.StatusInternalServerError)
-				return
-			}
-			fmt.Fprintf(w, "Module %s v%s uploaded and processed as zip.\n", name, version)
-			return
-		}
 		// Sinon, traite le nupkg comme avant
 		log.Printf("[DEBUG] zip.NewReader...")
 		zipReader, err := zip.NewReader(bytes.NewReader(nupkgBytes), int64(len(nupkgBytes)))
@@ -119,24 +132,24 @@ func ModuleUploadHandler(db *sql.DB) http.HandlerFunc {
 				log.Printf("[DEBUG] Found root psd1: %s", psd1Name)
 			}
 		}
-		log.Printf("[DEBUG] ExtractModuleInfo...")
-		name := ""
-		version := ""
-		if psd1Name != "" {
-			name = strings.TrimSuffix(filepath.Base(psd1Name), ".psd1")
-			version = ""
-			lines := strings.Split(psd1Content, "\n")
-			for _, line := range lines {
-				l := strings.ToLower(line)
-				if strings.Contains(l, "moduleversion") {
-					parts := strings.SplitN(line, "=", 2)
-					if len(parts) == 2 {
-						version = strings.TrimSpace(parts[1])
-						version = strings.Trim(version, "'\"")
-					}
-				}
-			}
-		}
+		   log.Printf("[DEBUG] ExtractModuleInfo...")
+		   name := ""
+		   version := ""
+		   if psd1Name != "" {
+			   name = strings.TrimSuffix(filepath.Base(psd1Name), ".psd1")
+			   version = ""
+			   lines := strings.Split(psd1Content, "\n")
+			   for _, line := range lines {
+				   l := strings.ToLower(line)
+				   if strings.Contains(l, "moduleversion") {
+					   parts := strings.SplitN(line, "=", 2)
+					   if len(parts) == 2 {
+						   version = strings.TrimSpace(parts[1])
+						   version = strings.Trim(version, "'\"")
+					   }
+				   }
+			   }
+		   }
 		   if !auth.IsAdmin(r, db) {
 			   http.Error(w, "Forbidden: admin only", http.StatusForbidden)
 			   return
@@ -177,11 +190,18 @@ func ModuleUploadHandler(db *sql.DB) http.HandlerFunc {
 		checksum := strings.ToUpper(fmt.Sprintf("%x", sha[:]))
 		log.Printf("[DEBUG] DB insert...")
 		_, err = db.Exec(`INSERT INTO modules (name, version, checksum, zip_blob) VALUES (?, ?, ?, ?)`, name, version, checksum, zipBytes)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("DB error: %v", err), http.StatusInternalServerError)
-			return
-		}
-		fmt.Fprintf(w, "Module %s v%s uploaded and processed.\n", name, version)
-		   // ...existing code...
+		   fmt.Fprintf(w, "Module %s v%s uploaded and processed.\n", name, version)
+		   // Audit log for nupkg upload
+		   user := "?"
+		   if r.Context().Value("userId") != nil {
+			   if sub, ok := r.Context().Value("userId").(string); ok {
+				   user = sub
+			   }
+		   }
+		   // Try to load driver name for audit
+		driverName := global.AppConfig.Database.Driver
+		   if driverName != "" {
+			   _ = internaldb.InsertAudit(db, driverName, user, "create", "module", fmt.Sprintf("Ajout module: %s v%s (nupkg)", name, version), "")
+		   }
 	}
 }
