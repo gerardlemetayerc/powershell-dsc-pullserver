@@ -11,7 +11,7 @@ func WebAdminOnly(dbConn *sql.DB, renderDenied func(http.ResponseWriter)) func(h
     return func(next http.Handler) http.Handler {
         return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
             if !auth.IsAdmin(r, dbConn) {
-                w.WriteHeader(http.StatusUnauthorized)
+                w.WriteHeader(http.StatusForbidden)
                 renderDenied(w)
                 return
             }

@@ -5,6 +5,9 @@ import (
 	"go-dsc-pull/internal/auth"
 	"net/http"
 	"strconv"
+	"fmt"
+	"go-dsc-pull/internal/global"
+	internaldb "go-dsc-pull/internal/db"
 )
 
 // ModuleDeleteHandler supprime un module par id (admin seulement)
@@ -21,12 +24,29 @@ func ModuleDeleteHandler(db *sql.DB) http.HandlerFunc {
 			w.Write([]byte("Invalid module id"))
 			return
 		}
-		_, err = db.Exec(`DELETE FROM modules WHERE id = ?`, id)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("DB error"))
-			return
-		}
+		   // Récupère les infos du module avant suppression
+		   var modName, modVersion string
+		   err = db.QueryRow(`SELECT name, version FROM modules WHERE id = ?`, id).Scan(&modName, &modVersion)
+		   if err != nil {
+			   w.WriteHeader(http.StatusInternalServerError)
+			   w.Write([]byte("DB error: unable to fetch module info"))
+			   return
+		   }
+		   _, err = db.Exec(`DELETE FROM modules WHERE id = ?`, id)
+		   if err != nil {
+			   w.WriteHeader(http.StatusInternalServerError)
+			   w.Write([]byte("DB error"))
+			   return
+		   }
+		   // Audit suppression
+		   driverName := global.AppConfig.Database.Driver
+		   user := "?"
+		   if r.Context().Value("userId") != nil {
+			   if sub, ok := r.Context().Value("userId").(string); ok {
+				   user = sub
+			   }
+			   _ = internaldb.InsertAudit(db, driverName, user, "delete", "module", fmt.Sprintf("Deleted module: %s v%s", modName, modVersion), "")
+		   }
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Module deleted"))
 	}

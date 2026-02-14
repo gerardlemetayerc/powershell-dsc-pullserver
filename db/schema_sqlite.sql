@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS reports (
     errors TEXT,           -- JSON array
     status_data TEXT,      -- JSON array
     additional_data TEXT,  -- JSON array
+    mof_applied INTEGER DEFAULT 0, -- Indique si un MOF a été appliqué (0 ou 1)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     raw_json TEXT
 );

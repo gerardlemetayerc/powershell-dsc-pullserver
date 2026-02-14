@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/global"
 	"go-dsc-pull/utils"
-	"path/filepath"
 )
 
 // SendReportHandler gère POST /PSDSCPullServer.svc/Nodes(AgentId='...')/SendReport
@@ -37,67 +37,75 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 	statusDataJson, _ := json.Marshal(report.StatusData)
 	additionalDataJson, _ := json.Marshal(report.AdditionalData)
 
+	// Contrôle de la présence de MetaData dans StatusData
+	mofApplied := 0
+	for _, statusEntry := range report.StatusData {
+		var entryMap map[string]interface{}
+		if err := json.Unmarshal([]byte(statusEntry), &entryMap); err == nil {
+			if _, ok := entryMap["MetaData"]; ok {
+				mofApplied = 1
+				break
+			}
+		}
+	}
+
 	// Insérer en base
-	   exeDir, err := utils.ExePath()
-	   var dbCfg *schema.DBConfig
-	   if err == nil {
-		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
-		   dbCfg, err = db.LoadDBConfig(configPath)
-	   }
-	   if err == nil {
-		   database, err := db.OpenDB(dbCfg)
+	if err == nil {
+		database, err := db.OpenDB(&global.AppConfig.Database)
 		if err == nil {
-			   // Vérifie si un rapport existe déjà pour ce job_id
-			   var count int
-			   err = database.QueryRow("SELECT COUNT(*) FROM reports WHERE job_id = ?", report.JobId).Scan(&count)
-			   if err != nil {
-				   log.Printf("[SENDREPORT] Erreur SELECT COUNT sur reports: %v", err)
-			   }
-			   if count > 0 {
-				   log.Printf("[SENDREPORT] Update rapport en base: agent_id=%s, job_id=%s, operation_type=%s", agentId, report.JobId, report.OperationType)
-				   _, err := database.Exec(`UPDATE reports SET 
-					   agent_id=?, report_format_version=?, operation_type=?, refresh_mode=?, status=?, start_time=?, end_time=?, reboot_requested=?, errors=?, status_data=?, additional_data=?, raw_json=?
-					   WHERE job_id=?`,
-					   agentId,
-					   report.ReportFormatVersion,
-					   report.OperationType,
-					   report.RefreshMode,
-					   report.Status,
-					   report.StartTime,
-					   report.EndTime,
-					   report.RebootRequested,
-					   string(errorsJson),
-					   string(statusDataJson),
-					   string(additionalDataJson),
-					   string(reportBody),
-					   report.JobId,
-				   )
-				   if err != nil {
-					   log.Printf("[SENDREPORT] Erreur update rapport en base: %v", err)
-				   }
-			   } else {
-				   log.Printf("[SENDREPORT] Insertion rapport en base: agent_id=%s, job_id=%s, operation_type=%s", agentId, report.JobId, report.OperationType)
-				   _, err := database.Exec(`INSERT INTO reports (
-					   agent_id, job_id, report_format_version, operation_type, refresh_mode, status, start_time, end_time, reboot_requested, errors, status_data, additional_data, raw_json
-				   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-					   agentId,
-					   report.JobId,
-					   report.ReportFormatVersion,
-					   report.OperationType,
-					   report.RefreshMode,
-					   report.Status,
-					   report.StartTime,
-					   report.EndTime,
-					   report.RebootRequested,
-					   string(errorsJson),
-					   string(statusDataJson),
-					   string(additionalDataJson),
-					   string(reportBody),
-				   )
-				   if err != nil {
-					   log.Printf("[SENDREPORT] Erreur insertion rapport en base: %v", err)
-				   }
-			   }
+			// Vérifie si un rapport existe déjà pour ce job_id
+			var count int
+			err = database.QueryRow("SELECT COUNT(*) FROM reports WHERE job_id = ?", report.JobId).Scan(&count)
+			if err != nil {
+				log.Printf("[SENDREPORT] Erreur SELECT COUNT sur reports: %v", err)
+			}
+			if count > 0 {
+				log.Printf("[SENDREPORT] Update rapport en base: agent_id=%s, job_id=%s, operation_type=%s", agentId, report.JobId, report.OperationType)
+				_, err := database.Exec(`UPDATE reports SET 
+					agent_id=?, report_format_version=?, operation_type=?, refresh_mode=?, status=?, start_time=?, end_time=?, reboot_requested=?, errors=?, status_data=?, additional_data=?, mof_applied=?, raw_json=?
+					WHERE job_id=?`,
+					agentId,
+					report.ReportFormatVersion,
+					report.OperationType,
+					report.RefreshMode,
+					report.Status,
+					report.StartTime,
+					report.EndTime,
+					report.RebootRequested,
+					string(errorsJson),
+					string(statusDataJson),
+					string(additionalDataJson),
+					mofApplied,
+					string(reportBody),
+					report.JobId,
+				)
+				if err != nil {
+					log.Printf("[SENDREPORT] Erreur update rapport en base: %v", err)
+				}
+			} else {
+				log.Printf("[SENDREPORT] Insertion rapport en base: agent_id=%s, job_id=%s, operation_type=%s", agentId, report.JobId, report.OperationType)
+				_, err := database.Exec(`INSERT INTO reports (
+					agent_id, job_id, report_format_version, operation_type, refresh_mode, status, start_time, end_time, reboot_requested, errors, status_data, additional_data, mof_applied, raw_json
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					agentId,
+					report.JobId,
+					report.ReportFormatVersion,
+					report.OperationType,
+					report.RefreshMode,
+					report.Status,
+					report.StartTime,
+					report.EndTime,
+					report.RebootRequested,
+					string(errorsJson),
+					string(statusDataJson),
+					string(additionalDataJson),
+					mofApplied,
+					string(reportBody),
+				)
+				if err != nil {
+					log.Printf("[SENDREPORT] Erreur insertion rapport en base: %v", err)
+				}
+			}
 			   // Met à jour last_communication et has_error_last_report uniquement pour les rapports Initial
 			   hasError := 0
 			   if report.OperationType == "Initial" {

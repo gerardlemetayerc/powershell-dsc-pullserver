@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/global"
 	"net/http"
 	"database/sql"
 	"strings"
@@ -16,31 +17,35 @@ func AgentReportsListHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "AgentId manquant", http.StatusBadRequest)
 		return
 	}
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		http.Error(w, "DB config error", http.StatusInternalServerError)
-		return
-	}
-	database, err := db.OpenDB(dbCfg)
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		http.Error(w, "DB open error", http.StatusInternalServerError)
 		return
 	}
 	defer database.Close()
 
-	// Récupère le filtre operationType si présent
+	// Récupère le filtre operationType et mofApplied si présents
 	opType := r.URL.Query().Get("operationtype")
+	mofApplied := r.URL.Query().Get("mofapplied")
 	var rows *sql.Rows
 	var debugMsg string
+	query := `SELECT id, job_id, created_at, status FROM reports WHERE agent_id = ?`
+	params := []interface{}{agentId}
 	if opType != "" {
-		// Filtre insensible à la casse
 		opTypeLower := strings.ToLower(opType)
+		query += " AND LOWER(operation_type) = ?"
+		params = append(params, opTypeLower)
 		debugMsg = "Filtre operationType: '" + opTypeLower + "'"
-		rows, err = database.Query(`SELECT id, job_id, created_at, status FROM reports WHERE agent_id = ? AND LOWER(operation_type) = ? ORDER BY created_at DESC`, agentId, opTypeLower)
 	} else {
 		debugMsg = "Pas de filtre operationType"
-		rows, err = database.Query(`SELECT id, job_id, created_at, status FROM reports WHERE agent_id = ? ORDER BY created_at DESC`, agentId)
 	}
+	if mofApplied != "" {
+		query += " AND mof_applied = ?"
+		params = append(params, mofApplied)
+		debugMsg += ", mof_applied=" + mofApplied
+	}
+	query += " ORDER BY created_at DESC"
+	rows, err = database.Query(query, params...)
 	if err != nil {
 		http.Error(w, "DB query error", http.StatusInternalServerError)
 		return

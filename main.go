@@ -1,3 +1,4 @@
+
 package main
 
 import (
@@ -18,6 +19,7 @@ import (
 	"go-dsc-pull/internal/service"
 	"go-dsc-pull/internal/auth"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/global"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -42,15 +44,17 @@ func main() {
 			   }
 			   return certFile, keyFile
 		   }
+
 		   // Chargement de la configuration globale (incluant SAML)
 		   appCfg, err := internal.LoadAppConfig("config.json")
 		   if err != nil {
 			   logs.WriteLogFile(fmt.Sprintf("ERROR [INIT] Failed to load global config: %v", err))
 			   os.Exit(1)
 		   }
+		   global.AppConfig = appCfg
 
 		   // Initialisation SAML Service Provider si activé
-		   samlMiddleware, err := auth.InitSamlMiddleware(appCfg)
+		   samlMiddleware, err := auth.InitSamlMiddleware(global.AppConfig)
 		   if err != nil {
 			   logs.WriteLogFile(fmt.Sprintf("ERROR [SAML] %v", err))
 			   os.Exit(1)
@@ -58,12 +62,12 @@ func main() {
 
 		   // Initialisation automatique de la base (CREATE IF NOT EXISTS)
 		   dbCfg := &schema.DBConfig{
-			   Driver:   appCfg.Database.Driver,
-			   Server:   appCfg.Database.Server,
-			   Port:     appCfg.Database.Port,
-			   User:     appCfg.Database.User,
-			   Password: appCfg.Database.Password,
-			   Database: appCfg.Database.Database,
+			   Driver:   global.AppConfig.Database.Driver,
+			   Server:   global.AppConfig.Database.Server,
+			   Port:     global.AppConfig.Database.Port,
+			   User:     global.AppConfig.Database.User,
+			   Password: global.AppConfig.Database.Password,
+			   Database: global.AppConfig.Database.Database,
 		   }
 		   dbPath := dbCfg.Database
 		   if dbCfg.Driver == "sqlite" && !filepath.IsAbs(dbPath) {
@@ -81,8 +85,8 @@ func main() {
 			   os.Exit(1)
 		   }
 
-		   if appCfg.SAML.Enabled {
-			   logs.WriteLogFile(fmt.Sprintf("INFO [SAML] SAML Authentication activated (EntityID: %s)", appCfg.SAML.EntityID))
+		   if global.AppConfig.SAML.Enabled {
+			   logs.WriteLogFile(fmt.Sprintf("INFO [SAML] SAML Authentication activated (EntityID: %s)", global.AppConfig.SAML.EntityID))
 		   } else {
 			   logs.WriteLogFile("INFO [SAML] SAML Authentication deactivated (local auth)")
 		   }
@@ -118,7 +122,7 @@ func main() {
 					   // Vérification de l'empreinte si la validation du certificat client est activée
 					   // On ne fait PAS ce contrôle pour la route de registration DSC (PUT /PSDSCPullServer.svc/{node})
 					   isRegister := r.Method == "PUT" && strings.HasPrefix(r.URL.Path, "/PSDSCPullServer.svc/") && len(strings.Split(r.URL.Path, "/")) == 3
-					   if appCfg.DSCPullServer.EnableClientCertValidation && !isRegister {
+					   if global.AppConfig.DSCPullServer.EnableClientCertValidation && !isRegister {
 						   // Vérifier la présence de l'empreinte dans la base de données (en minuscules)
 						   var count int
 						   err := dbConn.QueryRow("SELECT COUNT(*) FROM agents WHERE LOWER(certificate_thumbprint) = ?", sha1sumLower).Scan(&count)
@@ -147,13 +151,13 @@ func main() {
 
 		   // Lancer les deux serveurs sur des ports différents avec HTTPS optionnel
 		   go func() {
-			   if appCfg.DSCPullServer.EnableHTTPS {
-				   logs.WriteLogFile(fmt.Sprintf("INFO [DSC Core Server] DSC Server (HTTPS) on :%d ...", appCfg.DSCPullServer.Port))
-				   certFile, keyFile := resolveCertKeyPath(appCfg.DSCPullServer.CertFile, appCfg.DSCPullServer.KeyFile)
+			   if global.AppConfig.DSCPullServer.EnableHTTPS {
+				   logs.WriteLogFile(fmt.Sprintf("INFO [DSC Core Server] DSC Server (HTTPS) on :%d ...", global.AppConfig.DSCPullServer.Port))
+				   certFile, keyFile := resolveCertKeyPath(global.AppConfig.DSCPullServer.CertFile, global.AppConfig.DSCPullServer.KeyFile)
 				   // Bypass CA verification: accepter tout certificat client présenté
 				 tlsConfig := &tls.Config{}
-				   if appCfg.DSCPullServer.EnableClientCertValidation {
-					   if appCfg.DSCPullServer.BypassCAValidation {  
+				   if global.AppConfig.DSCPullServer.EnableClientCertValidation {
+					   if global.AppConfig.DSCPullServer.BypassCAValidation {  
 							tlsConfig = &tls.Config{
 								ClientAuth: tls.RequireAnyClientCert,
 							}
@@ -162,7 +166,7 @@ func main() {
 						logs.WriteLogFile(fmt.Sprintf("WARN [DSC Core Server] Client certificate validation is disabled."))
 					}
 				   server := &http.Server{
-					   Addr:      fmt.Sprintf(":%d", appCfg.DSCPullServer.Port),
+					   Addr:      fmt.Sprintf(":%d", global.AppConfig.DSCPullServer.Port),
 					   Handler:   dscHandler,
 					   TLSConfig: tlsConfig,
 				   }
@@ -172,8 +176,8 @@ func main() {
 					   os.Exit(1)
 				   }
 			   } else {
-				   logs.WriteLogFile(fmt.Sprintf("INFO [DSC WebUi] DSC Server (HTTP) on :%d ...", appCfg.DSCPullServer.Port))
-				   err := http.ListenAndServe(fmt.Sprintf(":%d", appCfg.DSCPullServer.Port), dscHandler)
+				   logs.WriteLogFile(fmt.Sprintf("INFO [DSC WebUi] DSC Server (HTTP) on :%d ...", global.AppConfig.DSCPullServer.Port))
+				   err := http.ListenAndServe(fmt.Sprintf(":%d", global.AppConfig.DSCPullServer.Port), dscHandler)
 				   if err != nil {
 					   logs.WriteLogFile(fmt.Sprintf("ERROR [DSC WebUi] Error starting HTTP server: %v", err))
 					   os.Exit(1)
@@ -181,11 +185,11 @@ func main() {
 			   }
 		   }()
 
-		   if appCfg.WebUI.EnableHTTPS {
-			   logs.WriteLogFile(fmt.Sprintf("INFO [DSC WebUI] IHM/API (HTTPS) on :%d ... (IHM on /web/)", appCfg.WebUI.Port))
-			   certFile, keyFile := resolveCertKeyPath(appCfg.WebUI.CertFile, appCfg.WebUI.KeyFile)
+		   if global.AppConfig.WebUI.EnableHTTPS {
+			   logs.WriteLogFile(fmt.Sprintf("INFO [DSC WebUI] IHM/API (HTTPS) on :%d ... (IHM on /web/)", global.AppConfig.WebUI.Port))
+			   certFile, keyFile := resolveCertKeyPath(global.AppConfig.WebUI.CertFile, global.AppConfig.WebUI.KeyFile)
 			   err := http.ListenAndServeTLS(
-				   fmt.Sprintf(":%d", appCfg.WebUI.Port),
+				   fmt.Sprintf(":%d", global.AppConfig.WebUI.Port),
 				   certFile,
 				   keyFile,
 				   webHandler,
@@ -195,8 +199,8 @@ func main() {
 				   os.Exit(1)
 			   }
 		   } else {
-			   logs.WriteLogFile(fmt.Sprintf("INFO [DSC WebUI] IHM/API (HTTP) on :%d ... (IHM on /web/)", appCfg.WebUI.Port))
-			   err := http.ListenAndServe(fmt.Sprintf(":%d", appCfg.WebUI.Port), webHandler)
+			   logs.WriteLogFile(fmt.Sprintf("INFO [DSC WebUI] IHM/API (HTTP) on :%d ... (IHM on /web/)", global.AppConfig.WebUI.Port))
+			   err := http.ListenAndServe(fmt.Sprintf(":%d", global.AppConfig.WebUI.Port), webHandler)
 			   if err != nil {
 				   logs.WriteLogFile(fmt.Sprintf("ERROR [DSC WebUI] Error starting HTTP server: %v", err))
 				   os.Exit(1)

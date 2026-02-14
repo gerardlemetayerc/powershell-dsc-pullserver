@@ -6,17 +6,60 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"log"
 	"path/filepath"
 	"go-dsc-pull/utils"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal"
 	 _ "modernc.org/sqlite"
 	 _ "github.com/denisenkom/go-mssqldb"
 )
 
+// Insert an audit entry (generic)
+func InsertAudit(db *sql.DB, driverName string, userEmail, action, target, details, ip string) error {
+	if driverName == "mssql" || driverName == "sqlserver" {
+		_, err := db.Exec("INSERT INTO audit (user_email, action, target, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+			userEmail, action, target, details, ip)
+		return err
+	}
+	_, err := db.Exec("INSERT INTO audit (user_email, action, target, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+		userEmail, action, target, details, ip, time.Now().Format("2006-01-02 15:04:05"))
+	return err
+}
+
 func UpdateLastLogon(db *sql.DB, userId interface{}) error {
 
-	_, err := db.Exec("UPDATE users SET last_logon_date=? WHERE id=?", time.Now().Format("2006-01-02 15:04:05"), userId)
+	// Détermine le type de driver via LoadAppConfig
+	appCfg, err := internal.LoadAppConfig("config.json")
+	if err != nil {
+		log.Printf("[ERROR] Could not load app config: %v", err)
+		return err
+	}
+	driverName := appCfg.Database.Driver
+	if driverName == "mssql" || driverName == "sqlserver" {
+		_, err = db.Exec("UPDATE users SET last_logon_date=CURRENT_TIMESTAMP WHERE id=?", userId)
+	} else {
+		_, err = db.Exec("UPDATE users SET last_logon_date=? WHERE id=?", time.Now().Format("2006-01-02 15:04:05"), userId)
+	}
+	if err != nil {
+		return err
+	}
+	// Ajout audit: connexion utilisateur
+	err = InsertAudit(db, driverName, getUserEmail(db, userId), "login", "users", "User login", "")
+	if err != nil {
+		log.Printf("[ERROR] Could not insert audit entry: %v", err)
+	}
 	return err
+}
+
+// Récupère l'email de l'utilisateur par son id
+func getUserEmail(db *sql.DB, userId interface{}) string {
+	var email string
+	err := db.QueryRow("SELECT email FROM users WHERE id=?", userId).Scan(&email)
+	if err != nil {
+		return ""
+	}
+	return email
 }
 
 func UpdateRole(db *sql.DB, userId interface{}, role string) error {

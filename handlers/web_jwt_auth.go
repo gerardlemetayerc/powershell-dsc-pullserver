@@ -4,8 +4,7 @@ import (
 	"net/http"
 	"strings"
 	"github.com/golang-jwt/jwt/v5"
-	"go-dsc-pull/internal"
-	"log"
+	"go-dsc-pull/internal/global"
 	"fmt"
 	"os"
 )
@@ -37,10 +36,9 @@ func WebJWTAuthMiddleware(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/web/login", http.StatusFound)
 			return
 		}
-		// 3. Valide le JWT (clé à adapter selon ton projet)
-		appCfg, err := internal.LoadAppConfig("config.json")
-		if err != nil {
-			log.Printf("[REGISTER][CONFIG] Error loading config: %v", err)
+		// 3. Valide le JWT et extrait les claims
+		appCfg := global.AppConfig
+		if appCfg == nil {
 			http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
 			return
 		}

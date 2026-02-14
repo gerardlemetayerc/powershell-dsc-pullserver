@@ -22,7 +22,7 @@ $(document).ready(function() {
                 render: function(data, type, row) {
                     if (row.state) {
                         switch (row.state.toLowerCase()) {
-                            case 'success':
+                            case 'ok':
                                 return `<span class="badge bg-success" style="min-width:60px;">OK</span>`;
                             case 'waiting_for_registration':
                                 return `<span class="badge bg-secondary" style="min-width:100px;">Pending Enroll</span>`;
@@ -56,7 +56,7 @@ $(document).ready(function() {
         agents.forEach(a => {
             if (!a.state) return;
             switch (a.state.toLowerCase()) {
-                case 'success':
+                case 'ok':
                     ok++;
                     break;
                 case 'failure':

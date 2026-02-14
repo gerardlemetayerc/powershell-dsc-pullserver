@@ -7,7 +7,7 @@ import (
 	"strings"
 	"golang.org/x/crypto/bcrypt"
 	"log"
-	"go-dsc-pull/internal"
+	"go-dsc-pull/internal/global"
 	"time"
 	"strconv"
 	"github.com/golang-jwt/jwt/v5"
@@ -175,8 +175,8 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 		if err := internaldb.UpdateLastLogon(db, id); err != nil {
 			log.Printf("[LOGIN] Erreur update last_logon_date: %v", err)
 		}
-		appCfg, err := internal.LoadAppConfig("config.json")
-		if err != nil {
+		appCfg := global.AppConfig
+		if appCfg == nil {
 			log.Printf("[REGISTER][CONFIG] Error loading config: %v", err)
 			http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
 			return
@@ -315,54 +315,106 @@ func UpdateUserHandler(db *sql.DB) http.HandlerFunc {
 
 // Delete user
 func DeleteUserHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-		_, err := db.Exec("DELETE FROM users WHERE id=?", id)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}
+	       return func(w http.ResponseWriter, r *http.Request) {
+		       id := r.PathValue("id")
+		       // actorEmail = userId/sub from context
+		       actorEmail := "?"
+		       if r.Context().Value("userId") != nil {
+			       if sub, ok := r.Context().Value("userId").(string); ok {
+				       actorEmail = sub
+			       }
+		       }
+		       // Get email of the user being deleted
+		       deletedEmail := "?"
+		       row := db.QueryRow("SELECT email FROM users WHERE id = ?", id)
+		       var email string
+		       if err := row.Scan(&email); err == nil {
+			       deletedEmail = email
+		       }
+		       _, err := db.Exec("DELETE FROM users WHERE id=?", id)
+		       if err != nil {
+			       http.Error(w, err.Error(), http.StatusInternalServerError)
+			       return
+		       }
+		       // Audit suppression
+		       driverName := global.AppConfig.Database.Driver
+		       _ = internaldb.InsertAudit(db, driverName, actorEmail, "delete", "user", "Deleted user: "+id+" ("+deletedEmail+")", "")
+		       w.WriteHeader(http.StatusNoContent)
+	       }
 }
 
 // Activate/Deactivate user
 func SetUserActiveHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-		active := r.URL.Query().Get("active")
-		isActive := 0
-		if strings.ToLower(active) == "true" || active == "1" {
-			isActive = 1
-		}
-		_, err := db.Exec("UPDATE users SET is_active=? WHERE id=?", isActive, id)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}
+	       return func(w http.ResponseWriter, r *http.Request) {
+		       id := r.PathValue("id")
+		       active := r.URL.Query().Get("active")
+		       isActive := 0
+		       if strings.ToLower(active) == "true" || active == "1" {
+			       isActive = 1
+		       }
+		       // actorEmail = userId/sub from context
+		       actorEmail := "?"
+		       if r.Context().Value("userId") != nil {
+			       if sub, ok := r.Context().Value("userId").(string); ok {
+				       actorEmail = sub
+			       }
+		       }
+		       // Get email of the user being activated/deactivated
+		       targetEmail := "?"
+		       row := db.QueryRow("SELECT email FROM users WHERE id = ?", id)
+		       var email string
+		       if err := row.Scan(&email); err == nil {
+			       targetEmail = email
+		       }
+		       _, err := db.Exec("UPDATE users SET is_active=? WHERE id=?", isActive, id)
+		       if err != nil {
+			       http.Error(w, err.Error(), http.StatusInternalServerError)
+			       return
+		       }
+		       // Audit activation/désactivation
+		       driverName := global.AppConfig.Database.Driver
+		       action := "deactivate"
+		       if isActive == 1 {
+			       action = "activate"
+		       }
+		       _ = internaldb.InsertAudit(db, driverName, actorEmail, action, "user", action+" user: "+id+" ("+targetEmail+")", "")
+		       w.WriteHeader(http.StatusNoContent)
+	       }
 }
 
 // Change user password
 func ChangeUserPasswordHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-		var req struct { NewPassword string `json:"new_password"` }
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.NewPassword == "" {
-			http.Error(w, "Bad request", http.StatusBadRequest)
-			return
-		}
-		hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
-		if err != nil {
-			http.Error(w, "Hash error", http.StatusInternalServerError)
-			return
-		}
-		_, err = db.Exec("UPDATE users SET password_hash=? WHERE id=?", string(hash), id)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}
+       return func(w http.ResponseWriter, r *http.Request) {
+	       id := r.PathValue("id")
+	       var req struct { NewPassword string `json:"new_password"` }
+	       if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.NewPassword == "" {
+		       http.Error(w, "Bad request", http.StatusBadRequest)
+		       return
+	       }
+	       hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	       if err != nil {
+		       http.Error(w, "Hash error", http.StatusInternalServerError)
+		       return
+	       }
+	       // Get email of the user performing the action (from context userId)
+	       actorEmail := "?"
+	       if r.Context().Value("userId") != nil {
+		       if sub, ok := r.Context().Value("userId").(string); ok {
+			       row := db.QueryRow("SELECT email FROM users WHERE id = ?", sub)
+			       var email string
+			       if err := row.Scan(&email); err == nil {
+				       actorEmail = email
+			       }
+		       }
+	       }
+	       _, err = db.Exec("UPDATE users SET password_hash=? WHERE id=?", string(hash), id)
+	       if err != nil {
+		       http.Error(w, err.Error(), http.StatusInternalServerError)
+		       return
+	       }
+	       // Audit changement de mot de passe
+	       driverName := global.AppConfig.Database.Driver
+	       _ = internaldb.InsertAudit(db, driverName, actorEmail, "update", "user", "Changed password for user: "+id, "")
+	       w.WriteHeader(http.StatusNoContent)
+       }
 }

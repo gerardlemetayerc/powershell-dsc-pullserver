@@ -9,6 +9,7 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE WHERE TABLE_NAME = 'configuration_model' AND COLUMN_NAME = 'previous_id')
         ALTER TABLE configuration_model ADD CONSTRAINT FK_configuration_model_previous_id FOREIGN KEY (previous_id) REFERENCES configuration_model(id);
 END
+
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
 CREATE TABLE users (
     id INT IDENTITY(1,1) PRIMARY KEY,
@@ -60,9 +61,14 @@ CREATE TABLE reports (
     errors NVARCHAR(MAX),           -- JSON array
     status_data NVARCHAR(MAX),      -- JSON array
     additional_data NVARCHAR(MAX),  -- JSON array
+    mof_applied BIT DEFAULT 0,      -- Indique si un MOF a été appliqué (0 ou 1)
     created_at DATETIME DEFAULT GETDATE(),
     raw_json NVARCHAR(MAX)
 );
+
+-- Pour migration manuelle si la colonne n'existe pas déjà :
+-- IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'reports' AND COLUMN_NAME = 'mof_applied')
+--     ALTER TABLE reports ADD mof_applied BIT DEFAULT 0;
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_reports_agent_id' AND object_id = OBJECT_ID('reports'))
     CREATE INDEX idx_reports_agent_id ON reports(agent_id);
 

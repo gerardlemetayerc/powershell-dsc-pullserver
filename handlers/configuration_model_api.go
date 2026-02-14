@@ -11,22 +11,16 @@ import (
 	"log"
 	"go-dsc-pull/internal/auth"
 	"go-dsc-pull/internal/db"
-	"go-dsc-pull/internal"
+	"go-dsc-pull/internal/utils"
+	"go-dsc-pull/internal/global"
 	"go-dsc-pull/internal/schema"
 	"go-dsc-pull/internal/logs"
-	"go-dsc-pull/internal/utils"
 	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 // POST /api/v1/configuration_models
 func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("DB config error"))
-		return
-	}
-	dbConn, err := db.OpenDB(dbCfg)
+	dbConn, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("DB open error"))
@@ -82,19 +76,13 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 
 		// 2. Tenter la création de la configuration, et indiquer si besoin l'ID de la précédente configuration (celle modifiée précédemment) si besoin dans le champ prévu à cet effet
 		uploadedBy := "?"
-		if r.Context().Value("user") != nil {
-			if sub, ok := r.Context().Value("user").(string); ok {
+		if r.Context().Value("userId") != nil {
+			if sub, ok := r.Context().Value("userId").(string); ok {
 				uploadedBy = sub
 			}
 		} else if auth := r.Header.Get("Authorization"); len(auth) > 7 {
 			tokenStr := auth[7:]
-			appCfg, err := internal.LoadAppConfig("config.json")
-			if err != nil {
-				log.Printf("[REGISTER][CONFIG] Error loading config: %v", err)
-				http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
-				return
-			}
-			secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
+			secret := []byte(global.AppConfig.DSCPullServer.SharedAccessSecret)
 			token, _ := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) { return secret, nil })
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 				if sub, ok := claims["sub"].(string); ok {
@@ -123,6 +111,10 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Audit création
+		driverName := global.AppConfig.Database.Driver
+		_ = db.InsertAudit(dbConn, driverName, uploadedBy, "create", "configuration_model", "Created configuration: "+name, "")
+
 		// Met à jour le statut des agents liés à cette configuration
 		var res sql.Result
 		res, err = dbConn.Exec("UPDATE agents SET state = 'pending_apply' WHERE agent_id IN (SELECT agent_id FROM agent_configurations WHERE configuration_name = ?)", name)
@@ -133,7 +125,7 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 			msg := fmt.Sprintf("[INFO] New configuration uploaded, impacted nodes: %d", n)
 			logs.WriteLogFile(msg)
 		}
-	w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusCreated)
 }
 
 // GET /api/v1/configuration_models/{id}
@@ -168,12 +160,7 @@ func GetConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/configuration_models
 func ListConfigurationModelsHandler(w http.ResponseWriter, r *http.Request) {
-		       dbCfg, err := db.LoadDBConfig("config.json")
-		       if err != nil {
-			       w.WriteHeader(http.StatusInternalServerError)
-			       return
-		       }
-		       dbConn, err := db.OpenDB(dbCfg)
+		       dbConn, err := db.OpenDB(&global.AppConfig.Database)
 		       if err != nil {
 			       w.WriteHeader(http.StatusInternalServerError)
 			       return
@@ -251,12 +238,7 @@ func ListConfigurationModelsHandler(w http.ResponseWriter, r *http.Request) {
 
 // PUT /api/v1/configuration_models/{id}
 func UpdateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	dbConn, err := db.OpenDB(dbCfg)
+	dbConn, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -298,23 +280,25 @@ func UpdateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/v1/configuration_models/{id}
 func DeleteConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	dbConn, err := db.OpenDB(dbCfg)
+	dbConn, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	defer dbConn.Close()
-	// Extract id from URL path: /api/v1/configuration_models/{id}
+	// Récupère l'id soit dans le chemin, soit en paramètre
+	var idStr string
 	parts := strings.Split(r.URL.Path, "/")
-	idStr := parts[len(parts)-1]
+	if len(parts) > 0 {
+		idStr = parts[len(parts)-1]
+	}
+	if idStr == "" || idStr == "configuration_models" {
+		idStr = r.URL.Query().Get("id")
+	}
 	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+	if err != nil || id <= 0 {
 		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Invalid configuration id"))
 		return
 	}
 	// Récupère le nom de la configuration
@@ -343,17 +327,22 @@ func DeleteConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	// Audit suppression
+	driverName := global.AppConfig.Database.Driver
+	// Récupère l'utilisateur
+	user := "?"
+	if r.Context().Value("userId") != nil {
+		if sub, ok := r.Context().Value("userId").(string); ok {
+			user = sub
+		}
+	}
+	_ = db.InsertAudit(dbConn, driverName, user, "delete", "configuration_model", "Deleted configuration: "+configName, "")
 	w.WriteHeader(http.StatusOK)
 }
 
 // GET /api/v1/configuration_models/{id}/detail
 func GetConfigurationModelDetailHandler(w http.ResponseWriter, r *http.Request) {
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	dbConn, err := db.OpenDB(dbCfg)
+	dbConn, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -370,7 +359,7 @@ func GetConfigurationModelDetailHandler(w http.ResponseWriter, r *http.Request) 
 	// Récupère la config courante par nom
 	// MSSQL: utilise TOP 1, SQLite: utilise LIMIT 1
 	query := ""
-	if strings.Contains(strings.ToLower(dbCfg.Driver), "sqlserver") || strings.Contains(strings.ToLower(dbCfg.Driver), "mssql") {
+	if strings.Contains(strings.ToLower(global.AppConfig.Database.Driver), "sqlserver") || strings.Contains(strings.ToLower(global.AppConfig.Database.Driver), "mssql") {
 		query = `SELECT TOP 1 id, name, original_name, previous_id, upload_date, uploaded_by, mof_file, last_usage FROM configuration_model WHERE name = ? ORDER BY upload_date DESC`
 	} else {
 		query = `SELECT id, name, original_name, previous_id, upload_date, uploaded_by, mof_file, last_usage FROM configuration_model WHERE name = ? ORDER BY upload_date DESC LIMIT 1`
@@ -509,29 +498,24 @@ func GetConfigurationModelDetailHandler(w http.ResponseWriter, r *http.Request) 
 
 // GET /api/v1/configuration_models/{id}/download
 func DownloadConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	dbConn, err := db.OpenDB(dbCfg)
+	dbConn, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	defer dbConn.Close()
-		       // Extract id from URL path: /api/v1/configuration_models/{id}/download
-		       parts := strings.Split(r.URL.Path, "/")
-		       if len(parts) < 5 {
-			       w.WriteHeader(http.StatusBadRequest)
-			       return
-		       }
-		       idStr := parts[len(parts)-2]
-		       id, err := strconv.ParseInt(idStr, 10, 64)
-		       if err != nil {
-			       w.WriteHeader(http.StatusBadRequest)
-			       return
-		       }
+	// Extract id from URL path: /api/v1/configuration_models/{id}/download
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 5 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	idStr := parts[len(parts)-2]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	cm, err := db.GetConfigurationModel(dbConn, id)
 	if err != nil || cm.MofFile == nil {
 		w.WriteHeader(http.StatusNotFound)

@@ -7,20 +7,13 @@ import (
 	"strconv"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
-	"path/filepath"
-	"go-dsc-pull/utils"
 	"go-dsc-pull/internal/auth"
+	"go-dsc-pull/internal/global"
 )
 
 // --- Properties CRUD ---
 func PropertiesListHandler(w http.ResponseWriter, r *http.Request) {
-	   exeDir, err := utils.ExePath()
-	   var dbCfg *schema.DBConfig
-	   if err == nil {
-		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
-		   dbCfg, _ = db.LoadDBConfig(configPath)
-	   }
-	   database, _ := db.OpenDB(dbCfg)
+	database, _ := db.OpenDB(&global.AppConfig.Database)
 	defer database.Close()
 	rows, _ := database.Query("SELECT id, name, description, priority FROM properties ORDER BY priority, name")
 	var props []schema.Property
@@ -39,13 +32,7 @@ func PropertiesListHandler(w http.ResponseWriter, r *http.Request) {
 func PropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
 	var p schema.Property
 	_ = json.NewDecoder(r.Body).Decode(&p)
-	exeDir, err := utils.ExePath()
-	var dbCfg *schema.DBConfig
-	if err == nil {
-		configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
-		dbCfg, _ = db.LoadDBConfig(configPath)
-	}
-	database, _ := db.OpenDB(dbCfg)
+	database, _ := db.OpenDB(&global.AppConfig.Database)
 	defer database.Close()
 	if !auth.IsAdmin(r, database) {
 		http.Error(w, "Forbidden: admin only", http.StatusForbidden)
@@ -64,13 +51,7 @@ func PropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 func PropertiesGetHandler(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(r.PathValue("id"))
-	   exeDir, err := utils.ExePath()
-	   var dbCfg *schema.DBConfig
-	   if err == nil {
-		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
-		   dbCfg, _ = db.LoadDBConfig(configPath)
-	   }
-	   database, _ := db.OpenDB(dbCfg)
+	database, _ := db.OpenDB(&global.AppConfig.Database)
 	defer database.Close()
 	row := database.QueryRow("SELECT id, name, description, priority FROM properties WHERE id = ?", id)
 	var p schema.Property
@@ -86,8 +67,7 @@ func PropertiesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(r.PathValue("id"))
 	var p schema.Property
 	_ = json.NewDecoder(r.Body).Decode(&p)
-	dbCfg, _ := db.LoadDBConfig("config.json")
-	database, _ := db.OpenDB(dbCfg)
+	database, _ := db.OpenDB(&global.AppConfig.Database)
 	defer database.Close()
 	if !auth.IsAdmin(r, database) {
 		http.Error(w, "Forbidden: admin only", http.StatusForbidden)
@@ -103,8 +83,7 @@ func PropertiesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 func PropertiesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(r.PathValue("id"))
-	dbCfg, _ := db.LoadDBConfig("config.json")
-	database, _ := db.OpenDB(dbCfg)
+	database, _ := db.OpenDB(&global.AppConfig.Database)
 	defer database.Close()
 	if !auth.IsAdmin(r, database) {
 		http.Error(w, "Forbidden: admin only", http.StatusForbidden)
@@ -121,8 +100,7 @@ func PropertiesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 // --- Node Properties CRUD ---
 func NodePropertiesListHandler(w http.ResponseWriter, r *http.Request) {
 	node := r.PathValue("nodename")
-	dbCfg, _ := db.LoadDBConfig("config.json")
-	database, _ := db.OpenDB(dbCfg)
+	database, _ := db.OpenDB(&global.AppConfig.Database)
 	defer database.Close()
 	rows, _ := database.Query("SELECT node_id, property_id, value FROM node_properties WHERE node_id = ?", node)
 	var props []schema.NodeProperty
@@ -143,8 +121,7 @@ func NodePropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
 	var p schema.NodeProperty
 	_ = json.NewDecoder(r.Body).Decode(&p)
 	p.NodeName = node
-	dbCfg, _ := db.LoadDBConfig("config.json")
-	database, _ := db.OpenDB(dbCfg)
+	database, _ := db.OpenDB(&global.AppConfig.Database)
 	defer database.Close()
 	_, err := database.Exec("INSERT INTO node_properties (node_id, property_id, value) VALUES (?, ?, ?)", p.NodeName, p.PropertyID, p.Value)
 	if err != nil {
@@ -157,8 +134,7 @@ func NodePropertiesCreateHandler(w http.ResponseWriter, r *http.Request) {
 func NodePropertyGetHandler(w http.ResponseWriter, r *http.Request) {
 	node := r.PathValue("nodename")
 	pid, _ := strconv.Atoi(r.PathValue("property_id"))
-	dbCfg, _ := db.LoadDBConfig("config.json")
-	database, _ := db.OpenDB(dbCfg)
+	database, _ := db.OpenDB(&global.AppConfig.Database)
 	defer database.Close()
 	row := database.QueryRow("SELECT node_id, property_id, value FROM node_properties WHERE node_id = ? AND property_id = ?", node, pid)
 	var p schema.NodeProperty
@@ -175,8 +151,7 @@ func NodePropertyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	pid, _ := strconv.Atoi(r.PathValue("property_id"))
 	var p schema.NodeProperty
 	_ = json.NewDecoder(r.Body).Decode(&p)
-	dbCfg, _ := db.LoadDBConfig("config.json")
-	database, _ := db.OpenDB(dbCfg)
+	database, _ := db.OpenDB(&global.AppConfig.Database)
 	defer database.Close()
 	_, err := database.Exec("UPDATE node_properties SET value=? WHERE node_id=? AND property_id=?", p.Value, node, pid)
 	if err != nil {
@@ -189,8 +164,7 @@ func NodePropertyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 func NodePropertyDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	node := r.PathValue("nodename")
 	pid, _ := strconv.Atoi(r.PathValue("property_id"))
-	dbCfg, _ := db.LoadDBConfig("config.json")
-	database, _ := db.OpenDB(dbCfg)
+	database, _ := db.OpenDB(&global.AppConfig.Database)
 	defer database.Close()
 	_, err := database.Exec("DELETE FROM node_properties WHERE node_id=? AND property_id=?", node, pid)
 	if err != nil {

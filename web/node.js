@@ -412,7 +412,7 @@ $(document).ready(function() {
         });
     // Charger la liste des rapports
     $.ajax({
-        url: `/api/v1/agents/${agentId}/reports?operationtype=Initial`,
+        url: `/api/v1/agents/${agentId}/reports?mofapplied=1`,
         method: 'GET',
         dataType: 'json',
         success: function(reports) {

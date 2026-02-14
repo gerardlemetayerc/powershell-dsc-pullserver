@@ -8,8 +8,7 @@ import (
 	"encoding/hex"
 	"strings"
 	"go-dsc-pull/internal/db"
-	"path/filepath"
-	"go-dsc-pull/utils"
+	"go-dsc-pull/internal/global"
 )
 
 // ConfigurationContentHandler gère GET /PSDSCPullServer.svc/{node}/{config}/ConfigurationContent
@@ -34,46 +33,34 @@ func ConfigurationContentHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-		       log.Printf("[CONFIGURATIONCONTENT] AgentId=%s ConfigName=%s", agentId, configName)
-		       // Récupère le fichier MOF depuis la base
-			   exeDir, err := utils.ExePath()
-			   if err != nil {
-				   http.Error(w, "DB config error", http.StatusInternalServerError)
-				   return
-			   }
-			   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
-			   dbCfg, err := db.LoadDBConfig(configPath)
-			   if err != nil {
-				   http.Error(w, "DB config error", http.StatusInternalServerError)
-				   return
-			   }
-			dbConn, err := db.OpenDB(dbCfg)
-		       if err != nil {
-			       http.Error(w, "DB open error", http.StatusInternalServerError)
-			       return
-		       }
-		       defer dbConn.Close()
-			   // Recherche par nom (sans extension)
-			       log.Printf("[CONFIGURATIONCONTENT] Recherche MOF en base pour configName='%s'", configName)
-				       // Met à jour last_usage à CURRENT_TIMESTAMP pour cette configuration (insensible à la casse)
-				       _, err = dbConn.Exec("UPDATE configuration_model SET last_usage = CURRENT_TIMESTAMP WHERE LOWER(name) = LOWER(?)", configName)
-				       if err != nil {
-					       log.Printf("[CONFIGURATIONCONTENT] Erreur lors de la mise à jour de last_usage: %v", err)
-				       }
-				       row := dbConn.QueryRow("SELECT mof_file FROM configuration_model WHERE LOWER(name) = LOWER(?)", configName)
-			       var data []byte
-			       if err := row.Scan(&data); err != nil {
-				       http.Error(w, "Configuration not found", http.StatusNotFound)
-				       return
-			       }
-		       // Calcul du checksum SHA256
-		       hash := sha256.Sum256(data)
-		       checksum := hex.EncodeToString(hash[:])
-		       w.Header().Set("Content-Type", "application/octet-stream")
-		       w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
-		       w.Header().Set("Checksum", strings.ToUpper(checksum))
-		       w.Header().Set("ChecksumAlgorithm", "SHA-256")
-		       w.Header().Set("ProtocolVersion", "2.0")
-		       w.WriteHeader(http.StatusOK)
-		       w.Write(data)
+	log.Printf("[CONFIGURATIONCONTENT] AgentId=%s ConfigName=%s", agentId, configName)
+	dbConn, err := db.OpenDB(&global.AppConfig.Database)
+	if err != nil {
+		http.Error(w, "DB open error", http.StatusInternalServerError)
+		return
+	}
+	defer dbConn.Close()
+	// Recherche par nom (sans extension)
+	log.Printf("[CONFIGURATIONCONTENT] Recherche MOF en base pour configName='%s'", configName)
+	// Met à jour last_usage à CURRENT_TIMESTAMP pour cette configuration (insensible à la casse)
+	_, err = dbConn.Exec("UPDATE configuration_model SET last_usage = CURRENT_TIMESTAMP WHERE LOWER(name) = LOWER(?)", configName)
+	if err != nil {
+		log.Printf("[CONFIGURATIONCONTENT] Erreur lors de la mise à jour de last_usage: %v", err)
+	}
+	row := dbConn.QueryRow("SELECT mof_file FROM configuration_model WHERE LOWER(name) = LOWER(?)", configName)
+	var data []byte
+	if err := row.Scan(&data); err != nil {
+		http.Error(w, "Configuration not found", http.StatusNotFound)
+		return
+	}
+	// Calcul du checksum SHA256
+	hash := sha256.Sum256(data)
+	checksum := hex.EncodeToString(hash[:])
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+	w.Header().Set("Checksum", strings.ToUpper(checksum))
+	w.Header().Set("ChecksumAlgorithm", "SHA-256")
+	w.Header().Set("ProtocolVersion", "2.0")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
 }
