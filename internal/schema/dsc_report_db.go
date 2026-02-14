@@ -15,6 +15,7 @@ type DscReportDB struct {
 	Errors              string // JSON array
 	StatusData          string // JSON array
 	AdditionalData      string // JSON array
+	MofApplied          int    // 0 ou 1 : indique si un MOF a été appliqué
 	CreatedAt           string
 	RawJson             string
 }
