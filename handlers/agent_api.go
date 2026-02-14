@@ -111,15 +111,24 @@ func DeleteNodeHandler(w http.ResponseWriter, r *http.Request) {
 	       return
        }
        id := parts[len(parts)-1]
-       // Supprime les tags
-       _, _ = dbConn.Exec("DELETE FROM agent_tags WHERE agent_id = ?", id)
-       // Supprime les rapports
-       _, _ = dbConn.Exec("DELETE FROM dsc_report WHERE agent_id = ?", id)
-       // Supprime le noeud
-       _, err = dbConn.Exec("DELETE FROM agents WHERE agent_id = ?", id)
-       if err != nil {
-	       w.WriteHeader(http.StatusInternalServerError)
-	       return
-       }
-       w.WriteHeader(http.StatusOK)
+	   // Supprime les tags
+	   _, _ = dbConn.Exec("DELETE FROM agent_tags WHERE agent_id = ?", id)
+	   // Supprime les rapports
+	   _, _ = dbConn.Exec("DELETE FROM dsc_report WHERE agent_id = ?", id)
+	   // Supprime le noeud
+	   _, err = dbConn.Exec("DELETE FROM agents WHERE agent_id = ?", id)
+	   if err != nil {
+		   w.WriteHeader(http.StatusInternalServerError)
+		   return
+	   }
+	   // Audit suppression
+	   driverName := global.AppConfig.Database.Driver
+	   user := "?"
+	   if r.Context().Value("userId") != nil {
+		   if sub, ok := r.Context().Value("userId").(string); ok {
+			   user = sub
+		   }
+	   }
+	   _ = db.InsertAudit(dbConn, driverName, user, "delete", "agent", "Deleted agent: "+id, "")
+	   w.WriteHeader(http.StatusOK)
 }

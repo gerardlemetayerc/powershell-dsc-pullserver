@@ -53,14 +53,24 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 					       // fallback générique
 					       _, err = database.Exec(`INSERT INTO agents (agent_id, node_name) VALUES (?, ?)`, tempAgentId, req.NodeName)
 				       }
-	       if err != nil {
-		       log.Printf("[API][DB] Erreur insertion agent: %v", err)
-		       _ = logs.WriteLogFile(fmt.Sprintf("ERROR [API][PRE-ENROLL] Erreur insertion agent: %v (NodeName=%s)", err, req.NodeName))
-		       http.Error(w, "DB insert error", http.StatusInternalServerError)
-		       return
-	       }
+		if err != nil {
+			log.Printf("[API][DB] Erreur insertion agent: %v", err)
+			_ = logs.WriteLogFile(fmt.Sprintf("ERROR [API][PRE-ENROLL] Erreur insertion agent: %v (NodeName=%s)", err, req.NodeName))
+			http.Error(w, "DB insert error", http.StatusInternalServerError)
+			return
+		}
 
-	_ = logs.WriteLogFile(fmt.Sprintf("INFO [API][PRE-ENROLL] Agent pré-enregistré: NodeName=%s, AgentId=%s", req.NodeName, tempAgentId))
+		_ = logs.WriteLogFile(fmt.Sprintf("INFO [API][PRE-ENROLL] Agent pré-enregistré: NodeName=%s, AgentId=%s", req.NodeName, tempAgentId))
+
+		// Audit pre-enroll
+		driverName := global.AppConfig.Database.Driver
+		user := "?"
+		if r.Context().Value("userId") != nil {
+			if sub, ok := r.Context().Value("userId").(string); ok {
+				user = sub
+			}
+		}
+		_ = db.InsertAudit(database, driverName, user, "preenroll", "agent", "Pre-enrolled agent: "+tempAgentId+" ("+req.NodeName+")", "")
 
 	agent := schema.Agent{
 		AgentId:           tempAgentId,
