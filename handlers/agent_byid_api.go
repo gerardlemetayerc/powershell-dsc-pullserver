@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"log"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/global"
 	"go-dsc-pull/internal/schema"
 )
 
@@ -19,13 +20,7 @@ func AgentByIdAPIHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "AgentId manquant", http.StatusBadRequest)
 		return
 	}
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		log.Printf("[API][DB] Erreur chargement config DB: %v", err)
-		http.Error(w, "DB config error", http.StatusInternalServerError)
-		return
-	}
-	database, err := db.OpenDB(dbCfg)
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		log.Printf("[API][DB] Erreur ouverture DB: %v", err)
 		http.Error(w, "DB open error", http.StatusInternalServerError)

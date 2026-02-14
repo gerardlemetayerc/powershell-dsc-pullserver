@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/global"
 	"log"
 )
 
@@ -15,19 +16,23 @@ func AgentReportsLatestHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "AgentId manquant", http.StatusBadRequest)
 		return
 	}
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		http.Error(w, "DB config error", http.StatusInternalServerError)
-		return
-	}
-	database, err := db.OpenDB(dbCfg)
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		http.Error(w, "DB open error", http.StatusInternalServerError)
 		return
 	}
 	defer database.Close()
 
-	row := database.QueryRow(`SELECT raw_json FROM reports WHERE agent_id = ? ORDER BY created_at DESC LIMIT 1`, agentId)
+	var query string
+	switch global.AppConfig.Database.Driver {
+	case "sqlite":
+		query = `SELECT raw_json FROM reports WHERE agent_id = ? ORDER BY created_at DESC LIMIT 1`
+	case "mssql":
+		query = `SELECT TOP 1 raw_json FROM reports WHERE agent_id = ? ORDER BY created_at DESC`
+	default:
+		query = `SELECT raw_json FROM reports WHERE agent_id = ? ORDER BY created_at DESC`
+	}
+	row := database.QueryRow(query, agentId)
 	var raw string
 	err = row.Scan(&raw)
 	if err != nil {

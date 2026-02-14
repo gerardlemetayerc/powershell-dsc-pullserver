@@ -6,20 +6,14 @@ import (
 	"log"
 	"strings"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/global"
 	"go-dsc-pull/internal/schema"
 
 )
 
 // GET /api/v1/agents
 func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
-	// Chargement de la config DB
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		log.Printf("[API][DB] Erreur chargement config DB: %v", err)
-		http.Error(w, "DB config error", http.StatusInternalServerError)
-		return
-	}
-	database, err := db.OpenDB(dbCfg)
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		log.Printf("[API][DB] Erreur ouverture DB: %v", err)
 		http.Error(w, "DB open error", http.StatusInternalServerError)
@@ -104,12 +98,7 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/v1/agents/{id}
 func DeleteNodeHandler(w http.ResponseWriter, r *http.Request) {
-       dbCfg, err := db.LoadDBConfig("config.json")
-       if err != nil {
-	       w.WriteHeader(http.StatusInternalServerError)
-	       return
-       }
-       dbConn, err := db.OpenDB(dbCfg)
+       dbConn, err := db.OpenDB(&global.AppConfig.Database)
        if err != nil {
 	       w.WriteHeader(http.StatusInternalServerError)
 	       return

@@ -9,6 +9,7 @@ import (
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
 	"go-dsc-pull/internal/logs"
+	"go-dsc-pull/internal/global"
 )
 
 // ptr retourne un pointeur sur une chaîne (utilitaire)
@@ -33,13 +34,7 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 	h.Write([]byte(req.NodeName + "TEMP"))
 	tempAgentId := fmt.Sprintf("TEMP-%x", h.Sum(nil)[:8])
 
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		log.Printf("[API][DB] Erreur chargement config DB: %v", err)
-		http.Error(w, "DB config error", http.StatusInternalServerError)
-		return
-	}
-	database, err := db.OpenDB(dbCfg)
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		log.Printf("[API][DB] Erreur ouverture DB: %v", err)
 		http.Error(w, "DB open error", http.StatusInternalServerError)
@@ -48,7 +43,7 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 	defer database.Close()
 
 	       // Insert agent (ignore if already exists), compatible SQLite/MSSQL
-			       driver := dbCfg.Driver
+			       driver := global.AppConfig.Database.Driver
 				       if driver == "sqlite" {
 					       _, err = database.Exec(`INSERT OR IGNORE INTO agents (agent_id, node_name, last_communication, state) VALUES (?, ?, ?, ?)`, tempAgentId, req.NodeName, "0000-00-01 00:00:00", "waiting_for_registration")
 				       } else if driver == "mssql" {

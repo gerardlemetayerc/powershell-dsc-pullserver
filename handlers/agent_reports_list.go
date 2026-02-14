@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/global"
 	"net/http"
 	"database/sql"
 	"strings"
@@ -16,12 +17,7 @@ func AgentReportsListHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "AgentId manquant", http.StatusBadRequest)
 		return
 	}
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		http.Error(w, "DB config error", http.StatusInternalServerError)
-		return
-	}
-	database, err := db.OpenDB(dbCfg)
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		http.Error(w, "DB open error", http.StatusInternalServerError)
 		return

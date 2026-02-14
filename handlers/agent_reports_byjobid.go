@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/global"
 	"log"
 )
 
@@ -16,12 +17,7 @@ func AgentReportsByJobIdHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "AgentId ou JobId manquant", http.StatusBadRequest)
 		return
 	}
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		http.Error(w, "DB config error", http.StatusInternalServerError)
-		return
-	}
-	database, err := db.OpenDB(dbCfg)
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		http.Error(w, "DB open error", http.StatusInternalServerError)
 		return
@@ -29,7 +25,7 @@ func AgentReportsByJobIdHandler(w http.ResponseWriter, r *http.Request) {
 	defer database.Close()
 
 	var query string
-	switch dbCfg.Driver {
+	switch global.AppConfig.Database.Driver {
 	case "sqlite":
 		query = `SELECT raw_json FROM reports WHERE agent_id = ? AND job_id = ? ORDER BY created_at DESC LIMIT 1`
 	case "mssql":

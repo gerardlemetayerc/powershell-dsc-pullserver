@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"log"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/global"
 )
 
 // AgentConfigsAPIHandlerPostDelete gère POST (ajout) et DELETE (suppression) sur /api/v1/agents/{id}/configs
@@ -15,13 +16,8 @@ func AgentConfigsAPIHandlerPostDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "AgentId manquant", http.StatusBadRequest)
 		return
 	}
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		log.Printf("[API][DB] Erreur chargement config DB: %v", err)
-		http.Error(w, "DB config error", http.StatusInternalServerError)
-		return
-	}
-	database, err := db.OpenDB(dbCfg)
+
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		log.Printf("[API][DB] Erreur ouverture DB: %v", err)
 		http.Error(w, "DB open error", http.StatusInternalServerError)
@@ -38,7 +34,7 @@ func AgentConfigsAPIHandlerPostDelete(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Nom de configuration manquant ou invalide", http.StatusBadRequest)
 				return
 			}
-			   driver := dbCfg.Driver
+			   driver := global.AppConfig.Database.Driver
 			   if driver == "sqlite" {
 				   _, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, req.ConfigurationName)
 				   if err != nil {

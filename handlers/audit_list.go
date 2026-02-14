@@ -5,18 +5,13 @@ import (
 	"net/http"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/global"
 )
 
 // AuditListHandler retourne la liste des entrées d'audit (GET /api/v1/audit)
 func AuditListHandler(w http.ResponseWriter, r *http.Request) {
 	// Accès admin déjà vérifié par le middleware
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("DB config error"))
-		return
-	}
-	database, err := db.OpenDB(dbCfg)
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("DB open error"))

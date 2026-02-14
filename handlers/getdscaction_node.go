@@ -10,35 +10,12 @@ import (
 	"fmt"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
-	"path/filepath"
-	"go-dsc-pull/utils"
+	"go-dsc-pull/internal/global"
 )
 
 // GetDscActionNodeHandlerWithId gère POST /PSDSCPullServer.svc/{id}/GetDscAction avec agentId déjà extrait
 func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agentId string) {
-		// Met à jour last_communication dans la table agents
-		   exeDir, errExe := utils.ExePath()
-		   if errExe == nil {
-			   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
-			   log.Printf("[GETDSCACTION-NODE] Utilisation du chemin config.json: %s", configPath)
-			   dbCfgUpdate, errUpdate := db.LoadDBConfig(configPath)
-			   if errUpdate == nil {
-				   log.Printf("[GETDSCACTION-NODE] Chemin base de données (database): %s", dbCfgUpdate.Database)
-				   database, err := db.OpenDB(dbCfgUpdate)
-				   if err == nil {
-					   if err != nil {
-						   log.Printf("[GETDSCACTION-NODE] Erreur update last_communication: %v", err)
-					   }
-					   database.Close()
-				   } else {
-					   log.Printf("[GETDSCACTION-NODE] Erreur ouverture base: %v", err)
-				   }
-			   } else {
-				   log.Printf("[GETDSCACTION-NODE] Erreur chargement config DB: %v", errUpdate)
-			   }
-		   } else {
-			   log.Printf("[GETDSCACTION-NODE] Erreur récupération chemin exécutable: %v", errExe)
-		   }
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	// Log du body et des headers reçus pour debug
 	body, _ := io.ReadAll(r.Body)
 	r.Body = io.NopCloser(strings.NewReader(string(body)))
@@ -48,58 +25,24 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 
 	// Charger les noms de configuration depuis la base
 	var configNames []string
-	   dbCfg := (*schema.DBConfig)(nil)
-	   if errExe == nil {
-		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
-		   log.Printf("[GETDSCACTION-NODE] Utilisation du chemin config.json: %s", configPath)
-		   dbCfgTmp, err := db.LoadDBConfig(configPath)
-		   if err == nil {
-			   dbCfg = dbCfgTmp
-			   log.Printf("[GETDSCACTION-NODE] Chemin base de données (database): %s", dbCfg.Database)
-			   database, err := db.OpenDB(dbCfg)
-			   if err == nil {
-				   rows, err := database.Query(`SELECT configuration_name FROM agent_configurations WHERE agent_id = ?`, agentId)
-				   if err == nil {
-					   defer rows.Close()
-					   for rows.Next() {
-						   var name string
-						   if err := rows.Scan(&name); err == nil {
-							   log.Printf("[GETDSCACTION-NODE] Nom de configuration trouvé pour agent %s : %s", agentId, name)
-							   configNames = append(configNames, name)
-						   }
-					   }
-				   }
-				   database.Close()
-			   } else {
-				   log.Printf("[GETDSCACTION-NODE] Erreur ouverture base: %v", err)
-			   }
-		   } else {
-			   log.Printf("[GETDSCACTION-NODE] Erreur chargement config DB: %v", err)
-		   }
-	   }
+	rows, err := database.Query(`SELECT configuration_name FROM agent_configurations WHERE agent_id = ?`, agentId)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err == nil {
+				log.Printf("[GETDSCACTION-NODE] Nom de configuration trouvé pour agent %s : %s", agentId, name)
+				configNames = append(configNames, name)
+			}
+		}
+	} else {
+		log.Printf("[GETDSCACTION-NODE] Erreur ouverture base: %v", err)
+	}
 
 	// Vérifie qu'il existe au moins une configuration en base pour cet agent
-	   dbCfgCheck := (*schema.DBConfig)(nil)
-	   if errExe == nil {
-		   configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
-		   log.Printf("[GETDSCACTION-NODE] Utilisation du chemin config.json: %s", configPath)
-		   dbCfgTmp, errCheck := db.LoadDBConfig(configPath)
-		   if errCheck != nil {
-			   log.Printf("[GETDSCACTION-NODE] Erreur chargement config DB: %v", errCheck)
-			   http.Error(w, "DB config error", http.StatusInternalServerError)
-			   return
-		   }
-		   dbCfgCheck = dbCfgTmp
-		   log.Printf("[GETDSCACTION-NODE] Chemin base de données (database): %s", dbCfgCheck.Database)
-	   }
-   dbConnCheck, errCheck := db.OpenDB(dbCfgCheck)
-   if errCheck != nil {
-	   log.Printf("[GETDSCACTION-NODE] Erreur ouverture base: %v", errCheck)
-	   http.Error(w, "DB open error", http.StatusInternalServerError)
-	   return
-   }
-   defer dbConnCheck.Close()
-	row := dbConnCheck.QueryRow("SELECT COUNT(*) FROM agent_configurations WHERE agent_id = ?", agentId)
+
+   	defer database.Close()
+	row := database.QueryRow("SELECT COUNT(*) FROM agent_configurations WHERE agent_id = ?", agentId)
 	var count int
 	if err := row.Scan(&count); err != nil {
 		http.Error(w, "Configuration not found", http.StatusNotFound)
@@ -133,32 +76,32 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 					}
 				}
 				// Calcul du hash sur le bon fichier (lié à configName)
-				   if cs.ChecksumAlgorithm == "SHA-256" && cs.Checksum != "" {
-					   var hash string
-					   // Récupère le MOF depuis la base
-					   log.Printf("[GETDSCACTION-NODE] Recherche MOF en base pour configName='%s'", configName)
-					   row := dbConnCheck.QueryRow("SELECT mof_file FROM configuration_model WHERE name = ? COLLATE NOCASE", configName)
-					   var mofBytes []byte
-					   if err := row.Scan(&mofBytes); err == nil {
-						   hash = sha256SumHex(mofBytes)
-					   } else {
-						   allOk = false
-					   }
-					   log.Printf("[GETDSCACTION-NODE] Config=%s, Hash envoyé=%s, Hash calculé=%s", configName, cs.Checksum, hash)
-						_, err := dbConnCheck.Exec("UPDATE configuration_model SET last_usage = CURRENT_TIMESTAMP WHERE name = ? COLLATE NOCASE", configName)
-					    log.Printf("[GETDSCACTION-NODE] Mise à jour last_usage pour configName='%s', err=%v", configName, err)
-						if hash != "" && strings.EqualFold(hash, cs.Checksum) {
-						   status = "OK"
-						   // Met à jour last_usage à CURRENT_TIMESTAMP pour cette configuration
-						   if err != nil {
-							   log.Printf("[GETDSCACTION-NODE] Erreur lors de la mise à jour de last_usage: %v", err)
-						   }
-					   } else {
-						   allOk = false
-					   }
-				   } else {
-					   allOk = false
-				   }
+					if cs.ChecksumAlgorithm == "SHA-256" && cs.Checksum != "" {
+						// Récupère le MOF depuis la base
+						log.Printf("[GETDSCACTION-NODE] Recherche MOF en base pour configName='%s'", configName)
+						row := database.QueryRow("SELECT mof_file FROM configuration_model WHERE LOWER(name) = LOWER(?)", configName)
+						var mofBytes []byte
+						err := row.Scan(&mofBytes)
+						if err != nil {
+							log.Printf("[GETDSCACTION-NODE] MOF introuvable pour configName='%s': %v", configName, err)
+							allOk = false
+						} else {
+							hash := sha256SumHex(mofBytes)
+							log.Printf("[GETDSCACTION-NODE] Config=%s, Hash envoyé=%s, Hash calculé=%s", configName, cs.Checksum, hash)
+							_, err := database.Exec("UPDATE configuration_model SET last_usage = CURRENT_TIMESTAMP WHERE LOWER(name) = LOWER(?)", configName)
+							log.Printf("[GETDSCACTION-NODE] Mise à jour last_usage pour configName='%s', err=%v", configName, err)
+							if hash != "" && strings.EqualFold(hash, cs.Checksum) {
+								status = "OK"
+								if err != nil {
+									log.Printf("[GETDSCACTION-NODE] Erreur lors de la mise à jour de last_usage: %v", err)
+								}
+							} else {
+								allOk = false
+							}
+						}
+					} else {
+						allOk = false
+					}
 				details = append(details, schema.DscActionDetail{
 					ConfigurationName: configName,
 					Status:            status,
@@ -166,7 +109,6 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 			}
 			if allOk {
 				nodeStatus = "OK"
-				database, err := db.OpenDB(dbCfg)
 				_, err = database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP, state = 'OK' WHERE agent_id = ?", agentId)
 				if err != nil {
 					log.Printf("[GETDSCACTION-NODE] Erreur update last_communication state OK: %v", err)
