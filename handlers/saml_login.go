@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 	"database/sql"
-	"go-dsc-pull/internal"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/global"
 	samlsp "github.com/crewjam/saml/samlsp"
 	jwt "github.com/golang-jwt/jwt/v5"
 )
@@ -15,13 +15,13 @@ import (
 // SAMLLoginHandler handles SAML login, user mapping, and JWT issuance
 func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		attributesIface := samlsp.SessionFromContext(r.Context())
-		appCfg, err := internal.LoadAppConfig("config.json")
-		if err != nil {
-			log.Printf("[REGISTER][CONFIG] Error loading config: %v", err)
-			http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
-			return
-		}
+		   attributesIface := samlsp.SessionFromContext(r.Context())
+		   appCfg := global.AppConfig
+		   if appCfg == nil {
+			   log.Printf("[REGISTER][CONFIG] Error loading config: global.AppConfig is nil")
+			   http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
+			   return
+		   }
 		//log.Printf("[SAML] SAML session attributes: %+v", attributesIface[])
 		var email, firstName, lastName, role string
 		if attributesIface == nil {
@@ -80,7 +80,7 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 		}
 		var userId int
 		var isActiveBool bool
-		err = dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActiveBool)
+		err := dbConn.QueryRow("SELECT id, is_active FROM users WHERE email = ?", email).Scan(&userId, &isActiveBool)
 		if err == sql.ErrNoRows {
 			log.Printf("[SAML] Création nouvel utilisateur: %s %s <%s> (role: %s)", firstName, lastName, email, role)
 			_, err := dbConn.Exec("INSERT INTO users (first_name, last_name, email, password_hash, is_active, last_logon_date, source, role) VALUES (?, ?, ?, '', 1, ?, 'saml', ?)", firstName, lastName, email, time.Now().Format("2006-01-02 15:04:05"), role)

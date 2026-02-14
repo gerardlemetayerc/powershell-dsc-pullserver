@@ -9,15 +9,11 @@ import (
 	"log"
 	"strings"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/global"
 )
 
 func GetModuleVersionHandler(w http.ResponseWriter, r *http.Request) {
-	dbCfg, err := db.LoadDBConfig("config.json")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	dbConn, err := db.OpenDB(dbCfg)
+	dbConn, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -39,7 +35,7 @@ func GetModuleVersionHandler(w http.ResponseWriter, r *http.Request) {
 	       var version string
 	       var found bool
 	       query := ""
-	       if strings.Contains(strings.ToLower(dbCfg.Driver), "sqlserver") || strings.Contains(strings.ToLower(dbCfg.Driver), "mssql") {
+	       if strings.Contains(strings.ToLower(global.AppConfig.Database.Driver), "sqlserver") || strings.Contains(strings.ToLower(global.AppConfig.Database.Driver), "mssql") {
 		       query = "SELECT TOP 1 version FROM modules WHERE name = ? ORDER BY version DESC"
 	       } else {
 		       query = "SELECT version FROM modules WHERE name = ? ORDER BY version DESC LIMIT 1"

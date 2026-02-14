@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/global"
 	"go-dsc-pull/utils"
-	"path/filepath"
 )
 
 // SendReportHandler gère POST /PSDSCPullServer.svc/Nodes(AgentId='...')/SendReport
@@ -50,14 +50,8 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insérer en base
-	exeDir, err := utils.ExePath()
-	var dbCfg *schema.DBConfig
 	if err == nil {
-		configPath := filepath.Join(filepath.Dir(exeDir), "config.json")
-		dbCfg, err = db.LoadDBConfig(configPath)
-	}
-	if err == nil {
-		database, err := db.OpenDB(dbCfg)
+		database, err := db.OpenDB(&global.AppConfig.Database)
 		if err == nil {
 			// Vérifie si un rapport existe déjà pour ce job_id
 			var count int

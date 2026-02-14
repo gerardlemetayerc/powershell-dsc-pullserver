@@ -200,8 +200,8 @@ func ModuleUploadHandler(db *sql.DB) http.HandlerFunc {
 		   }
 		   // Try to load driver name for audit
 		driverName := global.AppConfig.Database.Driver
-		   if driverName != "" {
-			   _ = internaldb.InsertAudit(db, driverName, user, "create", "module", fmt.Sprintf("Ajout module: %s v%s (nupkg)", name, version), "")
-		   }
+		if driverName != "" {
+			_ = internaldb.InsertAudit(db, driverName, user, "create", "module", fmt.Sprintf("Ajout module: %s v%s (nupkg)", name, version), "")
+		}
 	}
 }

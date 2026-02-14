@@ -8,9 +8,9 @@ import (
 	"time"
 	utils "go-dsc-pull/utils"
 	internalutils "go-dsc-pull/internal/utils"
-	"go-dsc-pull/internal"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/global"
 	"io"
 )
 
@@ -24,13 +24,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Charger la config pour récupérer la clé d'enregistrement
-	appCfg, err := internal.LoadAppConfig("config.json")
-	if err != nil {
-		log.Printf("[REGISTER][CONFIG] Error loading config: %v", err)
-		http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
-		return
-	}
-	registrationKeyPlain := appCfg.DSCPullServer.RegistrationKey
+	registrationKeyPlain := global.AppConfig.DSCPullServer.RegistrationKey
 	if registrationKeyPlain == "" {
 		log.Printf("[REGISTER][CONFIG] registrationKey missing in config file, server stopped.")
 		http.Error(w, "Server configuration error: registrationKey missing", http.StatusInternalServerError)
@@ -58,17 +52,16 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	// --- Insertion en base ---
 	// Charger la config DB
-	dbCfg, err := db.LoadDBConfig("config.json")
+	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
-		log.Printf("[REGISTER][DB] Erreur chargement config DB: %v", err)
+		log.Printf("[REGISTER][DB] Erreur ouverture DB: %v", err)
 		// On continue, mais pas d'insertion DB
 	} else {
-			   database, err := db.OpenDB(dbCfg)
 			   if err != nil {
 				   log.Printf("[REGISTER][DB] Erreur ouverture DB: %v", err)
 			   } else {
 				   defer database.Close()
-				   driver := dbCfg.Driver
+				   driver := global.AppConfig.Database.Driver
 				   // Insertion ou mise à jour agent principal
 				   agentInfo := req["AgentInformation"].(map[string]interface{})
 				   nodeName := agentInfo["NodeName"].(string)
