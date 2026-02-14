@@ -1,0 +1,20 @@
+{{define "content"}}
+<div class="container mt-4">
+    <h2>Audit utilisateur</h2>
+    <div id="audit-table-block">
+        <table id="audit-table" class="display table table-bordered table-sm" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Action</th>
+                    <th>Cible</th>
+                    <th>Détails</th>
+                    <th>IP</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+</div>
+<script src="/web/admin_audit.js"></script>
+{{end}}

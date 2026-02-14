@@ -14,6 +14,7 @@ import (
 
 // RegisterWebRoutes sets up all web/API endpoints on the provided mux
 func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware func(http.Handler) http.Handler, samlMiddleware http.Handler) {
+	// Handler pour la page d'audit admin
 			       // Admin-only middleware for user management
 			       adminOnly := func(next http.Handler) http.Handler {
 				       return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,8 +53,8 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 					       http.Error(w, "Render error: "+err.Error(), http.StatusInternalServerError)
 				       }
 			       }
-		// Endpoint pour la liste des profils utilisateurs disponibles
-		mux.Handle("GET /api/v1/user_roles", jwtAuthMiddleware(http.HandlerFunc(handlers.UserRolesHandler())))
+	// Endpoint pour la liste des profils utilisateurs disponibles
+	mux.Handle("GET /api/v1/user_roles", jwtAuthMiddleware(http.HandlerFunc(handlers.UserRolesHandler())))
 	exeDir, err := utils.ExePath()
 	if err != nil {
 		panic("Failed to get executable path: " + err.Error())
@@ -151,4 +152,6 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("/web/configuration_model/", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebConfigurationModelDetailHandler)))
 	mux.Handle("GET /api/v1/modules/{name}", jwtAuthMiddleware(http.HandlerFunc(handlers.GetModuleVersionHandler)))
 	mux.Handle("DELETE /api/v1/agents/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteNodeHandler)))
+	mux.Handle("/web/admin/audit",handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebAuditHandler))))
+	mux.Handle("GET /api/v1/audit", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AuditListHandler))))
 }
