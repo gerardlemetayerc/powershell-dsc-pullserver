@@ -155,16 +155,16 @@ func main() {
 				   logs.WriteLogFile(fmt.Sprintf("INFO [DSC Core Server] DSC Server (HTTPS) on :%d ...", global.AppConfig.DSCPullServer.Port))
 				   certFile, keyFile := resolveCertKeyPath(global.AppConfig.DSCPullServer.CertFile, global.AppConfig.DSCPullServer.KeyFile)
 				   // Bypass CA verification: accepter tout certificat client présenté
-				 tlsConfig := &tls.Config{}
+				   tlsConfig := &tls.Config{
+					   MinVersion: tls.VersionTLS12,
+				   }
 				   if global.AppConfig.DSCPullServer.EnableClientCertValidation {
 					   if global.AppConfig.DSCPullServer.BypassCAValidation {  
-							tlsConfig = &tls.Config{
-								ClientAuth: tls.RequireAnyClientCert,
-							}
-						}
-					}else{
-						logs.WriteLogFile(fmt.Sprintf("WARN [DSC Core Server] Client certificate validation is disabled."))
-					}
+						   tlsConfig.ClientAuth = tls.RequireAnyClientCert
+					   }
+				   } else {
+					   logs.WriteLogFile(fmt.Sprintf("WARN [DSC Core Server] Client certificate validation is disabled."))
+				   }
 				   server := &http.Server{
 					   Addr:      fmt.Sprintf(":%d", global.AppConfig.DSCPullServer.Port),
 					   Handler:   dscHandler,
