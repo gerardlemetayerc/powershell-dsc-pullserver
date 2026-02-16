@@ -12,13 +12,24 @@ $(function() {
         var html = '';
         html += '<h3>' + data.name + '</h3>';
         html += '<p><b>Uploaded by:</b> ' + data.uploaded_by + ' | <b>Date:</b> ' + (data.upload_date ? new Date(data.upload_date).toLocaleString() : '') + '</p>';
-        html += '<a class="btn btn-primary" href="/api/v1/configuration_models/' + encodeURIComponent(data.name) + '/download">Download MOF</a>';
+        html += '<button class="btn btn-primary" id="download-mof-btn">Download MOF</button>';
         html += '<hr><h4>Version history</h4>';
-        html += '<ul>';
-        data.versions.forEach(function(v) {
-            html += '<li><a href="/web/configuration_model/' + encodeURIComponent(v.name) + '">' + v.name + '</a> (' + (v.upload_date ? new Date(v.upload_date).toLocaleString() : '') + ')</li>';
+        html += '<div style="font-family:monospace">';
+        data.versions.forEach(function(v, idx) {
+            var isCurrent = (v.name === data.name);
+            html += '<div>';
+            if(isCurrent) {
+                html += '<span style="font-weight:bold;color:#222">&bull;</span> ';
+                html += '<b>';
+            } else {
+                html += '<span style="color:#888">&#8593;</span> ';
+            }
+            html += '<a href="/web/configuration_model/' + encodeURIComponent(v.name) + '">' + v.name + '</a>';
+            if(isCurrent) html += '</b>';
+            html += ' <span style="color:#888">(' + (v.upload_date ? new Date(v.upload_date).toLocaleString() : '') + ')</span>';
+            html += '</div>';
         });
-        html += '</ul>';
+        html += '</div>';
         // Linked nodes display
         html += '<hr><h4>Nodes linked to this configuration</h4>';
         if(data.linked_nodes && data.linked_nodes.length) {
@@ -53,6 +64,30 @@ $(function() {
             html += '<p>No modules detected.</p>';
         }
         $('#config-detail-container').html(html);
+        // MOF download with auth
+        $('#download-mof-btn').on('click', function() {
+            var url = '/api/v1/configuration_models/' + encodeURIComponent(data.id) + '/download';
+            var token = localStorage.getItem('jwt_token') || sessionStorage.getItem('jwt_token');
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            if(token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            xhr.responseType = 'blob';
+            xhr.onload = function() {
+                if(xhr.status === 200) {
+                    var blob = xhr.response;
+                    var link = document.createElement('a');
+                    link.href = window.URL.createObjectURL(blob);
+                    link.download = data.name + '.mof';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } else {
+                    alert('Download failed: ' + xhr.status);
+                }
+            };
+            xhr.onerror = function() { alert('Download error'); };
+            xhr.send();
+        });
 
         // Module version check
         if(data.modules && data.modules.length) {
