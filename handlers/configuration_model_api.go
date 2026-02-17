@@ -56,9 +56,17 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		var existingId int64
 		var existingDate string
 		var originalName sql.NullString
-		err = dbConn.QueryRow(`SELECT id, upload_date, original_name FROM configuration_model WHERE name = ?`, name).Scan(&existingId, &existingDate, &originalName)
+		var existingMof []byte
+		err = dbConn.QueryRow(`SELECT id, upload_date, original_name, mof_file FROM configuration_model WHERE name = ?`, name).Scan(&existingId, &existingDate, &originalName, &existingMof)
 		var newName string
 		if err == nil && existingId > 0 {
+			// Contrôle du contenu : si le fichier est identique à la version actuelle, on retourne 200 OK avec un message
+			if string(existingMof) == string(mofBytes) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(map[string]string{"info": "Configuration identical to current version, no update performed."})
+				return
+			}
 			safeDate := existingDate
 			safeDate = strings.ReplaceAll(safeDate, ":", "")
 			safeDate = strings.ReplaceAll(safeDate, "-", "")
