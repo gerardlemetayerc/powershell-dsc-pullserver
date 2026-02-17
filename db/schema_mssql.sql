@@ -153,3 +153,23 @@ CREATE TABLE agent_tags (
     PRIMARY KEY (agent_id, tag_key, tag_value),
     FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
 );
+
+
+-- Recommended indexes for performance
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_configuration_model_name' AND object_id = OBJECT_ID('configuration_model'))
+    CREATE INDEX idx_configuration_model_name ON configuration_model(name);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_configuration_model_original_name' AND object_id = OBJECT_ID('configuration_model'))
+    CREATE INDEX idx_configuration_model_original_name ON configuration_model(original_name);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_agent_configurations_configuration_name' AND object_id = OBJECT_ID('agent_configurations'))
+    CREATE INDEX idx_agent_configurations_configuration_name ON agent_configurations(configuration_name);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_agents_state' AND object_id = OBJECT_ID('agents'))
+    CREATE INDEX idx_agents_state ON agents(state);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_reports_job_id' AND object_id = OBJECT_ID('reports'))
+    CREATE INDEX idx_reports_job_id ON reports(job_id);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_modules_name' AND object_id = OBJECT_ID('modules'))
+    CREATE INDEX idx_modules_name ON modules(name);
