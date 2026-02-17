@@ -22,7 +22,7 @@ $(document).ready(function() {
                 render: function(data, type, row) {
                     if (row.state) {
                         switch (row.state.toLowerCase()) {
-                            case 'ok':
+                            case 'success':
                                 return `<span class="badge bg-success" style="min-width:60px;">OK</span>`;
                             case 'waiting_for_registration':
                                 return `<span class="badge bg-secondary" style="min-width:100px;">Pending Enroll</span>`;
@@ -56,7 +56,7 @@ $(document).ready(function() {
         agents.forEach(a => {
             if (!a.state) return;
             switch (a.state.toLowerCase()) {
-                case 'ok':
+                case 'success':
                     ok++;
                     break;
                 case 'failure':
@@ -78,7 +78,7 @@ $(document).ready(function() {
         const chart = new Chart(ctx, {
             type: 'pie',
             data: {
-                labels: ['OK', 'Failed', 'Pending Enroll', 'Pending Apply'],
+                labels: ['success', 'Failed', 'Pending Enroll', 'Pending Apply'],
                 datasets: [{
                     data: [ok, err, pendingEnroll, pendingApply],
                     backgroundColor: ['#28a745', '#dc3545', '#6c757d', '#ffc107'],
