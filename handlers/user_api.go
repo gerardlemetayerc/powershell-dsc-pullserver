@@ -17,38 +17,27 @@ import (
 
 // Retourne les infos de l'utilisateur courant (d'après le JWT)
 func MyUserInfoHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Récupère l'email depuis le JWT (claim sub)
-		auth := r.Header.Get("Authorization")
-		if !strings.HasPrefix(auth, "Bearer ") {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		tokenStr := strings.TrimPrefix(auth, "Bearer ")
-		token, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
-		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok || claims["sub"] == nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		email := claims["sub"].(string)
-		row := db.QueryRow("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date FROM users WHERE email = ?", email)
-		var u schema.User
-		var lastLogon sql.NullString
-		var isActiveBool bool
-		if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &isActiveBool, &u.CreatedAt, &lastLogon); err != nil {
-			http.Error(w, "Not found", http.StatusNotFound)
-			return
-		}
+	       return func(w http.ResponseWriter, r *http.Request) {
+		       // Récupère l'email depuis le contexte (middleware JWT)
+		       userId := r.Context().Value("userId")
+		       email, ok := userId.(string)
+		       if !ok || email == "" {
+			       http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			       return
+		       }
+		       row := db.QueryRow("SELECT id, first_name, last_name, email, role, is_active, created_at, last_logon_date FROM users WHERE email = ?", email)
+		       var u schema.User
+		       var lastLogon sql.NullString
+		       var isActiveBool bool
+		       if err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Role, &isActiveBool, &u.CreatedAt, &lastLogon); err != nil {
+			       http.Error(w, "Not found", http.StatusNotFound)
+			       return
+		       }
 		       u.IsActive = isActiveBool
-		if lastLogon.Valid { u.LastLogonDate = &lastLogon.String } else { u.LastLogonDate = nil }
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(u)
-	}
+		       if lastLogon.Valid { u.LastLogonDate = &lastLogon.String } else { u.LastLogonDate = nil }
+		       w.Header().Set("Content-Type", "application/json")
+		       json.NewEncoder(w).Encode(u)
+	       }
 }
 
 // Liste les tokens API d'un utilisateur
@@ -423,4 +412,21 @@ func ChangeUserPasswordHandler(db *sql.DB) http.HandlerFunc {
 	       _ = internaldb.InsertAudit(db, driverName, actorEmail, "update", "user", "Changed password for user: "+id, "")
 	       w.WriteHeader(http.StatusNoContent)
        }
+}
+
+// Handler de logout : supprime le cookie JWT côté serveur
+func LogoutHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "jwt_token",
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true, // à adapter si tu testes en HTTP
+			SameSite: http.SameSiteStrictMode,
+			MaxAge:   0,
+			Expires:  time.Unix(0, 0),
+		})
+		w.WriteHeader(http.StatusNoContent)
+	}
 }

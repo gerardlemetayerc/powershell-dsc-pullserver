@@ -17,57 +17,7 @@
         </li>
     </ul>
 </nav>
-<script>
-// Affiche le nom d'utilisateur extrait du JWT (claim sub) et gère le menu admin
-function parseJwt (token) {
-    try {
-        return JSON.parse(atob(token.split('.')[1]));
-    } catch(e) { return {}; }
-}
-const token = localStorage.getItem('jwt_token');
-if (token) {
-    const payload = parseJwt(token);
-    document.addEventListener('DOMContentLoaded', function() {
-        if (payload && payload.sub) {
-            document.getElementById('userName').textContent = payload.sub;
-        }
-        // Affiche ou masque le menu admin selon le rôle
-        var adminMenu = document.getElementById('adminMenu');
-        if (adminMenu) {
-            if (payload && payload.role === 'admin') {
-                adminMenu.style.display = '';
-            } else {
-                adminMenu.style.display = 'none';
-            }
-        }
-    });
-}
-// Déconnexion
-document.addEventListener('DOMContentLoaded', function() {
-    const btn = document.getElementById('logoutBtn');
-    if (btn) {
-        btn.onclick = function() {
-            localStorage.removeItem('jwt_token');
-            // Supprime le cookie JWT si présent
-            document.cookie = 'jwt_token=; Max-Age=0; path=/;';
-            document.cookie = 'token=; Max-Age=0; path=/;';
-            window.location.href = '/web/login';
-        };
-    }
-});
-// Active dynamiquement le menu selon l'URL
-document.addEventListener('DOMContentLoaded', function() {
-    var path = window.location.pathname;
-    document.querySelectorAll('.main-sidebar .nav-link').forEach(function(link) {
-        // Retire la classe active de tous
-        link.classList.remove('active');
-        // Active si correspond à l'URL courante
-        if (link.getAttribute('href') === path) {
-            link.classList.add('active');
-        }
-    });
-});
-</script>
+<script src="/web/user_session.js"></script>
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
     <a href="/web/reports.html" class="brand-link">
         <span class="brand-text font-weight-light">DSC Admin Console</span>

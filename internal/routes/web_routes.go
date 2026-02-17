@@ -103,6 +103,7 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("PUT /api/v1/configuration_models/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateConfigurationModelHandler)))
 	mux.Handle("DELETE /api/v1/configuration_models", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteConfigurationModelHandler)))
 	mux.Handle("POST /api/v1/login", handlers.LoginHandler(dbConn))
+	mux.Handle("POST /api/v1/logout", handlers.LogoutHandler())
 	mux.HandleFunc("/web/login", WebLoginHandler)
 	if smw, ok := samlMiddleware.(*samlsp.Middleware); ok {
 		mux.Handle("/web/login/saml", smw.RequireAccount(handlers.SAMLLoginHandler(dbConn)))

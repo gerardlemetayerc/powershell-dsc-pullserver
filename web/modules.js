@@ -24,6 +24,13 @@ $(document).ready(function() {
     $('#btn-upload-module').on('click', function() {
         $('#modal-upload-module').modal('show');
     });
+
+    window.addEventListener('userReady', function() {
+        if(window.currentUser && window.currentUser.role === 'admin'){
+            $('#btn-upload-module').show();
+        }
+    });
+
     // Formulaire upload
     $('#form-upload-module').on('submit', function(e) {
         e.preventDefault();
