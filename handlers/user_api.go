@@ -137,10 +137,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			Username string `json:"username"`
 			Password string `json:"password"`
 		}
-		type LoginResponse struct {
-			Token string `json:"token"`
-			ExpiresAt int64 `json:"expires_at"`
-		}
+		   // Plus besoin de LoginResponse, le token sera dans le cookie
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Bad request", http.StatusBadRequest)
@@ -194,9 +191,18 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Token error", http.StatusInternalServerError)
 			return
 		}
-		resp := LoginResponse{Token: signed, ExpiresAt: expiresAt}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		   // Place le JWT dans un cookie HttpOnly/Secure/SameSite
+		   http.SetCookie(w, &http.Cookie{
+			   Name:     "jwt_token",
+			   Value:    signed,
+			   Path:     "/",
+			   HttpOnly: true,
+			   Secure:   true, // à adapter si tu testes en HTTP
+			   SameSite: http.SameSiteStrictMode,
+			   Expires:  time.Unix(expiresAt, 0),
+		   })
+		   w.Header().Set("Content-Type", "application/json")
+		   json.NewEncoder(w).Encode(map[string]interface{}{"expires_at": expiresAt})
 	}
 }
 

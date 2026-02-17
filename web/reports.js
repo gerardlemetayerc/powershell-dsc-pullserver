@@ -24,6 +24,9 @@ $(document).ready(function() {
                         switch (row.state.toLowerCase()) {
                             case 'success':
                                 return `<span class="badge bg-success" style="min-width:60px;">OK</span>`;
+                            case 'ok':
+                                return `<span class="badge bg-success" style="min-width:60px;">OK</span>`;
+
                             case 'waiting_for_registration':
                                 return `<span class="badge bg-secondary" style="min-width:100px;">Pending Enroll</span>`;
                             case 'failure':
@@ -57,6 +60,9 @@ $(document).ready(function() {
             if (!a.state) return;
             switch (a.state.toLowerCase()) {
                 case 'success':
+                    ok++;
+                    break;
+                case 'ok':
                     ok++;
                     break;
                 case 'failure':
