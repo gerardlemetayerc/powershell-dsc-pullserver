@@ -1,4 +1,4 @@
-$(document).ready(function() {
+window.addEventListener('userReady', function() {
     // Table modules
     var table = $('#modules-table').DataTable({
         ajax: {
@@ -13,7 +13,11 @@ $(document).ready(function() {
             {
                 data: 'id',
                 render: function(id, type, row) {
-                    return `<button class="btn btn-danger btn-sm btn-delete-module" data-id="${id}"><i class="fas fa-trash"></i></button>`;
+                    if(window.currentUser && window.currentUser.role === 'admin'){
+                        return `<button class="btn btn-danger btn-sm btn-delete-module" data-id="${id}"><i class="fas fa-trash"></i></button>`;
+                    } else {
+                        return '';
+                    }
                 },
                 orderable: false,
                 searchable: false
@@ -25,11 +29,9 @@ $(document).ready(function() {
         $('#modal-upload-module').modal('show');
     });
 
-    window.addEventListener('userReady', function() {
-        if(window.currentUser && window.currentUser.role === 'admin'){
-            $('#btn-upload-module').show();
-        }
-    });
+    if(window.currentUser && window.currentUser.role === 'admin'){
+        $('#btn-upload-module').show();
+    }
 
     // Formulaire upload
     $('#form-upload-module').on('submit', function(e) {
