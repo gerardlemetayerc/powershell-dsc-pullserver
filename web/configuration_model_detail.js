@@ -67,10 +67,8 @@ $(function() {
         // MOF download with auth
         $('#download-mof-btn').on('click', function() {
             var url = '/api/v1/configuration_models/' + encodeURIComponent(data.id) + '/download';
-            var token = localStorage.getItem('jwt_token') || sessionStorage.getItem('jwt_token');
             var xhr = new XMLHttpRequest();
             xhr.open('GET', url, true);
-            if(token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
             xhr.responseType = 'blob';
             xhr.onload = function() {
                 if(xhr.status === 200) {

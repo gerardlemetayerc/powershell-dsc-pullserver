@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"go-dsc-pull/internal/global"
 	"golang.org/x/crypto/bcrypt"
 	"time"
 )
@@ -25,8 +26,20 @@ func StoreAPIToken(db *sql.DB, userId int64, plainToken, label string) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec(`INSERT INTO user_api_tokens (user_id, token_hash, label, is_active, created_at) VALUES (?, ?, ?, 1, ?)`,
-		userId, string(hash), label, time.Now().Format("2006-01-02 15:04:05"))
+	// Detect driver
+	driver := "sqlite"
+	if global.AppConfig != nil && global.AppConfig.Database.Driver != "" {
+		driver = global.AppConfig.Database.Driver
+	}
+	if driver == "mssql" || driver == "sqlserver" {
+		// Use CURRENT_TIMESTAMP for SQL Server
+		_, err = db.Exec(`INSERT INTO user_api_tokens (user_id, token_hash, label, is_active, created_at) VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)`,
+			userId, string(hash), label)
+	} else {
+		// Use formatted string for SQLite
+		_, err = db.Exec(`INSERT INTO user_api_tokens (user_id, token_hash, label, is_active, created_at) VALUES (?, ?, ?, 1, ?)`,
+			userId, string(hash), label, time.Now().Format("2006-01-02 15:04:05"))
+	}
 	return err
 }
 

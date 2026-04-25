@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"log"
-	"strings"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/global"
 	"go-dsc-pull/internal/schema"
@@ -98,37 +97,70 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /api/v1/agents/{id}
 func DeleteNodeHandler(w http.ResponseWriter, r *http.Request) {
-       dbConn, err := db.OpenDB(&global.AppConfig.Database)
-       if err != nil {
-	       w.WriteHeader(http.StatusInternalServerError)
-	       return
-       }
-       defer dbConn.Close()
-       // Récupère l'id du noeud
-       parts := strings.Split(r.URL.Path, "/")
-       if len(parts) < 5 {
-	       w.WriteHeader(http.StatusBadRequest)
-	       return
-       }
-       id := parts[len(parts)-1]
-	   // Supprime les tags
-	   _, _ = dbConn.Exec("DELETE FROM agent_tags WHERE agent_id = ?", id)
-	   // Supprime les rapports
-	   _, _ = dbConn.Exec("DELETE FROM dsc_report WHERE agent_id = ?", id)
-	   // Supprime le noeud
-	   _, err = dbConn.Exec("DELETE FROM agents WHERE agent_id = ?", id)
-	   if err != nil {
-		   w.WriteHeader(http.StatusInternalServerError)
-		   return
-	   }
-	   // Audit suppression
-	   driverName := global.AppConfig.Database.Driver
-	   user := "?"
-	   if r.Context().Value("userId") != nil {
-		   if sub, ok := r.Context().Value("userId").(string); ok {
-			   user = sub
-		   }
-	   }
-	   _ = db.InsertAudit(dbConn, driverName, user, "delete", "agent", "Deleted agent: "+id, "")
-	   w.WriteHeader(http.StatusOK)
+	dbConn, err := db.OpenDB(&global.AppConfig.Database)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer dbConn.Close()
+
+	id := r.PathValue("id")
+	if id == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	tx, err := dbConn.Begin()
+	if err != nil {
+		log.Printf("[API][DB] Cannot start transaction for agent delete %s: %v", id, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	deleteQueries := []string{
+		"DELETE FROM agent_tags WHERE agent_id = ?",
+		"DELETE FROM reports WHERE agent_id = ?",
+		"DELETE FROM agent_configurations WHERE agent_id = ?",
+		"DELETE FROM agent_ips WHERE agent_id = ?",
+	}
+	for _, query := range deleteQueries {
+		if _, err := tx.Exec(query, id); err != nil {
+			_ = tx.Rollback()
+			log.Printf("[API][DB] Failed to delete dependencies for agent %s with query %q: %v", id, query, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	result, err := tx.Exec("DELETE FROM agents WHERE agent_id = ?", id)
+	if err != nil {
+		_ = tx.Rollback()
+		log.Printf("[API][DB] Failed to delete agent %s: %v", id, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		_ = tx.Rollback()
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Printf("[API][DB] Failed to commit agent delete %s: %v", id, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Audit suppression
+	driverName := global.AppConfig.Database.Driver
+	user := "?"
+	if r.Context().Value("userId") != nil {
+		if sub, ok := r.Context().Value("userId").(string); ok {
+			user = sub
+		}
+	}
+	_ = db.InsertAudit(dbConn, driverName, user, "delete", "agent", "Deleted agent: "+id, "")
+	w.WriteHeader(http.StatusOK)
 }

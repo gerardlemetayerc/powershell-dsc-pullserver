@@ -4,6 +4,12 @@ $(function() {
         $('#modal-upload-config-model').modal('show');
     });
 
+    window.addEventListener('userReady', function() {
+        if(window.currentUser && window.currentUser.role === 'admin'){
+            $('#btn-upload-config-model').show();
+        }
+    });
+
     // Soumission du formulaire d'upload
     $('#form-upload-config-model').on('submit', function(e) {
         e.preventDefault();

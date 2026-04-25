@@ -7,7 +7,7 @@ function Test-DSCPullServerToken {
     }
     $headers = @{ Authorization = "$($script:DSCPullServerSession.AuthType) $($script:DSCPullServerSession.Token)" }
     try {
-        $resp = Invoke-RestMethod -Uri "$($script:DSCPullServerSession.ServerUrl)/api/v1/my"xw -Headers $headers -Method GET -Verbose:$true
+        $resp = Invoke-RestMethod -Uri "$($script:DSCPullServerSession.ServerUrl)/api/v1/my" -Headers $headers -Method GET -Verbose:$true
         Write-Host "Token valide pour l'utilisateur $($resp.email)"
         return $true
     } catch {
@@ -29,13 +29,43 @@ function Connect-DSCPullServer {
         $script:DSCPullServerSession = @{ ServerUrl = $ServerUrl; Token = $Token; AuthType = 'Token' }
     } elseif ($Credential) {
         $body = @{ username = $Credential.UserName; password = $Credential.GetNetworkCredential().Password } | ConvertTo-Json
-        $resp = Invoke-RestMethod -Uri "$ServerUrl/api/v1/login" -Method POST -ContentType 'application/json' -Body $body
-        if ($resp.token) {
-            $script:DSCPullServerSession = @{ ServerUrl = $ServerUrl; Token = $resp.token; AuthType = 'Bearer' }
-            return $true
-        } else {
-            throw "Échec de l'authentification."
+        $invokeParams = @{
+            Uri             = "$ServerUrl/api/v1/login"
+            Method          = 'POST'
+            ContentType     = 'application/json'
+            Body            = $body
+            SessionVariable = 'webSession'
         }
+        if ($PSVersionTable.PSVersion.Major -lt 6) {
+            $invokeParams['UseBasicParsing'] = $true
+        }
+        $resp = Invoke-WebRequest @invokeParams
+        $jwtToken = $null
+
+        if ($webSession -and $webSession.Cookies) {
+            try {
+                $cookie = $webSession.Cookies.GetCookies($ServerUrl) | Where-Object { $_.Name -eq 'jwt_token' } | Select-Object -First 1
+                if ($cookie) {
+                    $jwtToken = $cookie.Value
+                }
+            } catch {
+                # Fallback handled below via Set-Cookie header parsing.
+            }
+        }
+
+        if (-not $jwtToken) {
+            $setCookie = $resp.Headers['Set-Cookie']
+            if ($setCookie -match 'jwt_token=([^;]+)') {
+                $jwtToken = $matches[1]
+            }
+        }
+
+        if ($jwtToken) {
+            $script:DSCPullServerSession = @{ ServerUrl = $ServerUrl; Token = $jwtToken; AuthType = 'Bearer' }
+            return $true
+        }
+
+        throw "Echec de l'authentification: aucun jeton JWT recu."
     } else {
         throw "Vous devez fournir soit -Token, soit -Credential."
     }

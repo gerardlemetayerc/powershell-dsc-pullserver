@@ -3,16 +3,7 @@ var currentUserId = null;
 
 $(function() {
     // Récupère l'ID utilisateur depuis le JWT
-    function parseJwt (token) {
-        try { return JSON.parse(atob(token.split('.')[1])); } catch(e) { return {}; }
-    }
-    const token = localStorage.getItem('jwt_token');
-    if (!token) { window.location.href = '/web/login'; return; }
-    const payload = parseJwt(token);
-    const userEmail = payload.sub;
-    
-    $('#profileEmail').text(userEmail);
-    // Optionnel: charger nom complet via API si besoin
+    // L'email utilisateur est récupéré via l'API /api/v1/my
 
     // Récupère l'ID utilisateur via /api/v1/users?email=...
     $.get('/api/v1/my', function(user) {
