@@ -430,47 +430,8 @@ func GetConfigurationModelDetailHandler(w http.ResponseWriter, r *http.Request) 
 			       }
 		       }
 	       }
-	       // Extraction des modules/dépendances (simple: parse le MOF pour "ModuleName = ...")
-		       modules := []map[string]interface{}{}
-		       if cm.MofFile != nil {
-			       mofStr := string(cm.MofFile)
-			       modMap := map[string]map[string]interface{}{}
-			       for _, line := range strings.Split(mofStr, "\n") {
-				       line = strings.TrimSpace(line)
-				       // Nettoie les caractères parasites
-				       line = strings.ReplaceAll(line, ";", "")
-				       if strings.HasPrefix(line, "ModuleName = ") {
-					       name := strings.Trim(line[len("ModuleName = "):], " \"'{}[];")
-					       if _, ok := modMap[name]; !ok && name != "" {
-						       modMap[name] = map[string]interface{}{ "name": name }
-					       }
-				       }
-				       if strings.HasPrefix(line, "ModuleVersion = ") {
-					       ver := strings.Trim(line[len("ModuleVersion = "):], " \"'{}[];")
-					       for _, m := range modMap {
-						       if m["version"] == nil && ver != "" {
-							       m["version"] = ver
-						       }
-					       }
-				       }
-				       if strings.HasPrefix(line, "RequiredModules = ") {
-					       deps := strings.Trim(line[len("RequiredModules = "):], " {}\"'[];")
-					       depList := []string{}
-					       for _, d := range strings.Split(deps, ",") {
-						       d = strings.Trim(d, " \"'{}[];")
-						       if d != "" {
-							       depList = append(depList, d)
-						       }
-					       }
-					       for _, m := range modMap {
-						       m["dependencies"] = depList
-					       }
-				       }
-			       }
-			       for _, m := range modMap {
-				       modules = append(modules, m)
-			       }
-		       }
+	       // Extraction des modules/dépendances depuis le contenu MOF (UTF-8/UTF-16)
+	       modules := parseModulesFromMOFBytes(cm.MofFile)
 
 	       // Ajout des noeuds liés à la configuration (agents)
 	       linkedNodes := []map[string]interface{}{}
