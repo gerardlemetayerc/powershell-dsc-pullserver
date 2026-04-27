@@ -2,10 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
-	"net/http"
-	"log"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/global"
+	"go-dsc-pull/internal/schema"
+	"log"
+	"net/http"
 )
 
 // AgentConfigsAPIHandler retourne la liste des configurations pour un agent donné
@@ -27,20 +28,15 @@ func AgentConfigsAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
-	rows, err := database.Query(`SELECT configuration_name FROM agent_configurations WHERE agent_id = ?`, agentId)
+	bindings, err := db.GetAgentConfigurationBindings(database, agentId)
 	if err != nil {
 		http.Error(w, "DB query error", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
 
-	configs := []string{}
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err == nil {
-			configs = append(configs, name)
-		}
-	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(configs)
+	if bindings == nil {
+		bindings = make([]schema.AgentConfigurationBinding, 0)
+	}
+	_ = json.NewEncoder(w).Encode(bindings)
 }

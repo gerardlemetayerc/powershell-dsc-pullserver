@@ -76,11 +76,11 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='dsc_infra_info' AND xtype='U
 CREATE TABLE dsc_infra_info (
     id INT PRIMARY KEY CHECK (id = 1),
     web_version NVARCHAR(20) DEFAULT '0.0.1',
-    db_version NVARCHAR(20) DEFAULT '0.0.4',
+    db_version NVARCHAR(20) DEFAULT '1.2.0',
     updated_at DATETIME DEFAULT GETDATE()
 );
 -- To update version:
--- UPDATE dsc_infra_info SET db_version = '0.0.4', updated_at = GETDATE() WHERE id = 1;
+-- UPDATE dsc_infra_info SET db_version = '1.2.0', updated_at = GETDATE() WHERE id = 1;
 
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='agents' AND xtype='U')
 CREATE TABLE agents (
@@ -103,6 +103,12 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='agent_configurations' AND xt
 CREATE TABLE agent_configurations (
     agent_id NVARCHAR(128),
     configuration_name NVARCHAR(128),
+    schedule_type NVARCHAR(16) NOT NULL DEFAULT 'none',
+    scheduled_at DATETIME NULL,
+    recurrence_minutes INT NULL,
+    window_minutes INT NOT NULL DEFAULT 30,
+    scheduled_last_applied_at DATETIME NULL,
+    enabled BIT NOT NULL DEFAULT 1,
     PRIMARY KEY (agent_id, configuration_name),
     FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
 );

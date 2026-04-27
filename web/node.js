@@ -44,6 +44,7 @@ const state = {
     reports: [],
     error: null,
     tags: {},
+    configBindings: [],
 };
 function renderAgentTags() {
     let html = '';
@@ -115,13 +116,119 @@ function fillAgentInfo() {
     $('#agent-name').text(state.agent.node_name || '');
     $('#agent-thumbprint').text(certExp + daysLeft);
     $('#agent-lastcomm').text(lastComm);
-    if (Array.isArray(state.agent.configurations) && state.agent.configurations.length > 0) {
+    if (Array.isArray(state.agent.configuration_bindings) && state.agent.configuration_bindings.length > 0) {
+        let html = `<strong>Configurations:</strong> ` +
+            state.agent.configuration_bindings.map(c => {
+                const badge = c.schedule_type && c.schedule_type !== 'none' ? 'badge-warning' : 'badge-info';
+                const suffix = c.schedule_type && c.schedule_type !== 'none' ? ` (${c.schedule_type})` : ' (main)';
+                return `<span class="badge ${badge} mr-1">${c.configuration_name}${suffix}</span>`;
+            }).join(' ');
+        $('#agent-config-block').html(html);
+    } else if (Array.isArray(state.agent.configurations) && state.agent.configurations.length > 0) {
         let html = `<strong>Configuration${state.agent.configurations.length > 1 ? 's' : ''} associée${state.agent.configurations.length > 1 ? 's' : ''} :</strong> ` +
             state.agent.configurations.map(c => `<span class="badge badge-info mr-1">${c}</span>`).join(' ');
         $('#agent-config-block').html(html);
     } else {
         $('#agent-config-block').html('');
     }
+}
+
+function formatScheduleDate(value) {
+    if (!value) return '-';
+    const dt = new Date(value.replace(' ', 'T') + 'Z');
+    if (Number.isNaN(dt.getTime())) return value;
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    const hh = String(dt.getHours()).padStart(2, '0');
+    const mm = String(dt.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${d} ${hh}:${mm} UTC`;
+}
+
+function renderConfigBindingsTable() {
+    if (!Array.isArray(state.configBindings) || state.configBindings.length === 0) {
+        return '<em>No configuration binding configured.</em>';
+    }
+
+    let html = '<table class="table table-sm table-bordered"><thead><tr>' +
+        '<th>Configuration</th><th>Type</th><th>Scheduled at</th><th>Recurrence (min)</th><th>Window (min)</th><th>Enabled</th><th>Actions</th>' +
+        '</tr></thead><tbody>';
+
+    state.configBindings.forEach((b) => {
+        html += `<tr>
+            <td>${b.configuration_name || ''}</td>
+            <td>${b.schedule_type || 'none'}</td>
+            <td>${formatScheduleDate(b.scheduled_at)}</td>
+            <td>${b.recurrence_minutes || '-'}</td>
+            <td>${b.window_minutes || 30}</td>
+            <td>${b.enabled ? 'Yes' : 'No'}</td>
+            <td>
+                <button class="btn btn-outline-primary btn-xs edit-binding-btn" data-name="${(b.configuration_name || '').replace(/"/g, '&quot;')}">Edit</button>
+                <button class="btn btn-outline-danger btn-xs delete-binding-btn" data-name="${(b.configuration_name || '').replace(/"/g, '&quot;')}">Delete</button>
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    return html;
+}
+
+function renderConfigBindings() {
+    $('#config-bindings-block').html(renderConfigBindingsTable());
+}
+
+function showConfigBindingMessage(msg, type) {
+    const cls = type === 'error' ? 'text-danger' : 'text-success';
+    $('#config-binding-message').removeClass('text-danger text-success').addClass(cls).text(msg || '');
+}
+
+function resetConfigBindingForm() {
+    $('#config-binding-editing-original').val('');
+    $('#config-binding-name').val('');
+    $('#config-binding-type').val('none');
+    $('#config-binding-scheduled-at').val('');
+    $('#config-binding-recurrence').val('');
+    $('#config-binding-window').val('30');
+    $('#config-binding-enabled').prop('checked', true);
+    showConfigBindingMessage('', 'success');
+    updateConfigBindingFormByType();
+}
+
+function updateConfigBindingFormByType() {
+    const t = ($('#config-binding-type').val() || 'none').toLowerCase();
+    const isScheduled = t === 'oneshot' || t === 'recurring';
+    const isRecurring = t === 'recurring';
+    $('#config-binding-scheduled-at').prop('disabled', !isScheduled);
+    $('#config-binding-recurrence').prop('disabled', !isRecurring);
+}
+
+function toInputDateTime(value) {
+    if (!value) return '';
+    const normalized = value.replace(' ', 'T');
+    const dt = new Date(normalized.endsWith('Z') ? normalized : normalized + 'Z');
+    if (Number.isNaN(dt.getTime())) return '';
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    const hh = String(dt.getHours()).padStart(2, '0');
+    const mm = String(dt.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${d}T${hh}:${mm}`;
+}
+
+function loadConfigBindings(agentId) {
+    return $.ajax({
+        url: `/api/v1/agents/${agentId}/configs`,
+        method: 'GET',
+        dataType: 'json',
+        success: function(bindings) {
+            state.configBindings = Array.isArray(bindings) ? bindings : [];
+            renderConfigBindings();
+        },
+        error: function() {
+            state.configBindings = [];
+            renderConfigBindings();
+        }
+    });
 }
 
 function renderSelectedReport() {
@@ -319,6 +426,7 @@ function renderReportsDropdown() {
 function renderAll() {
     fillAgentInfo();
     $('#agent-tags-block').html(renderAgentTags());
+    renderConfigBindings();
     $('#reports-dropdown-block').html(renderReportsDropdown());
     $('#last-report-block').html(renderSelectedReport());
     $('#node-action-block').html(renderNodeActionBlock());
@@ -340,6 +448,7 @@ $(document).ready(function() {
         dataType: 'json',
         success: function(agent) {
             state.agent = agent;
+            state.configBindings = Array.isArray(agent.configuration_bindings) ? agent.configuration_bindings : state.configBindings;
             renderAll();
         },
         error: function() {
@@ -361,6 +470,8 @@ $(document).ready(function() {
             renderAll();
         }
     });
+    loadConfigBindings(agentId);
+    resetConfigBindingForm();
         // Ajout d'un tag
         $(document).on('submit', '#add-tag-form', function(e) {
             e.preventDefault();
@@ -464,4 +575,136 @@ $(document).ready(function() {
                window.location.href = '/web/node/' + encodeURIComponent(agentId) + '/properties';
            }
        });
+
+    $(document).on('change', '#config-binding-type', function() {
+        updateConfigBindingFormByType();
+    });
+
+    $(document).on('click', '#config-binding-reset', function() {
+        resetConfigBindingForm();
+    });
+
+    $(document).on('click', '.edit-binding-btn', function() {
+        const name = $(this).data('name');
+        const binding = (state.configBindings || []).find((b) => b.configuration_name === name);
+        if (!binding) return;
+        $('#config-binding-editing-original').val(binding.configuration_name || '');
+        $('#config-binding-name').val(binding.configuration_name || '');
+        $('#config-binding-type').val(binding.schedule_type || 'none');
+        $('#config-binding-scheduled-at').val(toInputDateTime(binding.scheduled_at));
+        $('#config-binding-recurrence').val(binding.recurrence_minutes || '');
+        $('#config-binding-window').val(binding.window_minutes || 30);
+        $('#config-binding-enabled').prop('checked', !!binding.enabled);
+        updateConfigBindingFormByType();
+        showConfigBindingMessage('', 'success');
+    });
+
+    $(document).on('click', '.delete-binding-btn', function() {
+        const name = $(this).data('name');
+        if (!name) return;
+        if (!confirm(`Supprimer la configuration "${name}" ?`)) return;
+        $.ajax({
+            url: `/api/v1/agents/${agentId}/configs`,
+            method: 'DELETE',
+            contentType: 'application/json',
+            data: JSON.stringify({ configuration_name: name }),
+            success: function() {
+                showConfigBindingMessage('Configuration supprimée.', 'success');
+                loadConfigBindings(agentId);
+                $.ajax({
+                    url: `/api/v1/agents/${agentId}`,
+                    method: 'GET',
+                    dataType: 'json',
+                    success: function(agent) {
+                        state.agent = agent;
+                        renderAll();
+                    }
+                });
+            },
+            error: function(xhr) {
+                showConfigBindingMessage(`Erreur suppression: ${xhr.responseText || xhr.status}`, 'error');
+            }
+        });
+    });
+
+    $(document).on('submit', '#config-binding-form', function(e) {
+        e.preventDefault();
+        const configurationName = ($('#config-binding-name').val() || '').trim();
+        const scheduleType = ($('#config-binding-type').val() || 'none').toLowerCase();
+        const scheduledAt = ($('#config-binding-scheduled-at').val() || '').trim();
+        const recurrenceMinutesRaw = ($('#config-binding-recurrence').val() || '').trim();
+        const windowMinutesRaw = ($('#config-binding-window').val() || '').trim();
+        const enabled = $('#config-binding-enabled').is(':checked');
+        const originalName = ($('#config-binding-editing-original').val() || '').trim();
+
+        if (!configurationName) {
+            showConfigBindingMessage('Le nom de configuration est requis.', 'error');
+            return;
+        }
+        if ((scheduleType === 'oneshot' || scheduleType === 'recurring') && !scheduledAt) {
+            showConfigBindingMessage('La date planifiée est requise.', 'error');
+            return;
+        }
+        if (scheduleType === 'recurring' && (!recurrenceMinutesRaw || Number(recurrenceMinutesRaw) <= 0)) {
+            showConfigBindingMessage('La récurrence doit être > 0.', 'error');
+            return;
+        }
+
+        const payload = {
+            configuration_name: configurationName,
+            schedule_type: scheduleType,
+            window_minutes: windowMinutesRaw ? Number(windowMinutesRaw) : 30,
+            enabled: enabled
+        };
+        if (scheduledAt) {
+            const dt = new Date(scheduledAt);
+            if (!Number.isNaN(dt.getTime())) {
+                payload.scheduled_at = dt.toISOString();
+            } else {
+                payload.scheduled_at = scheduledAt;
+            }
+        }
+        if (recurrenceMinutesRaw) {
+            payload.recurrence_minutes = Number(recurrenceMinutesRaw);
+        }
+
+        const saveBinding = function() {
+            $.ajax({
+                url: `/api/v1/agents/${agentId}/configs`,
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function() {
+                    showConfigBindingMessage('Configuration sauvegardée.', 'success');
+                    resetConfigBindingForm();
+                    loadConfigBindings(agentId);
+                    $.ajax({
+                        url: `/api/v1/agents/${agentId}`,
+                        method: 'GET',
+                        dataType: 'json',
+                        success: function(agent) {
+                            state.agent = agent;
+                            renderAll();
+                        }
+                    });
+                },
+                error: function(xhr) {
+                    showConfigBindingMessage(`Erreur sauvegarde: ${xhr.responseText || xhr.status}`, 'error');
+                }
+            });
+        };
+
+        if (originalName && originalName !== configurationName) {
+            $.ajax({
+                url: `/api/v1/agents/${agentId}/configs`,
+                method: 'DELETE',
+                contentType: 'application/json',
+                data: JSON.stringify({ configuration_name: originalName }),
+                complete: saveBinding
+            });
+            return;
+        }
+
+        saveBinding();
+    });
 });

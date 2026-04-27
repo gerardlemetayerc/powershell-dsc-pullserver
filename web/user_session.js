@@ -45,6 +45,29 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 });
+// A propos
+document.addEventListener('DOMContentLoaded', function() {
+    const aboutBtn = document.getElementById('aboutBtn');
+    if (!aboutBtn) return;
+    aboutBtn.onclick = function(e) {
+        e.preventDefault();
+        fetch('/api/v1/version', { credentials: 'same-origin' })
+            .then(function(resp) {
+                if (!resp.ok) throw new Error('version unavailable');
+                return resp.json();
+            })
+            .then(function(payload) {
+                document.getElementById('about-app-version').textContent = payload.version || '-';
+                document.getElementById('about-db-version').textContent = payload.target_db_version || '-';
+                $('#aboutModal').modal('show');
+            })
+            .catch(function() {
+                document.getElementById('about-app-version').textContent = 'N/A';
+                document.getElementById('about-db-version').textContent = 'N/A';
+                $('#aboutModal').modal('show');
+            });
+    };
+});
 // Active dynamiquement le menu selon l'URL
 document.addEventListener('DOMContentLoaded', function() {
     var path = window.location.pathname;

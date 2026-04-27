@@ -51,10 +51,10 @@ CREATE INDEX IF NOT EXISTS idx_reports_agent_id ON reports(agent_id);
 CREATE TABLE IF NOT EXISTS dsc_infra_info (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     web_version TEXT DEFAULT '0.0.1',
-    db_version TEXT DEFAULT '0.0.4',
+    db_version TEXT DEFAULT '1.2.0',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-UPDATE dsc_infra_info SET db_version = '0.0.4', updated_at = CURRENT_TIMESTAMP WHERE id = 1;
+UPDATE dsc_infra_info SET db_version = '1.2.0', updated_at = CURRENT_TIMESTAMP WHERE id = 1;
 -- Schéma pour la table agents
 
 CREATE TABLE IF NOT EXISTS agents (
@@ -84,6 +84,12 @@ CREATE TABLE IF NOT EXISTS agents (
 CREATE TABLE IF NOT EXISTS agent_configurations (
     agent_id TEXT,
     configuration_name TEXT,
+    schedule_type TEXT NOT NULL DEFAULT 'none',
+    scheduled_at TIMESTAMP NULL,
+    recurrence_minutes INTEGER NULL,
+    window_minutes INTEGER NOT NULL DEFAULT 30,
+    scheduled_last_applied_at TIMESTAMP NULL,
+    enabled BOOLEAN NOT NULL DEFAULT 1,
     PRIMARY KEY (agent_id, configuration_name),
     FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
 );

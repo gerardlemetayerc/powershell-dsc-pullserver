@@ -23,6 +23,49 @@
                     <div id="agent-config-block"></div>
                 </div>
                 <hr>
+                <h3>Configuration planning</h3>
+                <div id="config-bindings-block" class="mb-3"></div>
+                <form id="config-binding-form" class="mb-3">
+                    <input type="hidden" id="config-binding-editing-original" value="">
+                    <div class="form-row">
+                        <div class="form-group col-md-4">
+                            <label for="config-binding-name">Configuration name</label>
+                            <input type="text" class="form-control" id="config-binding-name" placeholder="Nom de la configuration" required>
+                        </div>
+                        <div class="form-group col-md-2">
+                            <label for="config-binding-type">Type</label>
+                            <select class="form-control" id="config-binding-type">
+                                <option value="none">Main</option>
+                                <option value="oneshot">One-shot</option>
+                                <option value="recurring">Recurring</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="config-binding-scheduled-at">Scheduled at</label>
+                            <input type="datetime-local" class="form-control" id="config-binding-scheduled-at">
+                        </div>
+                        <div class="form-group col-md-1">
+                            <label for="config-binding-recurrence">Every (min)</label>
+                            <input type="number" min="1" class="form-control" id="config-binding-recurrence" placeholder="60">
+                        </div>
+                        <div class="form-group col-md-1">
+                            <label for="config-binding-window">Window</label>
+                            <input type="number" min="1" class="form-control" id="config-binding-window" value="30">
+                        </div>
+                        <div class="form-group col-md-1 d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <input type="checkbox" class="form-check-input" id="config-binding-enabled" checked>
+                                <label class="form-check-label" for="config-binding-enabled">Enabled</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                        <button type="button" id="config-binding-reset" class="btn btn-outline-secondary btn-sm">Reset</button>
+                    </div>
+                    <div id="config-binding-message" class="mt-2"></div>
+                </form>
+                <hr>
                 <h3>Tags</h3>
                 <div id="agent-tags-block"></div>
                 <form id="add-tag-form" class="form-inline mb-2">

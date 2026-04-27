@@ -85,11 +85,11 @@ function Add-DSCPullServerConfiguration {
     if (-not $script:DSCPullServerSession.Token) {
         throw "Vous devez d'abord appeler Connect-DSCPullServer."
     }
-    $uri = "$($script:DSCPullServerSession.ServerUrl)/api/v1/configuration_models/upload"
+    $uri = "$($script:DSCPullServerSession.ServerUrl)/api/v1/configuration_models"
     $headers = @{ Authorization = "$($script:DSCPullServerSession.AuthType) $($script:DSCPullServerSession.Token)" }
     if ($PSVersionTable.PSVersion.Major -ge 7) {
         $file = Get-Item $Path
-        $form = @{ file = $file }
+        $form = @{ mof_file = $file }
         Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Form $form
     } else {
         # Compatible Windows PowerShell 5.1 : upload multipart
@@ -99,7 +99,7 @@ function Add-DSCPullServerConfiguration {
         $fileStream = [System.IO.File]::OpenRead($Path)
         $fileName = [System.IO.Path]::GetFileName($Path)
         $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
-        $multipart.Add($fileContent, 'file', $fileName)
+        $multipart.Add($fileContent, 'mof_file', $fileName)
         foreach ($k in $headers.Keys) { $client.DefaultRequestHeaders.Add($k, $headers[$k]) }
         try {
             $response = $client.PostAsync($uri, $multipart).Result
@@ -120,14 +120,34 @@ function Add-DSCPullServerConfiguration {
 function Remove-DSCPullServerConfiguration {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)]
-        [string]$ConfigurationName
+        [Parameter(Mandatory, ParameterSetName = 'ByName')]
+        [string]$ConfigurationName,
+
+        [Parameter(Mandatory, ParameterSetName = 'ById')]
+        [long]$ConfigurationId
     )
     if (-not $script:DSCPullServerSession.Token) {
         throw "Vous devez d'abord appeler Connect-DSCPullServer."
     }
-    $uri = "$($script:DSCPullServerSession.ServerUrl)/api/v1/configuration_models/delete?name=$ConfigurationName"
     $headers = @{ Authorization = "$($script:DSCPullServerSession.AuthType) $($script:DSCPullServerSession.Token)" }
+
+    $resolvedConfigurationId = $ConfigurationId
+    if ($PSCmdlet.ParameterSetName -eq 'ByName') {
+        $configurations = Get-DSCPullServerConfiguration
+        $matchingConfigurations = @($configurations | Where-Object { $_.name -eq $ConfigurationName })
+
+        if ($matchingConfigurations.Count -eq 0) {
+            throw "Configuration introuvable: $ConfigurationName"
+        }
+
+        if ($matchingConfigurations.Count -gt 1) {
+            throw "Plusieurs configurations correspondent a '$ConfigurationName'. Utilisez -ConfigurationId."
+        }
+
+        $resolvedConfigurationId = [long]$matchingConfigurations[0].id
+    }
+
+    $uri = "$($script:DSCPullServerSession.ServerUrl)/api/v1/configuration_models?id=$resolvedConfigurationId"
     Invoke-RestMethod -Uri $uri -Method Delete -Headers $headers
 }
 

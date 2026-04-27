@@ -41,9 +41,15 @@ async function loadConfigs(agentId) {
     const configs = await res.json();
     const ul = document.getElementById('configs-list');
     ul.innerHTML = '';
-    configs.forEach(cfg => {
+    configs.forEach(item => {
+        const cfg = typeof item === 'string' ? item : (item.configuration_name || '');
+        if (!cfg) return;
         const li = document.createElement('li');
-        li.textContent = cfg + ' ';
+        if (typeof item === 'object' && item !== null && item.schedule_type && item.schedule_type !== 'none') {
+            li.textContent = `${cfg} (${item.schedule_type}) `;
+        } else {
+            li.textContent = cfg + ' ';
+        }
         const delBtn = document.createElement('button');
         delBtn.textContent = 'Supprimer';
         delBtn.onclick = async function() {
