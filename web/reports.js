@@ -1,7 +1,7 @@
 
 $(document).ready(function() {
         // Affiche le nombre total de configurations
-        $.getJSON('/api/v1/configuration_models?count=1', function(data) {
+        $.getJSON('/api/v1/configuration_models?count=1&current=1', function(data) {
             if (data && typeof data.count !== 'undefined') {
                 $('#total-configurations').text(data.count);
             }

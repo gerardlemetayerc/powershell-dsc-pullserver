@@ -178,6 +178,9 @@ func ListConfigurationModelsHandler(w http.ResponseWriter, r *http.Request) {
 		       // Support de l'option ?count=1
 		       if r.URL.Query().Get("count") == "1" {
 			       row := dbConn.QueryRow("SELECT COUNT(*) FROM configuration_model")
+				   if r.URL.Query().Get("current") == "1" {
+					   row = dbConn.QueryRow("SELECT COUNT(*) FROM configuration_model WHERE original_name = name")
+				   }
 			       var count int
 			       if err := row.Scan(&count); err != nil {
 				       w.WriteHeader(http.StatusInternalServerError)
@@ -435,18 +438,39 @@ func GetConfigurationModelDetailHandler(w http.ResponseWriter, r *http.Request) 
 
 	       // Ajout des noeuds liés à la configuration (agents)
 	       linkedNodes := []map[string]interface{}{}
-	       rows, err := dbConn.Query(`SELECT a.agent_id, a.node_name, a.state, a.last_communication FROM agents a INNER JOIN agent_configurations ac ON a.agent_id = ac.agent_id WHERE ac.configuration_name = ?`, cm.Name)
+	       rows, err := dbConn.Query(`
+			SELECT
+				a.agent_id,
+				a.node_name,
+				a.last_communication,
+				ac.last_execution_status,
+				ac.last_execution_at
+			FROM agents a
+			INNER JOIN agent_configurations ac ON a.agent_id = ac.agent_id
+			WHERE ac.configuration_name = ?
+		`, cm.Name)
 	       if err == nil {
 		       defer rows.Close()
 		       for rows.Next() {
-			       var agentID, nodeName, state, lastComm string
-			       if err := rows.Scan(&agentID, &nodeName, &state, &lastComm); err == nil {
-				       linkedNodes = append(linkedNodes, map[string]interface{}{
+			       var agentID, nodeName string
+			       var lastComm sql.NullString
+			       var lastExecutionStatus sql.NullString
+			       var lastExecutionAt sql.NullString
+			       if err := rows.Scan(&agentID, &nodeName, &lastComm, &lastExecutionStatus, &lastExecutionAt); err == nil {
+				       linkedNode := map[string]interface{}{
 					       "agent_id": agentID,
 					       "node_name": nodeName,
-					       "state": state,
-					       "last_communication": lastComm,
-				       })
+				       }
+				       if lastComm.Valid {
+					       linkedNode["last_communication"] = lastComm.String
+				       }
+				       if lastExecutionStatus.Valid {
+					       linkedNode["last_execution_status"] = lastExecutionStatus.String
+				       }
+				       if lastExecutionAt.Valid {
+					       linkedNode["last_execution_at"] = lastExecutionAt.String
+				       }
+				       linkedNodes = append(linkedNodes, linkedNode)
 			       }
 		       }
 	       }
