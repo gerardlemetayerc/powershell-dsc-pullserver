@@ -7,6 +7,7 @@ import (
 	"go-dsc-pull/internal/schema"
 	"log"
 	"net/http"
+	"time"
 )
 
 // AgentConfigsAPIHandler retourne la liste des configurations pour un agent donné
@@ -33,6 +34,7 @@ func AgentConfigsAPIHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "DB query error", http.StatusInternalServerError)
 		return
 	}
+	decorateBindingsWithNextExecution(bindings, time.Now().UTC())
 
 	w.Header().Set("Content-Type", "application/json")
 	if bindings == nil {

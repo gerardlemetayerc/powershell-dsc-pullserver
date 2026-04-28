@@ -23,6 +23,14 @@ Detailed documentation is organized into two main sections:
 - [Roles & Access](doc/webui/droits.md)
 - [Storage Modes](doc/webui/stockage.md)
 
+## Version 1.2.0 Highlights
+
+- Node-level scheduled configuration override (one-shot or recurring) with configurable tolerance window.
+- Main header "A propos" menu showing current application version.
+- Database migration scripts for upgrade from `1.1.1` to `1.2.0`:
+	- `db/migration_v1.1.1_to_v1.2.0_sqlite.sql`
+	- `db/migration_v1.1.1_to_v1.2.0_mssql.sql`
+
 ## Contribution
 To contribute, open an issue or submit a pull request. Any help to improve the documentation or code is welcome.
 # Go DSC Pull Server

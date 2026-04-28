@@ -2,7 +2,6 @@ $(function() {
     const $form = $('#saml-config-form');
     const $status = $('#saml-config-status');
 
-    // Affiche le nom du fichier sélectionné pour chaque input file
     $('#sp_key_upload').on('change', function() {
         var fileName = $(this).val().split('\\').pop();
         $(this).next('.custom-file-label').addClass('selected').text(fileName || 'Upload Private Key (.key/.pem)');

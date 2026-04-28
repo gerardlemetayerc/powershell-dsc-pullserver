@@ -7,6 +7,7 @@ import (
 	"go-dsc-pull/internal/schema"
 	"log"
 	"net/http"
+	"time"
 )
 
 // AgentByIdAPIHandler retourne les infos d'un agent donné
@@ -46,6 +47,7 @@ func AgentByIdAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	bindings, err := db.GetAgentConfigurationBindings(database, agentId)
 	if err == nil {
+		decorateBindingsWithNextExecution(bindings, time.Now().UTC())
 		a.ConfigurationBindings = bindings
 	}
 	w.Header().Set("Content-Type", "application/json")

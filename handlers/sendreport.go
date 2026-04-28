@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"strings"
@@ -11,6 +12,70 @@ import (
 	"go-dsc-pull/internal/global"
 	"go-dsc-pull/utils"
 )
+
+func extractConfigurationNameFromMap(entry map[string]interface{}) string {
+	for k, v := range entry {
+		if strings.EqualFold(k, "ConfigurationName") {
+			s := strings.TrimSpace(fmt.Sprint(v))
+			if s != "" && s != "<nil>" {
+				return s
+			}
+		}
+
+		switch vv := v.(type) {
+		case map[string]interface{}:
+			if found := extractConfigurationNameFromMap(vv); found != "" {
+				return found
+			}
+		case []interface{}:
+			for _, item := range vv {
+				if nestedMap, ok := item.(map[string]interface{}); ok {
+					if found := extractConfigurationNameFromMap(nestedMap); found != "" {
+						return found
+					}
+				}
+			}
+		case string:
+			trimmed := strings.TrimSpace(vv)
+			if trimmed == "" || !(strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[")) {
+				continue
+			}
+			var nested interface{}
+			if err := json.Unmarshal([]byte(trimmed), &nested); err != nil {
+				continue
+			}
+			switch n := nested.(type) {
+			case map[string]interface{}:
+				if found := extractConfigurationNameFromMap(n); found != "" {
+					return found
+				}
+			case []interface{}:
+				for _, item := range n {
+					if nestedMap, ok := item.(map[string]interface{}); ok {
+						if found := extractConfigurationNameFromMap(nestedMap); found != "" {
+							return found
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+func extractConfigurationNameFromStatusData(statusData []string) string {
+	for _, statusEntry := range statusData {
+		var entryMap map[string]interface{}
+		if err := json.Unmarshal([]byte(statusEntry), &entryMap); err != nil {
+			continue
+		}
+		if found := extractConfigurationNameFromMap(entryMap); found != "" {
+			return found
+		}
+	}
+	return ""
+}
 
 // SendReportHandler gère POST /PSDSCPullServer.svc/Nodes(AgentId='...')/SendReport
 func SendReportHandler(w http.ResponseWriter, r *http.Request) {
@@ -104,6 +169,18 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 				)
 				if err != nil {
 					log.Printf("[SENDREPORT] Erreur insertion rapport en base: %v", err)
+				}
+			}
+			reportedConfigurationName := extractConfigurationNameFromStatusData(report.StatusData)
+			if reportedConfigurationName != "" {
+				err = db.UpdateConfigurationExecutionStatusByName(database, agentId, reportedConfigurationName, report.Status)
+				if err != nil {
+					log.Printf("[SENDREPORT] Erreur update last_execution_status config=%s: %v", reportedConfigurationName, err)
+				}
+			} else if report.OperationType == "Initial" || mofApplied == 1 {
+				err = db.UpdateLastConfigurationExecutionStatus(database, agentId, report.Status)
+				if err != nil {
+					log.Printf("[SENDREPORT] Erreur update last_execution_status (fallback): %v", err)
 				}
 			}
 			   // Met à jour last_communication et has_error_last_report uniquement pour les rapports Initial

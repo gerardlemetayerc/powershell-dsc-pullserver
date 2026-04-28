@@ -4,6 +4,45 @@ $(function() {
         var match = window.location.pathname.match(/configuration_model\/([^\/]+)/);
         return match ? decodeURIComponent(match[1]) : null;
     }
+
+    function formatDate(value) {
+        if (!value) return '';
+        var dt = new Date(value);
+        return isNaN(dt.getTime()) ? value : dt.toLocaleString();
+    }
+
+    function renderStatusBadge(status) {
+        if (!status) return '<span class="badge badge-secondary">No run yet</span>';
+        var normalized = String(status).toLowerCase();
+        var badgeClass = 'badge-secondary';
+        if (normalized === 'success' || normalized === 'ok') {
+            badgeClass = 'badge-success';
+        } else if (normalized === 'failure' || normalized === 'failed' || normalized === 'error') {
+            badgeClass = 'badge-danger';
+        } else if (normalized === 'pending_apply' || normalized === 'getconfiguration') {
+            badgeClass = 'badge-warning';
+        }
+        return '<span class="badge ' + badgeClass + '">' + status + '</span>';
+    }
+
+    function destroyDataTable(selector) {
+        if ($.fn.DataTable.isDataTable(selector)) {
+            $(selector).DataTable().clear().destroy();
+        }
+    }
+
+    function initDetailDataTables() {
+        ['#config-version-history-table', '#config-linked-nodes-table', '#config-used-modules-table'].forEach(function(selector) {
+            if ($(selector).length) {
+                destroyDataTable(selector);
+                $(selector).DataTable({
+                    pageLength: 10,
+                    order: []
+                });
+            }
+        });
+    }
+
     var name = getNameFromUrl();
     if (!name) return;
 
@@ -11,35 +50,35 @@ $(function() {
     $.getJSON('/api/v1/configuration_models/' + encodeURIComponent(name) + '/detail', function(data) {
         var html = '';
         html += '<h3>' + data.name + '</h3>';
-        html += '<p><b>Uploaded by:</b> ' + data.uploaded_by + ' | <b>Date:</b> ' + (data.upload_date ? new Date(data.upload_date).toLocaleString() : '') + '</p>';
+        html += '<p><b>Uploaded by:</b> ' + data.uploaded_by + ' | <b>Date:</b> ' + formatDate(data.upload_date) + '</p>';
         html += '<button class="btn btn-primary" id="download-mof-btn">Download MOF</button>';
         html += '<hr><h4>Version history</h4>';
-        html += '<div style="font-family:monospace">';
-        data.versions.forEach(function(v, idx) {
-            var isCurrent = (v.name === data.name);
-            html += '<div>';
-            if(isCurrent) {
-                html += '<span style="font-weight:bold;color:#222">&bull;</span> ';
-                html += '<b>';
-            } else {
-                html += '<span style="color:#888">&#8593;</span> ';
-            }
-            html += '<a href="/web/configuration_model/' + encodeURIComponent(v.name) + '">' + v.name + '</a>';
-            if(isCurrent) html += '</b>';
-            html += ' <span style="color:#888">(' + (v.upload_date ? new Date(v.upload_date).toLocaleString() : '') + ')</span>';
-            html += '</div>';
-        });
-        html += '</div>';
+        if(data.versions && data.versions.length) {
+            html += '<div class="table-responsive"><table id="config-version-history-table" class="table table-sm table-bordered"><thead><tr><th>Name</th><th>Current</th><th>Uploaded at</th><th>Uploaded by</th></tr></thead><tbody>';
+            data.versions.forEach(function(v) {
+                var isCurrent = (v.name === data.name);
+                html += '<tr>';
+                html += '<td><a href="/web/configuration_model/' + encodeURIComponent(v.name) + '">' + v.name + '</a></td>';
+                html += '<td>' + (isCurrent ? '<span class="badge badge-primary">Current</span>' : '') + '</td>';
+                html += '<td>' + formatDate(v.upload_date) + '</td>';
+                html += '<td>' + (v.uploaded_by || '') + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+        } else {
+            html += '<p>No version history.</p>';
+        }
         // Linked nodes display
         html += '<hr><h4>Nodes linked to this configuration</h4>';
         if(data.linked_nodes && data.linked_nodes.length) {
-            html += '<div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>Agent ID</th><th>Node name</th><th>Status</th><th>Last communication</th></tr></thead><tbody>';
+            html += '<div class="table-responsive"><table id="config-linked-nodes-table" class="table table-sm table-bordered"><thead><tr><th>Agent ID</th><th>Node name</th><th>Last execution status</th><th>Last execution at</th><th>Last communication</th></tr></thead><tbody>';
             data.linked_nodes.forEach(function(n) {
                 html += '<tr>';
                 html += '<td>' + n.agent_id + '</td>';
                 html += '<td>' + (n.node_name || '') + '</td>';
-                html += '<td>' + (n.state || '') + '</td>';
-                html += '<td>' + (n.last_communication ? new Date(n.last_communication).toLocaleString() : '') + '</td>';
+                html += '<td>' + renderStatusBadge(n.last_execution_status) + '</td>';
+                html += '<td>' + formatDate(n.last_execution_at) + '</td>';
+                html += '<td>' + formatDate(n.last_communication) + '</td>';
                 html += '</tr>';
             });
             html += '</tbody></table></div>';
@@ -50,7 +89,7 @@ $(function() {
         // Used modules display
         html += '<hr><h4>Used modules</h4>';
         if(data.modules && data.modules.length) {
-            html += '<div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>Name</th><th>Required version</th><th>Available version</th></tr></thead><tbody>';
+            html += '<div class="table-responsive"><table id="config-used-modules-table" class="table table-sm table-bordered"><thead><tr><th>Name</th><th>Required version</th><th>Available version</th></tr></thead><tbody>';
             data.modules.forEach(function(m, idx) {
                 var modId = 'modver_' + idx;
                 html += '<tr>';
@@ -64,6 +103,7 @@ $(function() {
             html += '<p>No modules detected.</p>';
         }
         $('#config-detail-container').html(html);
+        initDetailDataTables();
         // MOF download with auth
         $('#download-mof-btn').on('click', function() {
             var url = '/api/v1/configuration_models/' + encodeURIComponent(data.id) + '/download';

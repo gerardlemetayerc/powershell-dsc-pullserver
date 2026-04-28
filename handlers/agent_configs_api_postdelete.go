@@ -70,6 +70,26 @@ func AgentConfigsAPIHandlerPostDelete(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			if scheduleType == "none" {
+				var mainCount int
+				err = database.QueryRow(`
+					SELECT COUNT(*)
+					FROM agent_configurations
+					WHERE agent_id = ?
+					  AND LOWER(schedule_type) = 'none'
+					  AND LOWER(configuration_name) <> LOWER(?)
+				`, agentId, req.ConfigurationName).Scan(&mainCount)
+				if err != nil {
+					log.Printf("[API][CONFIG][POST] Erreur controle unicite main agent=%s config=%s: %v", agentId, req.ConfigurationName, err)
+					http.Error(w, "Erreur verification config main", http.StatusInternalServerError)
+					return
+				}
+				if mainCount > 0 {
+					http.Error(w, "Une configuration main existe deja pour ce noeud", http.StatusConflict)
+					return
+				}
+			}
+
 			windowMinutes := 30
 			if req.WindowMinutes != nil {
 				windowMinutes = *req.WindowMinutes

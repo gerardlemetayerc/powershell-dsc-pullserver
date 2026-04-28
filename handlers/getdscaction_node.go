@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/global"
+	"go-dsc-pull/internal/scheduling"
 	"go-dsc-pull/internal/schema"
 	"io"
 	"log"
@@ -41,6 +42,9 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 	}
 	if scheduleType != "none" {
 		log.Printf("[GETDSCACTION-NODE] Configuration planifiee activee pour agent %s: %s (%s)", agentId, effectiveConfig, scheduleType)
+	}
+	if err := db.MarkConfigurationRequested(database, agentId, effectiveConfig); err != nil {
+		log.Printf("[GETDSCACTION-NODE] Erreur memorisation configuration demandee pour agent=%s config=%s: %v", agentId, effectiveConfig, err)
 	}
 
 	// Utiliser les schémas importés
@@ -105,78 +109,6 @@ func sha256SumHex(data []byte) string {
 	return strings.ToUpper(fmt.Sprintf("%X", h[:]))
 }
 
-func parseDBTime(value string) (time.Time, bool) {
-	layouts := []string{
-		time.RFC3339,
-		"2006-01-02 15:04:05",
-		"2006-01-02T15:04:05",
-		"2006-01-02 15:04",
-		"2006-01-02T15:04",
-	}
-	for _, layout := range layouts {
-		if t, err := time.Parse(layout, value); err == nil {
-			return t.UTC(), true
-		}
-	}
-	return time.Time{}, false
-}
-
-func isScheduleDue(binding schema.AgentConfigurationBinding, now time.Time) (bool, time.Time) {
-	scheduleType := strings.ToLower(strings.TrimSpace(binding.ScheduleType))
-	if scheduleType != "oneshot" && scheduleType != "recurring" {
-		return false, time.Time{}
-	}
-	if !binding.Enabled || binding.ScheduledAt == nil || *binding.ScheduledAt == "" {
-		return false, time.Time{}
-	}
-
-	startAt, ok := parseDBTime(*binding.ScheduledAt)
-	if !ok {
-		return false, time.Time{}
-	}
-
-	windowMinutes := binding.WindowMinutes
-	if windowMinutes <= 0 {
-		windowMinutes = 30
-	}
-	window := time.Duration(windowMinutes) * time.Minute
-	if now.Before(startAt) {
-		return false, time.Time{}
-	}
-
-	if scheduleType == "oneshot" {
-		if binding.ScheduledLastAppliedAt != nil && *binding.ScheduledLastAppliedAt != "" {
-			return false, time.Time{}
-		}
-		if now.After(startAt.Add(window)) {
-			return false, time.Time{}
-		}
-		return true, startAt
-	}
-
-	if binding.RecurrenceMinutes == nil || *binding.RecurrenceMinutes <= 0 {
-		return false, time.Time{}
-	}
-
-	interval := time.Duration(*binding.RecurrenceMinutes) * time.Minute
-	elapsed := now.Sub(startAt)
-	occurrenceCount := int64(elapsed / interval)
-	occurrenceStart := startAt.Add(time.Duration(occurrenceCount) * interval)
-	if now.After(occurrenceStart.Add(window)) {
-		return false, time.Time{}
-	}
-
-	if binding.ScheduledLastAppliedAt != nil && *binding.ScheduledLastAppliedAt != "" {
-		if lastApplied, ok := parseDBTime(*binding.ScheduledLastAppliedAt); ok {
-			if !lastApplied.Before(occurrenceStart) {
-				return false, time.Time{}
-			}
-		}
-	}
-
-	return true, occurrenceStart
-}
-
 func resolveEffectiveConfiguration(database *sql.DB, agentId string, now time.Time) (string, string, error) {
 	bindings, err := db.GetAgentConfigurationBindings(database, agentId)
 	if err != nil {
@@ -197,7 +129,7 @@ func resolveEffectiveConfiguration(database *sql.DB, agentId string, now time.Ti
 			primary = binding.ConfigurationName
 		}
 
-		due, occurrence := isScheduleDue(binding, now)
+		due, occurrence := scheduling.IsScheduleDue(binding, now)
 		if due {
 			if bestScheduledName == "" || occurrence.After(bestOccurrence) {
 				bestScheduledName = binding.ConfigurationName
