@@ -108,6 +108,9 @@ CREATE TABLE agent_configurations (
     recurrence_minutes INT NULL,
     window_minutes INT NOT NULL DEFAULT 30,
     scheduled_last_applied_at DATETIME NULL,
+    last_requested_at DATETIME NULL,
+    last_execution_status NVARCHAR(32) NULL,
+    last_execution_at DATETIME NULL,
     enabled BIT NOT NULL DEFAULT 1,
     PRIMARY KEY (agent_id, configuration_name),
     FOREIGN KEY (agent_id) REFERENCES agents(agent_id)

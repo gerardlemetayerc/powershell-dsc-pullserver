@@ -18,6 +18,15 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'agent_configurations' AND COLUMN_NAME = 'scheduled_last_applied_at')
         ALTER TABLE agent_configurations ADD scheduled_last_applied_at DATETIME NULL;
 
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'agent_configurations' AND COLUMN_NAME = 'last_requested_at')
+        ALTER TABLE agent_configurations ADD last_requested_at DATETIME NULL;
+
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'agent_configurations' AND COLUMN_NAME = 'last_execution_status')
+        ALTER TABLE agent_configurations ADD last_execution_status NVARCHAR(32) NULL;
+
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'agent_configurations' AND COLUMN_NAME = 'last_execution_at')
+        ALTER TABLE agent_configurations ADD last_execution_at DATETIME NULL;
+
     IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'agent_configurations' AND COLUMN_NAME = 'enabled')
         ALTER TABLE agent_configurations ADD enabled BIT NOT NULL CONSTRAINT DF_agent_configurations_enabled DEFAULT 1;
 END

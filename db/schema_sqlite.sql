@@ -89,6 +89,9 @@ CREATE TABLE IF NOT EXISTS agent_configurations (
     recurrence_minutes INTEGER NULL,
     window_minutes INTEGER NOT NULL DEFAULT 30,
     scheduled_last_applied_at TIMESTAMP NULL,
+    last_requested_at TIMESTAMP NULL,
+    last_execution_status TEXT NULL,
+    last_execution_at TIMESTAMP NULL,
     enabled BOOLEAN NOT NULL DEFAULT 1,
     PRIMARY KEY (agent_id, configuration_name),
     FOREIGN KEY (agent_id) REFERENCES agents(agent_id)
