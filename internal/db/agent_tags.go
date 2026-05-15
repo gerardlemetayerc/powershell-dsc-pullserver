@@ -23,6 +23,12 @@ func DeleteAgentTag(db *sql.DB, agentId, key, value string) error {
        return err
 }
 
+// DeleteAllAgentTags supprime tous les tags d'un agent
+func DeleteAllAgentTags(db *sql.DB, agentId string) error {
+	_, err := db.Exec(`DELETE FROM agent_tags WHERE agent_id = ?`, agentId)
+	return err
+}
+
 // GetAgentTags retourne tous les tags clé/valeurs pour un agent (clé -> tableau de valeurs)
 func GetAgentTags(db *sql.DB, agentId string) (map[string][]string, error) {
        rows, err := db.Query(`SELECT tag_key, tag_value FROM agent_tags WHERE agent_id = ?`, agentId)

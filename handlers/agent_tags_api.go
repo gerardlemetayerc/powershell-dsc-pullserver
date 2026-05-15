@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/auth"
@@ -48,7 +49,11 @@ func AgentTagsSetHandler(w http.ResponseWriter, r *http.Request) {
 		   Value string `json:"value"`
 	   }
 	   if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Key == "" || req.Value == "" {
-		   logs.WriteLogFile("AgentTagsSetHandler: Invalid key/value: " + err.Error())
+		   if err != nil {
+			   logs.WriteLogFile("AgentTagsSetHandler: Invalid key/value: " + err.Error())
+		   } else {
+			   logs.WriteLogFile("AgentTagsSetHandler: Invalid key/value: missing key or value")
+		   }
 		   http.Error(w, "Invalid key/value", http.StatusBadRequest)
 		   return
 	   }
@@ -60,16 +65,10 @@ func AgentTagsSetHandler(w http.ResponseWriter, r *http.Request) {
 	   w.WriteHeader(http.StatusNoContent)
 }
 
-// DELETE /api/v1/agents/{id}/tags : supprime une valeur précise d'un tag clé pour un agent
+// DELETE /api/v1/agents/{id}/tags : supprime une valeur précise d'un tag (key/value) ou tous les tags
 func AgentTagsDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	   agentId := r.PathValue("id")
-	   dbCfg, err := db.LoadDBConfig("config.json")
-	   if err != nil {
-		   logs.WriteLogFile("AgentTagsDeleteHandler: DB config error: " + err.Error())
-		   http.Error(w, "DB config error", http.StatusInternalServerError)
-		   return
-	   }
-	   database, err := db.OpenDB(dbCfg)
+	   database, err := db.OpenDB(&global.AppConfig.Database)
 	   if err != nil {
 		   logs.WriteLogFile("AgentTagsDeleteHandler: DB open error: " + err.Error())
 		   http.Error(w, "DB open error", http.StatusInternalServerError)
@@ -80,19 +79,41 @@ func AgentTagsDeleteHandler(w http.ResponseWriter, r *http.Request) {
 		   http.Error(w, "Forbidden: admin only", http.StatusForbidden)
 		   return
 	   }
-	   var req struct {
-		   Key   string `json:"key"`
-		   Value string `json:"value"`
+	   key := r.URL.Query().Get("key")
+	   value := r.URL.Query().Get("value")
+
+	   if key == "" || value == "" {
+		   var req struct {
+			   Key   string `json:"key"`
+			   Value string `json:"value"`
+		   }
+		   if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			   key = req.Key
+			   value = req.Value
+		   } else if err != io.EOF {
+			   logs.WriteLogFile("AgentTagsDeleteHandler: Invalid payload: " + err.Error())
+			   http.Error(w, "Invalid key/value", http.StatusBadRequest)
+			   return
+		   }
 	   }
-	   if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Key == "" || req.Value == "" {
-		   logs.WriteLogFile("AgentTagsSetHandler: Invalid key/value: " + err.Error())
-		   http.Error(w, "Invalid key/value", http.StatusBadRequest)
-		   return
+
+	   if key != "" || value != "" {
+		   if key == "" || value == "" {
+			   logs.WriteLogFile("AgentTagsDeleteHandler: Invalid key/value: missing key or value")
+			   http.Error(w, "Invalid key/value", http.StatusBadRequest)
+			   return
+		   }
+		   if err := db.DeleteAgentTag(database, agentId, key, value); err != nil {
+			   logs.WriteLogFile("AgentTagsDeleteHandler: DB delete error: " + err.Error())
+			   http.Error(w, "DB update error: "+err.Error(), http.StatusInternalServerError)
+			   return
+		   }
+	   } else {
+		   if err := db.DeleteAllAgentTags(database, agentId); err != nil {
+			   logs.WriteLogFile("AgentTagsDeleteHandler: DB delete-all error: " + err.Error())
+			   http.Error(w, "DB update error: "+err.Error(), http.StatusInternalServerError)
+			   return
+		   }
 	   }
-	if err := db.SetAgentTag(database, global.AppConfig.Database.Driver, agentId, req.Key, req.Value); err != nil {
-		logs.WriteLogFile("AgentTagsSetHandler: DB update error: " + err.Error())
-		http.Error(w, "DB update error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
 	   w.WriteHeader(http.StatusNoContent)
 }

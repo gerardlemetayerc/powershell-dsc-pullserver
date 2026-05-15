@@ -17,6 +17,7 @@ import (
 	"go-dsc-pull/internal"
 	"go-dsc-pull/internal/logs"
 	"go-dsc-pull/internal/service"
+	"go-dsc-pull/internal/buildinfo"
 	"go-dsc-pull/internal/auth"
 	"go-dsc-pull/internal/schema"
 	"go-dsc-pull/internal/global"
@@ -26,6 +27,7 @@ import (
 func main() {
 
 	   runApp := func() {
+		   logs.WriteLogFile(fmt.Sprintf("INFO [BUILD] %s", buildinfo.Short()))
 		   // Résout dynamiquement les chemins de cert/key si nécessaire
 		   resolveCertKeyPath := func(certFile, keyFile string) (string, string) {
 			   if filepath.IsAbs(certFile) && filepath.IsAbs(keyFile) {
