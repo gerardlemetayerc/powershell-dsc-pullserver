@@ -289,14 +289,7 @@ function hasMainBinding(excludeName) {
 }
 
 function isMainTypeAllowedForCurrentForm() {
-    const originalName = ($('#config-binding-editing-original').val() || '').trim();
-    if (originalName) {
-        const binding = getConfigBindingByName(originalName);
-        if (binding && (binding.schedule_type || 'none').toLowerCase() === 'none') {
-            return true;
-        }
-    }
-    return !hasMainBinding('');
+    return true;
 }
 
 function refreshConfigBindingTypeOptions() {
@@ -306,14 +299,8 @@ function refreshConfigBindingTypeOptions() {
         return;
     }
 
-    const allowMain = isMainTypeAllowedForCurrentForm();
-    $mainOption.prop('disabled', !allowMain);
-    $mainOption.text(allowMain ? 'Main' : 'Main (already used)');
-
-    const currentType = ($typeSelect.val() || 'none').toLowerCase();
-    if (!allowMain && currentType === 'none') {
-        $typeSelect.val('oneshot');
-    }
+    $mainOption.prop('disabled', false);
+    $mainOption.text('Main');
 }
 
 function resetConfigBindingForm() {
@@ -810,10 +797,6 @@ $(document).ready(function() {
         }
         if (!availableConfigurations.has(configurationName)) {
             showConfigBindingMessage('Veuillez sélectionner une configuration existante.', 'error');
-            return;
-        }
-        if (scheduleType === 'none' && !isMainTypeAllowedForCurrentForm()) {
-            showConfigBindingMessage('Une configuration Main est déjà attachée à ce noeud.', 'error');
             return;
         }
         if ((scheduleType === 'oneshot' || scheduleType === 'recurring') && !scheduledAt) {

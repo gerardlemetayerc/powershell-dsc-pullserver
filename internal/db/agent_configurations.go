@@ -99,6 +99,7 @@ func GetAgentConfigurationBindings(db *sql.DB, agentId string) ([]schema.AgentCo
 		if lastExecutionStatus.Valid {
 			v := lastExecutionStatus.String
 			b.LastExecutionStatus = &v
+			b.LastExecutionState = &v
 		}
 		if lastExecutionAt.Valid {
 			v := lastExecutionAt.String
@@ -202,4 +203,41 @@ func UpdateConfigurationExecutionStatusByName(db *sql.DB, agentId, configuration
 		  AND LOWER(configuration_name) = LOWER(?)
 	`, status, agentId, configurationName)
 	return err
+}
+
+// GetSingleEnabledConfigurationName retourne la configuration active unique d'un agent.
+// Si plusieurs configurations actives existent, unique vaut false.
+func GetSingleEnabledConfigurationName(db *sql.DB, agentId string) (name string, unique bool, err error) {
+	rows, err := db.Query(`
+		SELECT configuration_name
+		FROM agent_configurations
+		WHERE agent_id = ?
+		  AND enabled = 1
+	`, agentId)
+	if err != nil {
+		return "", false, err
+	}
+	defer rows.Close()
+
+	count := 0
+	singleName := ""
+	for rows.Next() {
+		var cfgName string
+		if scanErr := rows.Scan(&cfgName); scanErr != nil {
+			continue
+		}
+		count++
+		if count == 1 {
+			singleName = cfgName
+		}
+		if count > 1 {
+			return "", false, nil
+		}
+	}
+
+	if count == 1 {
+		return singleName, true, nil
+	}
+
+	return "", false, nil
 }

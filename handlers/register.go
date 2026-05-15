@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 	"fmt"
+	"strings"
 	utils "go-dsc-pull/utils"
 	internalutils "go-dsc-pull/internal/utils"
 	"go-dsc-pull/internal/db"
@@ -108,42 +109,83 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 				   // Only proceed with configuration insertion if agent insert/update succeeded
 				   if err == nil {
-					   // Supprimer toutes les configurations existantes pour cet agent
-					   _, err := database.Exec(`DELETE FROM agent_configurations WHERE agent_id = ?`, agentId)
-					   if err != nil {
-						   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur suppression configs existantes: %v", err))
-					   }
-					   // Insertion des nouveaux noms de configuration (compatible SQLite/MSSQL)
-					   if configNames, ok := req["ConfigurationNames"]; ok {
-						   switch vv := configNames.(type) {
-						   case []interface{}:
-							   for _, n := range vv {
-								   if s, ok := n.(string); ok {
-									   if driver == "sqlite" {
-										  logs.WriteLogFile(fmt.Sprintf("[INFO][REGISTER][DB] Insertion config (SQLite): agentId=%s, config=%s", agentId, s))
-										   _, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, s)
-										   if err != nil {
-											   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config: %v (agentId=%s, config=%s)", err, agentId, s))
-										   }
-									   } else {
-										  logs.WriteLogFile(fmt.Sprintf("[INFO][REGISTER][DB] Insertion config (MSSQL): agentId=%s, config=%s", agentId, s))
-										   _, err := database.Exec(`IF NOT EXISTS (SELECT 1 FROM agent_configurations WHERE agent_id = ? AND configuration_name = ?) INSERT INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, s, agentId, s)
-										   if err != nil {
-											   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config: %v (agentId=%s, config=%s)", err, agentId, s))
-										   }
-									   }
+					   incomingConfigs := extractConfigurationNamesFromRegisterPayload(req)
+
+					   previousMains := make([]string, 0)
+					   if driver == "sqlite" {
+						   rows, qErr := database.Query(`
+							   SELECT configuration_name
+							   FROM agent_configurations
+							   WHERE agent_id = ?
+							     AND LOWER(COALESCE(NULLIF(TRIM(schedule_type), ''), 'none')) = 'none'
+							   ORDER BY configuration_name
+						   `, agentId)
+						   if qErr == nil {
+							   for rows.Next() {
+								   var cfg string
+								   if scanErr := rows.Scan(&cfg); scanErr == nil {
+									   previousMains = append(previousMains, cfg)
 								   }
 							   }
-						   case string:
+							   rows.Close()
+						   }
+					   } else {
+						   rows, qErr := database.Query(`
+							   SELECT configuration_name
+							   FROM agent_configurations
+							   WHERE agent_id = ?
+							     AND LOWER(COALESCE(NULLIF(LTRIM(RTRIM(schedule_type)), ''), 'none')) = 'none'
+							   ORDER BY configuration_name
+						   `, agentId)
+						   if qErr == nil {
+							   for rows.Next() {
+								   var cfg string
+								   if scanErr := rows.Scan(&cfg); scanErr == nil {
+									   previousMains = append(previousMains, cfg)
+								   }
+							   }
+							   rows.Close()
+						   }
+					   }
+
+					   mainConfigs := make([]string, 0)
+					   if len(incomingConfigs) > 0 {
+						   mainConfigs = incomingConfigs
+					   } else {
+						   mainConfigs = previousMains
+					   }
+
+					   if len(incomingConfigs) == 0 {
+						   logs.WriteLogFile(fmt.Sprintf("[WARN][REGISTER][DB] Aucune ConfigurationName detectee dans le payload register pour agentId=%s", agentId))
+					   }
+
+					   if len(mainConfigs) == 0 {
+						   logs.WriteLogFile(fmt.Sprintf("[WARN][REGISTER][DB] Aucune configuration main resolue pour agentId=%s, conservation des liens existants", agentId))
+					   } else {
+						   // Reset des liens seulement quand une cible explicite est disponible.
+						   _, err := database.Exec(`DELETE FROM agent_configurations WHERE agent_id = ?`, agentId)
+						   if err != nil {
+							   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur suppression configs existantes: %v", err))
+						   }
+
+						   for _, mainConfig := range mainConfigs {
 							   if driver == "sqlite" {
-								   _, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, vv)
+								   logs.WriteLogFile(fmt.Sprintf("[INFO][REGISTER][DB] Insertion config main (SQLite): agentId=%s, config=%s", agentId, mainConfig))
+								   _, err := database.Exec(`
+									   INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name, schedule_type, enabled)
+									   VALUES (?, ?, 'none', 1)
+								   `, agentId, mainConfig)
 								   if err != nil {
-									   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config: %v (agentId=%s, config=%s)", err, agentId, vv))
+									   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config main: %v (agentId=%s, config=%s)", err, agentId, mainConfig))
 								   }
 							   } else {
-								   _, err := database.Exec(`IF NOT EXISTS (SELECT 1 FROM agent_configurations WHERE agent_id = ? AND configuration_name = ?) INSERT INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, vv, agentId, vv)
+								   logs.WriteLogFile(fmt.Sprintf("[INFO][REGISTER][DB] Insertion config main (MSSQL): agentId=%s, config=%s", agentId, mainConfig))
+								   _, err := database.Exec(`
+									   INSERT INTO agent_configurations (agent_id, configuration_name, schedule_type, enabled)
+									   VALUES (?, ?, 'none', 1)
+								   `, agentId, mainConfig)
 								   if err != nil {
-									   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config: %v (agentId=%s, config=%s)", err, agentId, vv))
+									   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config main: %v (agentId=%s, config=%s)", err, agentId, mainConfig))
 								   }
 							   }
 						   }
@@ -170,4 +212,68 @@ func randomHex(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func appendUniqueConfigName(raw string, seen map[string]bool, names *[]string) {
+	s := strings.TrimSpace(raw)
+	if s == "" || s == "<nil>" {
+		return
+	}
+	key := strings.ToLower(s)
+	if seen[key] {
+		return
+	}
+	seen[key] = true
+	*names = append(*names, s)
+}
+
+func extractConfigurationNamesFromRegisterPayload(payload map[string]interface{}) []string {
+	seen := make(map[string]bool)
+	names := make([]string, 0)
+	collectConfigurationNamesFromValue(payload, seen, &names)
+	return names
+}
+
+func collectConfigurationNamesFromValue(value interface{}, seen map[string]bool, names *[]string) {
+	switch vv := value.(type) {
+	case map[string]interface{}:
+		for k, nested := range vv {
+			trimmedKey := strings.TrimSpace(k)
+			switch {
+			case strings.EqualFold(trimmedKey, "ConfigurationNames"):
+				switch cfgs := nested.(type) {
+				case []interface{}:
+					for _, item := range cfgs {
+						if s, ok := item.(string); ok {
+							appendUniqueConfigName(s, seen, names)
+						}
+					}
+				case string:
+					appendUniqueConfigName(cfgs, seen, names)
+				}
+			case strings.EqualFold(trimmedKey, "ConfigurationName"):
+				if s, ok := nested.(string); ok {
+					appendUniqueConfigName(s, seen, names)
+				}
+			case strings.EqualFold(trimmedKey, "PartialConfigurations"):
+				if partials, ok := nested.([]interface{}); ok {
+					for _, p := range partials {
+						if pm, ok := p.(map[string]interface{}); ok {
+							if d, ok := pm["Description"].(string); ok {
+								appendUniqueConfigName(d, seen, names)
+							}
+							if cn, ok := pm["ConfigurationName"].(string); ok {
+								appendUniqueConfigName(cn, seen, names)
+							}
+						}
+					}
+				}
+			}
+			collectConfigurationNamesFromValue(nested, seen, names)
+		}
+	case []interface{}:
+		for _, item := range vv {
+			collectConfigurationNamesFromValue(item, seen, names)
+		}
+	}
 }

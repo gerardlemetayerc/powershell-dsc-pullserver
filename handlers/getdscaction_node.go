@@ -33,18 +33,20 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 	// DEBUG : afficher le body dans la réponse HTTP (en plus du log)
 	w.Header().Set("X-Debug-Client-Body", string(body))
 
-	effectiveConfig, scheduleType, err := resolveEffectiveConfiguration(database, agentId, time.Now().UTC())
+	effectiveConfigs, scheduleType, err := resolveEffectiveConfigurations(database, agentId, time.Now().UTC())
 	if err != nil {
 		log.Printf("[GETDSCACTION-NODE] Erreur resolution configuration pour agent %s: %v", agentId, err)
 	}
-	if effectiveConfig == "" {
-		effectiveConfig = agentId
+	if len(effectiveConfigs) == 0 {
+		effectiveConfigs = []string{agentId}
 	}
 	if scheduleType != "none" {
-		log.Printf("[GETDSCACTION-NODE] Configuration planifiee activee pour agent %s: %s (%s)", agentId, effectiveConfig, scheduleType)
+		log.Printf("[GETDSCACTION-NODE] Configuration planifiee activee pour agent %s: %v (%s)", agentId, effectiveConfigs, scheduleType)
 	}
-	if err := db.MarkConfigurationRequested(database, agentId, effectiveConfig); err != nil {
-		log.Printf("[GETDSCACTION-NODE] Erreur memorisation configuration demandee pour agent=%s config=%s: %v", agentId, effectiveConfig, err)
+	for _, cfg := range effectiveConfigs {
+		if err := db.MarkConfigurationRequested(database, agentId, cfg); err != nil {
+			log.Printf("[GETDSCACTION-NODE] Erreur memorisation configuration demandee pour agent=%s config=%s: %v", agentId, cfg, err)
+		}
 	}
 
 	// Utiliser les schémas importés
@@ -52,26 +54,40 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 	nodeStatus := "GetConfiguration"
 	status := "GetConfiguration"
 	if err := json.Unmarshal(body, &cBody); err == nil && len(cBody.ClientStatus) > 0 {
-		row := database.QueryRow("SELECT mof_file FROM configuration_model WHERE LOWER(name) = LOWER(?)", effectiveConfig)
-		var mofBytes []byte
-		if err := row.Scan(&mofBytes); err == nil {
-			hash := sha256SumHex(mofBytes)
-			allOk := true
-			hasComparableStatus := false
+			checksumByConfig := make(map[string]string)
 			for _, cs := range cBody.ClientStatus {
-				if strings.EqualFold(cs.ChecksumAlgorithm, "SHA-256") && cs.Checksum != "" {
-					hasComparableStatus = true
-					if !strings.EqualFold(hash, cs.Checksum) {
-						allOk = false
-						break
+				if !strings.EqualFold(cs.ChecksumAlgorithm, "SHA-256") || cs.Checksum == "" {
+					continue
+				}
+				checksumByConfig[strings.ToLower(strings.TrimSpace(cs.ConfigurationName))] = cs.Checksum
+			}
+
+			allComparableAndOk := true
+			for _, cfg := range effectiveConfigs {
+				row := database.QueryRow("SELECT mof_file FROM configuration_model WHERE LOWER(name) = LOWER(?)", cfg)
+				var mofBytes []byte
+				if err := row.Scan(&mofBytes); err == nil {
+					hash := sha256SumHex(mofBytes)
+					checksum, hasChecksum := checksumByConfig[strings.ToLower(cfg)]
+					if hasChecksum {
+						if !strings.EqualFold(hash, checksum) {
+							allComparableAndOk = false
+						}
+					} else {
+						allComparableAndOk = false
+					}
+
+					_, err = database.Exec("UPDATE configuration_model SET last_usage = CURRENT_TIMESTAMP WHERE LOWER(name) = LOWER(?)", cfg)
+					if err != nil {
+						log.Printf("[GETDSCACTION-NODE] Erreur mise a jour last_usage pour configName='%s': %v", cfg, err)
 					}
 				} else {
-					allOk = false
-					break
+					allComparableAndOk = false
+					log.Printf("[GETDSCACTION-NODE] MOF introuvable pour configName='%s': %v", cfg, err)
 				}
 			}
 
-			if hasComparableStatus && allOk {
+			if allComparableAndOk && len(effectiveConfigs) > 0 {
 				status = "OK"
 				nodeStatus = "OK"
 				_, err = database.Exec("UPDATE agents SET last_communication = CURRENT_TIMESTAMP, state = 'OK' WHERE agent_id = ?", agentId)
@@ -79,20 +95,15 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 					log.Printf("[GETDSCACTION-NODE] Erreur update last_communication state OK: %v", err)
 				}
 			}
-
-			_, err = database.Exec("UPDATE configuration_model SET last_usage = CURRENT_TIMESTAMP WHERE LOWER(name) = LOWER(?)", effectiveConfig)
-			if err != nil {
-				log.Printf("[GETDSCACTION-NODE] Erreur mise a jour last_usage pour configName='%s': %v", effectiveConfig, err)
-			}
-		} else {
-			log.Printf("[GETDSCACTION-NODE] MOF introuvable pour configName='%s': %v", effectiveConfig, err)
-		}
 	}
 
-	details := []schema.DscActionDetail{{
-		ConfigurationName: effectiveConfig,
-		Status:            status,
-	}}
+		details := make([]schema.DscActionDetail, 0, len(effectiveConfigs))
+		for _, cfg := range effectiveConfigs {
+			details = append(details, schema.DscActionDetail{
+				ConfigurationName: cfg,
+				Status:            status,
+			})
+		}
 
 	resp := schema.DscActionResponse{
 		NodeStatus: nodeStatus,
@@ -109,24 +120,24 @@ func sha256SumHex(data []byte) string {
 	return strings.ToUpper(fmt.Sprintf("%X", h[:]))
 }
 
-func resolveEffectiveConfiguration(database *sql.DB, agentId string, now time.Time) (string, string, error) {
+func resolveEffectiveConfigurations(database *sql.DB, agentId string, now time.Time) ([]string, string, error) {
 	bindings, err := db.GetAgentConfigurationBindings(database, agentId)
 	if err != nil {
-		return "", "none", err
+		return nil, "none", err
 	}
 	if len(bindings) == 0 {
-		return "", "none", nil
+		return nil, "none", nil
 	}
 
-	primary := ""
+	primaries := make([]string, 0)
 	bestScheduledName := ""
 	bestScheduledType := "none"
 	bestOccurrence := time.Time{}
 
 	for _, binding := range bindings {
 		scheduleType := strings.ToLower(strings.TrimSpace(binding.ScheduleType))
-		if scheduleType == "none" && binding.Enabled && primary == "" {
-			primary = binding.ConfigurationName
+		if scheduleType == "none" && binding.Enabled {
+			primaries = append(primaries, binding.ConfigurationName)
 		}
 
 		due, occurrence := scheduling.IsScheduleDue(binding, now)
@@ -139,17 +150,17 @@ func resolveEffectiveConfiguration(database *sql.DB, agentId string, now time.Ti
 		}
 	}
 
-	if primary == "" {
-		primary = bindings[0].ConfigurationName
-	}
-
 	if bestScheduledName != "" {
 		err := db.MarkScheduledConfigurationApplied(database, agentId, bestScheduledName, bestScheduledType == "oneshot")
 		if err != nil {
 			log.Printf("[GETDSCACTION-NODE] Erreur maj scheduled_last_applied_at pour agent=%s config=%s: %v", agentId, bestScheduledName, err)
 		}
-		return bestScheduledName, bestScheduledType, nil
+		return []string{bestScheduledName}, bestScheduledType, nil
 	}
 
-	return primary, "none", nil
+	if len(primaries) > 0 {
+		return primaries, "none", nil
+	}
+
+	return []string{bindings[0].ConfigurationName}, "none", nil
 }

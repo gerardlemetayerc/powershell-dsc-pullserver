@@ -13,26 +13,44 @@ import (
 	"go-dsc-pull/utils"
 )
 
-func extractConfigurationNameFromMap(entry map[string]interface{}) string {
+func extractFirstErrorDetails(errors []string) (string, string) {
+	for _, errorEntry := range errors {
+		var errorMap map[string]interface{}
+		if err := json.Unmarshal([]byte(errorEntry), &errorMap); err != nil {
+			continue
+		}
+		errorCode := strings.TrimSpace(fmt.Sprint(errorMap["ErrorCode"]))
+		errorMessage := strings.TrimSpace(fmt.Sprint(errorMap["ErrorMessage"]))
+		if errorCode != "" && errorCode != "<nil>" {
+			return errorCode, errorMessage
+		}
+		if errorMessage != "" && errorMessage != "<nil>" {
+			return "", errorMessage
+		}
+	}
+	return "", ""
+}
+
+func extractConfigurationNamesFromMap(entry map[string]interface{}, seen map[string]bool, names *[]string) {
 	for k, v := range entry {
 		if strings.EqualFold(k, "ConfigurationName") {
 			s := strings.TrimSpace(fmt.Sprint(v))
 			if s != "" && s != "<nil>" {
-				return s
+				key := strings.ToLower(s)
+				if !seen[key] {
+					seen[key] = true
+					*names = append(*names, s)
+				}
 			}
 		}
 
 		switch vv := v.(type) {
 		case map[string]interface{}:
-			if found := extractConfigurationNameFromMap(vv); found != "" {
-				return found
-			}
+			extractConfigurationNamesFromMap(vv, seen, names)
 		case []interface{}:
 			for _, item := range vv {
 				if nestedMap, ok := item.(map[string]interface{}); ok {
-					if found := extractConfigurationNameFromMap(nestedMap); found != "" {
-						return found
-					}
+					extractConfigurationNamesFromMap(nestedMap, seen, names)
 				}
 			}
 		case string:
@@ -46,32 +64,38 @@ func extractConfigurationNameFromMap(entry map[string]interface{}) string {
 			}
 			switch n := nested.(type) {
 			case map[string]interface{}:
-				if found := extractConfigurationNameFromMap(n); found != "" {
-					return found
-				}
+				extractConfigurationNamesFromMap(n, seen, names)
 			case []interface{}:
 				for _, item := range n {
 					if nestedMap, ok := item.(map[string]interface{}); ok {
-						if found := extractConfigurationNameFromMap(nestedMap); found != "" {
-							return found
-						}
+						extractConfigurationNamesFromMap(nestedMap, seen, names)
 					}
 				}
 			}
 		}
 	}
-
-	return ""
 }
 
-func extractConfigurationNameFromStatusData(statusData []string) string {
+func extractConfigurationNamesFromStatusData(statusData []string) []string {
+	seen := make(map[string]bool)
+	names := make([]string, 0)
 	for _, statusEntry := range statusData {
 		var entryMap map[string]interface{}
 		if err := json.Unmarshal([]byte(statusEntry), &entryMap); err != nil {
 			continue
 		}
-		if found := extractConfigurationNameFromMap(entryMap); found != "" {
-			return found
+		extractConfigurationNamesFromMap(entryMap, seen, &names)
+	}
+	return names
+}
+
+func extractConfigurationNameFromAdditionalData(additionalData []schema.DscKeyValue) string {
+	for _, item := range additionalData {
+		if strings.EqualFold(strings.TrimSpace(item.Key), "ConfigurationName") {
+			value := strings.TrimSpace(item.Value)
+			if value != "" && value != "<nil>" {
+				return value
+			}
 		}
 	}
 	return ""
@@ -95,6 +119,22 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[SENDREPORT] Erreur parsing JSON rapport: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
+	}
+
+	report.OperationType = strings.TrimSpace(report.OperationType)
+	report.Status = strings.TrimSpace(report.Status)
+
+	if report.OperationType == "" {
+		report.OperationType = "Unknown"
+	}
+
+	if report.Status == "" {
+		errorCode, errorMessage := extractFirstErrorDetails(report.Errors)
+		report.Status = "Unknown"
+		if errorCode != "" && errorCode != "0" {
+			report.Status = "Failure"
+		}
+		log.Printf("[SENDREPORT] Report incomplet recu: job_id=%s operation_type=%s status=%s error_code=%s error_message=%s", report.JobId, report.OperationType, report.Status, errorCode, errorMessage)
 	}
 
 	// Préparer les champs JSON pour la base
@@ -171,16 +211,30 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 					log.Printf("[SENDREPORT] Erreur insertion rapport en base: %v", err)
 				}
 			}
-			reportedConfigurationName := extractConfigurationNameFromStatusData(report.StatusData)
-			if reportedConfigurationName != "" {
-				err = db.UpdateConfigurationExecutionStatusByName(database, agentId, reportedConfigurationName, report.Status)
-				if err != nil {
-					log.Printf("[SENDREPORT] Erreur update last_execution_status config=%s: %v", reportedConfigurationName, err)
+			reportedConfigurationNames := extractConfigurationNamesFromStatusData(report.StatusData)
+			if len(reportedConfigurationNames) == 0 {
+				if cfgFromAdditionalData := extractConfigurationNameFromAdditionalData(report.AdditionalData); cfgFromAdditionalData != "" {
+					reportedConfigurationNames = append(reportedConfigurationNames, cfgFromAdditionalData)
+				}
+			}
+			if len(reportedConfigurationNames) > 0 {
+				for _, cfgName := range reportedConfigurationNames {
+					err = db.UpdateConfigurationExecutionStatusByName(database, agentId, cfgName, report.Status)
+					if err != nil {
+						log.Printf("[SENDREPORT] Erreur update last_execution_status config=%s: %v", cfgName, err)
+					}
 				}
 			} else if report.OperationType == "Initial" || mofApplied == 1 {
-				err = db.UpdateLastConfigurationExecutionStatus(database, agentId, report.Status)
-				if err != nil {
-					log.Printf("[SENDREPORT] Erreur update last_execution_status (fallback): %v", err)
+				singleConfigName, uniqueConfig, lookupErr := db.GetSingleEnabledConfigurationName(database, agentId)
+				if lookupErr != nil {
+					log.Printf("[SENDREPORT] Erreur lecture configuration active unique: %v", lookupErr)
+				} else if uniqueConfig {
+					err = db.UpdateConfigurationExecutionStatusByName(database, agentId, singleConfigName, report.Status)
+					if err != nil {
+						log.Printf("[SENDREPORT] Erreur update last_execution_status (fallback unique) config=%s: %v", singleConfigName, err)
+					}
+				} else {
+					log.Printf("[SENDREPORT] Fallback statut ignore: configuration cible ambigue (agent=%s, job_id=%s)", agentId, report.JobId)
 				}
 			}
 			   // Met à jour last_communication et has_error_last_report uniquement pour les rapports Initial
@@ -202,6 +256,8 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 				   }
 			   }
 			database.Close()
+		} else {
+			log.Printf("[SENDREPORT] Erreur ouverture DB: %v", err)
 		}
 	}
 

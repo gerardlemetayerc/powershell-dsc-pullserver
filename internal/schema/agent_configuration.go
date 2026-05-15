@@ -15,6 +15,7 @@ type AgentConfigurationBinding struct {
 	ScheduledLastAppliedAt *string `json:"scheduled_last_applied_at,omitempty"`
 	LastRequestedAt        *string `json:"last_requested_at,omitempty"`
 	LastExecutionStatus    *string `json:"last_execution_status,omitempty"`
+	LastExecutionState     *string `json:"last_execution_state,omitempty"`
 	LastExecutionAt        *string `json:"last_execution_at,omitempty"`
 	Enabled                bool    `json:"enabled"`
 }
