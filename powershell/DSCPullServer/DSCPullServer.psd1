@@ -11,5 +11,10 @@
     CmdletsToExport = @()
     VariablesToExport = @()
     AliasesToExport = @()
-    PrivateData = @{}
+    PrivateData = @{
+        PSData = @{
+            ProjectUri = 'https://github.com/openinfraops/powershell-dsc-pullserver'
+            LicenseUri = 'https://github.com/openinfraops/powershell-dsc-pullserver/blob/main/LICENSE'
+        }
+    }
 }
