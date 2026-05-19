@@ -1,19 +1,36 @@
 // Variable globale pour stocker l'ID de l'utilisateur
 var currentUserId = null;
 
+async function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+    }
+
+    const tempInput = document.createElement('textarea');
+    tempInput.value = text;
+    tempInput.setAttribute('readonly', '');
+    tempInput.style.position = 'absolute';
+    tempInput.style.left = '-9999px';
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    document.execCommand('copy');
+    document.body.removeChild(tempInput);
+}
+
 $(function() {
     // Récupère l'ID utilisateur depuis le JWT
-    // L'email utilisateur est récupéré via l'API /api/v1/my
+    // The user's email is retrieved via the /api/v1/my API endpoint, which returns the current user's information based on the JWT token sent in the request headers. This allows us to get the user's ID without needing to decode the JWT on the client side.
 
-    // Récupère l'ID utilisateur via /api/v1/users?email=...
+    // Retrieve the user ID via /api/v1/users?email=...
     $.get('/api/v1/my', function(user) {
         if (!user) return;
         console.log(user);
         $('#profileName').text(user.first_name + ' ' + user.last_name);
         userId = user.id;
-        currentUserId = user.id; // Stocke l'ID utilisateur dans la variable globale
+        currentUserId = user.id; // Store the user ID in the global variable
         loadTokens(user.id);
-        // Création token
+        // Create token
         $('#addTokenBtn').click(function() { $('#createTokenModal').modal('show'); });
         $('#createTokenForm').on('submit', function(e) {
             e.preventDefault();
@@ -23,19 +40,22 @@ $(function() {
                 contentType: 'application/json',
                 data: JSON.stringify({ label: $('#tokenLabel').val() }),
                 success: function(resp) {
-                    $('#tokenPlainDiv').text('Token à copier : ' + resp.token).show();
+                    $('#tokenPlainCode').text(resp.token);
+                    $('#copyTokenFeedback').text('Copy this token now. It will not be shown again.');
+                    $('#tokenPlainDiv').show();
                     $('#createTokenModal').modal('hide');
+                    $('#tokenLabel').val('');
                     loadTokens(user.id);
                 },
                 error: function() {
-                    alert('Erreur création token');
+                    alert('Error creating token');
                 }
             });
         });
     });
     function loadTokens(userId) {
         $.get('/api/v1/users/' + userId + '/tokens', function(tokens) {
-            // Utilise DataTables pour afficher les tokens
+            // Use DataTables to display tokens
             if ($.fn.DataTable.isDataTable('#apiTokensTable')) {
                 $('#apiTokensTable').DataTable().clear().rows.add(tokens).draw();
             } else {
@@ -44,31 +64,56 @@ $(function() {
                     destroy: true,
                     columns: [
                         { data: 'label', defaultContent: '' },
-                        { data: 'is_active', render: function(data) { return data ? 'Oui' : 'Non'; } },
+                        { data: 'is_active', render: function(data) { return data ? 'Yes' : 'No'; } },
                         { data: 'created_at', defaultContent: '' },
                         { data: 'revoked_at', defaultContent: '' },
                         { data: null, orderable: false, render: function(data, type, row) {
-                            return (row.is_active ? '<button class="btn btn-sm btn-warning revoke-token" data-id="' + row.id + '">Révoquer</button> ' : '') +
-                                   '<button class="btn btn-sm btn-danger delete-token" data-id="' + row.id + '">Supprimer</button>';
+                            return (row.is_active ? '<button class="btn btn-sm btn-warning revoke-token" data-id="' + row.id + '">Revoke</button> ' : '') +
+                                   '<button class="btn btn-sm btn-danger delete-token" data-id="' + row.id + '">Delete</button>';
                         }}
                     ]
                 });
             }
         });
     }
-    // Actions révoquer/supprimer
+    // Actions revoke/delete
     $('#apiTokensTable').on('click', '.revoke-token', function() {
         const id = $(this).data('id');
+        if (!window.confirm('Revoke this API token? It will stop working immediately.')) {
+            return;
+        }
         $.post('/api/v1/users/' + currentUserId + '/tokens/' + id + '/revoke', function() {
             loadTokens(currentUserId);
+        }).fail(function(xhr) {
+            alert(xhr.responseText || 'Error revoking token');
         });
     });
     $('#apiTokensTable').on('click', '.delete-token', function() {
         const id = $(this).data('id');
+        if (!window.confirm('Delete this API token permanently?')) {
+            return;
+        }
         $.ajax({
             url: '/api/v1/users/' + currentUserId + '/tokens/' + id,
             type: 'DELETE',
-            success: function() { loadTokens(currentUserId); }
+            success: function() { loadTokens(currentUserId); },
+            error: function(xhr) {
+                alert(xhr.responseText || 'Error deleting token');
+            }
         });
+    });
+
+    $('#copyTokenBtn').on('click', async function() {
+        const token = $('#tokenPlainCode').text();
+        if (!token) {
+            return;
+        }
+
+        try {
+            await copyTextToClipboard(token);
+            $('#copyTokenFeedback').text('Token copied to clipboard.');
+        } catch (error) {
+            $('#copyTokenFeedback').text('Copy failed. Select and copy the token manually.');
+        }
     });
 });

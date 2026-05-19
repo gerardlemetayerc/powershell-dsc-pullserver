@@ -1,7 +1,7 @@
 @{
     # Module manifest for module 'DSCPullServer'
     RootModule = 'DSCPullServer.psm1'
-    ModuleVersion = '0.1.0'
+    ModuleVersion = '1.0.1'
     GUID = 'b1e1e1e1-0000-4000-8000-000000000001'
     Author = 'Charles GERARD-LE METAYER'
     Copyright = '(c) 2026 Charles GERARD-LE METAYER. Tous droits réservés.'
@@ -11,5 +11,10 @@
     CmdletsToExport = @()
     VariablesToExport = @()
     AliasesToExport = @()
-    PrivateData = @{}
+    PrivateData = @{
+        PSData = @{
+            ProjectUri = 'https://github.com/openinfraops/powershell-dsc-pullserver'
+            LicenseUri = 'https://github.com/openinfraops/powershell-dsc-pullserver/blob/main/LICENSE'
+        }
+    }
 }

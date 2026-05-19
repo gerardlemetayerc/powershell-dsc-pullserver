@@ -29,6 +29,22 @@ To contribute, open an issue or submit a pull request. Any help to improve the d
 
 A secure, modular DSC Pull Server written in Go, with a REST API and PowerShell module for remote management.
 
+## Build Windows versionne
+
+Pour generer un exe Windows avec:
+- metadonnees visibles dans les Proprietes du fichier (Product Version, File Version, etc.)
+- metadonnees de build injectees dans les logs (version, commit, date)
+
+Utilisez:
+
+```powershell
+./scripts/build-windows.ps1
+```
+
+Le fichier `build/version.json` est lu automatiquement par defaut et sert de source locale de versionning et de metadonnees produit.
+
+Depuis un environnement non-Windows, vous pouvez aussi cibler Windows en definissant `GOOS=windows` et `GOARCH` avant d'executer le script (PowerShell 7 requis).
+
 ## License
 
 MIT License

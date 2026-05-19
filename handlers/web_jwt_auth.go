@@ -28,7 +28,7 @@ func WebJWTAuthMiddleware(next http.Handler) http.Handler {
 			   if err == nil {
 				   tokenStr = cookie.Value
 			   } else {
-				   fmt.Printf("[WebJWTAuthMiddleware] Pas de cookie 'token'\n")
+				   fmt.Printf("[WebJWTAuthMiddleware] Pas de cookie 'jwt_token'\n")
 			   }
 		   }
 		if tokenStr == "" {

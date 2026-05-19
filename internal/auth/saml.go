@@ -55,10 +55,12 @@ func InitSamlMiddleware(appCfg *schema.AppConfig) (*samlsp.Middleware, error) {
 		return nil, fmt.Errorf("Erreur parsing SP URL: %v", err)
 	}
 	samlOptions := samlsp.Options{
-		URL: *parsedSpURL,
-		Key: cert.PrivateKey.(crypto.Signer),
-		Certificate: cert.Leaf,
-		IDPMetadata: idpMetadata,
+		URL:            *parsedSpURL,
+		Key:            cert.PrivateKey.(crypto.Signer),
+		Certificate:    cert.Leaf,
+		IDPMetadata:    idpMetadata,
+		CookieName:     "saml_session",
+		CookieSameSite: http.SameSiteNoneMode,
 	}
 	samlMiddleware, err := samlsp.New(samlOptions)
 	if err != nil {

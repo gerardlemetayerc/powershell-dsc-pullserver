@@ -393,6 +393,7 @@ $(document).ready(function() {
             const key = $(this).data('key');
             const value = $(this).data('value');
             if (!key || !value) return;
+            if (!window.confirm(`Supprimer le tag "${key}: ${value}" ?`)) return;
             $.ajax({
                 url: `/api/v1/agents/${agentId}/tags?key=` + encodeURIComponent(key) + `&value=` + encodeURIComponent(value),
                 method: 'DELETE',

@@ -6,7 +6,7 @@ This page explains how to install and deploy the Go DSC Pull Server.
 ## Steps
 
 1. **Download the latest release:**
-   - Go to the [GitHub Releases page](https://github.com/your-org/go-dsc-pull/releases) and download the pre-built executable for your platform.
+   - Go to the [GitHub Releases page](https://github.com/openinfraops/powershell-dsc-pullserver/releases) and download the pre-built executable for your platform.
    - Extract the archive. Make sure to keep the `web/` and `templates/` directories, which are required for the web interface and are included in the release zip.
    - Place the executable and all required directories in your desired location.
 

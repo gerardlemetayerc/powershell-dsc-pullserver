@@ -46,26 +46,26 @@ window.addEventListener('userReady', function() {
             success: function(resp) {
                 $('#modal-upload-module').modal('hide');
                 table.ajax.reload();
-                alert('Module uploadé avec succès !');
+                alert('Module uploaded successfully!');
             },
             error: function(xhr) {
-                alert('Erreur upload: ' + xhr.responseText);
+                alert('Error uploading module: ' + xhr.responseText);
             }
         });
     });
-    // Suppression module avec confirmation
+    // Delete module with confirmation
     $('#modules-table').on('click', '.btn-delete-module', function() {
         var id = $(this).data('id');
-        if (confirm('Voulez-vous vraiment supprimer ce module ?')) {
+        if (confirm('Do you really want to delete this module?')) {
             $.ajax({
                 url: '/api/v1/modules/delete?id=' + id,
                 type: 'DELETE',
                 success: function(resp) {
                     table.ajax.reload();
-                    alert('Module supprimé !');
+                    alert('Module deleted!');
                 },
                 error: function(xhr) {
-                    alert('Erreur suppression: ' + xhr.responseText);
+                    alert('Error deleting module: ' + xhr.responseText);
                 }
             });
         }

@@ -138,16 +138,26 @@ function Get-DSCPullServerAgent {
     [CmdletBinding()]
     param(
         [string]$NodeName,
-        [bool]$HasErrorLastReport
+        [Nullable[bool]]$HasErrorLastReport,
+        [string[]]$Tag
     )
     if (-not $script:DSCPullServerSession.Token) {
             throw "Vous devez d'abord appeler Connect-DSCPullServer."
     }
-    $params = @{}
-    if ($NodeName) { $params['node_name'] = $NodeName }
-    if ($HasErrorLastReport -eq $true) { $params['has_error_last_report'] = 'true' }
-    elseif ($HasErrorLastReport -eq $false) { $params['has_error_last_report'] = 'false' }
-    $queryString = ($params.GetEnumerator() | ForEach-Object {"$($_.Key)=$($_.Value)"}) -join "&"
+    $queryParts = @()
+    if ($NodeName) {
+        $queryParts += "node_name=$([System.Uri]::EscapeDataString($NodeName))"
+    }
+    if ($PSBoundParameters.ContainsKey('HasErrorLastReport')) {
+        $queryParts += "has_error_last_report=$($HasErrorLastReport.ToString().ToLowerInvariant())"
+    }
+    foreach ($rawTag in $Tag) {
+        if ([string]::IsNullOrWhiteSpace($rawTag) -or -not ($rawTag -match '^[^:]+:.+')) {
+            throw "Le parametre -Tag doit etre au format key:value."
+        }
+        $queryParts += "tag=$([System.Uri]::EscapeDataString($rawTag))"
+    }
+    $queryString = $queryParts -join "&"
     if ($queryString) {
         $uri = "$($script:DSCPullServerSession.ServerUrl)/api/v1/agents?$queryString"
     } else {

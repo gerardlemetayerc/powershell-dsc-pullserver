@@ -2,8 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
-	"net/http"
 	"log"
+	"net/http"
+	"strings"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/global"
 	"go-dsc-pull/internal/schema"
@@ -47,6 +48,15 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 		       } else if hasError == "false" {
 			       q += " AND has_error_last_report = 0"
 		       }
+		       for _, rawTag := range r.URL.Query()["tag"] {
+			       tagKey, tagValue, found := strings.Cut(rawTag, ":")
+			       if !found || tagKey == "" || tagValue == "" {
+				       http.Error(w, "Invalid tag filter, expected tag=key:value", http.StatusBadRequest)
+				       return
+			       }
+			       q += " AND EXISTS (SELECT 1 FROM agent_tags at WHERE at.agent_id = agents.agent_id AND at.tag_key = ? AND at.tag_value = ?)"
+			       args = append(args, tagKey, tagValue)
+		       }
 		       rows, err := database.Query(q, args...)
 		       if err != nil {
 			       http.Error(w, "DB query error", http.StatusInternalServerError)
@@ -85,6 +95,10 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 						   a.LastCommunication = empty
 					   }
 					   a.HasErrorLastReport = hasErrorBool
+					   tags, tagErr := db.GetAgentTags(database, a.AgentId)
+					   if tagErr == nil && len(tags) > 0 {
+						   a.Tags = tags
+					   }
 					   a.State = state
 					   agents = append(agents, a)
 				   } else {

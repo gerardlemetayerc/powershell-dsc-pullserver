@@ -11,6 +11,7 @@ import (
 	"time"
 	"strconv"
 	"github.com/golang-jwt/jwt/v5"
+	samlsp "github.com/crewjam/saml/samlsp"
 	internaldb "go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
 )
@@ -97,7 +98,17 @@ func CreateUserAPITokenHandler(db *sql.DB) http.HandlerFunc {
 func RevokeUserAPITokenHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tokenId := r.PathValue("tokenid")
-		_, err := db.Exec("UPDATE user_api_tokens SET is_active=0, revoked_at=? WHERE id=?", time.Now().Format("2006-01-02 15:04:05"), tokenId)
+		driver := "sqlite"
+		if global.AppConfig != nil && global.AppConfig.Database.Driver != "" {
+			driver = global.AppConfig.Database.Driver
+		}
+
+		var err error
+		if driver == "mssql" || driver == "sqlserver" {
+			_, err = db.Exec("UPDATE user_api_tokens SET is_active=0, revoked_at=CURRENT_TIMESTAMP WHERE id=?", tokenId)
+		} else {
+			_, err = db.Exec("UPDATE user_api_tokens SET is_active=0, revoked_at=? WHERE id=?", time.Now(), tokenId)
+		}
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -180,16 +191,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Token error", http.StatusInternalServerError)
 			return
 		}
-		   // Place le JWT dans un cookie HttpOnly/Secure/SameSite
-		   http.SetCookie(w, &http.Cookie{
-			   Name:     "jwt_token",
-			   Value:    signed,
-			   Path:     "/",
-			   HttpOnly: true,
-			   Secure:   true, // à adapter si tu testes en HTTP
-			   SameSite: http.SameSiteStrictMode,
-			   Expires:  time.Unix(expiresAt, 0),
-		   })
+		setJWTCookie(w, signed, time.Unix(expiresAt, 0))
 		   w.Header().Set("Content-Type", "application/json")
 		   json.NewEncoder(w).Encode(map[string]interface{}{"expires_at": expiresAt})
 	}
@@ -415,18 +417,14 @@ func ChangeUserPasswordHandler(db *sql.DB) http.HandlerFunc {
 }
 
 // Handler de logout : supprime le cookie JWT côté serveur
-func LogoutHandler() http.HandlerFunc {
+func LogoutHandler(samlMiddleware *samlsp.Middleware) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "jwt_token",
-			Value:    "",
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   true, // à adapter si tu testes en HTTP
-			SameSite: http.SameSiteStrictMode,
-			MaxAge:   0,
-			Expires:  time.Unix(0, 0),
-		})
+		clearJWTCookie(w)
+		if samlMiddleware != nil && samlMiddleware.Session != nil {
+			if err := samlMiddleware.Session.DeleteSession(w, r); err != nil {
+				log.Printf("[LOGOUT] Failed to delete SAML session: %v", err)
+			}
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

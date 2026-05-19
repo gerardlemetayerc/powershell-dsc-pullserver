@@ -19,9 +19,22 @@ jobs:
         with:
           go-version: '1.25.5'
 
-      - name: Build executable
+      - name: Sync version.json from tag
+        shell: pwsh
         run: |
-          go build -o DSC-Admin-Console.exe
+          $tagVersion = "${{ github.ref_name }}".TrimStart('v', 'V')
+          $jsonPath = "build/version.json"
+          $cfg = Get-Content -Raw -Path $jsonPath | ConvertFrom-Json
+          $cfg.version = $tagVersion
+          $json = $cfg | ConvertTo-Json -Depth 8
+          $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+          [System.IO.File]::WriteAllText($jsonPath, $json, $utf8NoBom)
+          Write-Host "version.json synced to tag version: $tagVersion"
+
+      - name: Build executable
+        shell: pwsh
+        run: |
+          ./scripts/build-windows.ps1 -Output "DSC-Admin-Console.exe" -CommitOverride "${{ github.sha }}"
 
       - name: Prepare release folder
         run: |

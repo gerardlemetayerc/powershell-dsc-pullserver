@@ -45,9 +45,9 @@ async function loadConfigs(agentId) {
         const li = document.createElement('li');
         li.textContent = cfg + ' ';
         const delBtn = document.createElement('button');
-        delBtn.textContent = 'Supprimer';
+        delBtn.textContent = 'Delete';
         delBtn.onclick = async function() {
-            if(confirm('Supprimer la configuration "' + cfg + '" ?')) {
+            if(confirm('Delete the configuration "' + cfg + '" ?')) {
                 await fetch(`/api/v1/agents/${agentId}/configs`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
@@ -59,7 +59,7 @@ async function loadConfigs(agentId) {
         li.appendChild(delBtn);
         ul.appendChild(li);
     });
-// Ajout de configuration
+// Add configuration
 document.getElementById('add-config-form').onsubmit = async function(e) {
     e.preventDefault();
     const agentId = document.getElementById('selected-agent-id').textContent;
