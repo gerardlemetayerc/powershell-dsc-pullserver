@@ -44,6 +44,10 @@ func AgentByIdAPIHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		a.Configurations = configs
 	}
+	tags, err := db.GetAgentTags(database, agentId)
+	if err == nil && len(tags) > 0 {
+		a.Tags = tags
+	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(a)
 }

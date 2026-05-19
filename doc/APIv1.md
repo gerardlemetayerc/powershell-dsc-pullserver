@@ -80,12 +80,20 @@ Both JWT and API tokens grant access to the API according to the user's permissi
 
 ### GET `/api/v1/agents`
 - List all agents.
+- Query params supported:
+	- `count=1`: return only the total count.
+	- `node_name=<name>`: filter by exact node name.
+	- `has_error_last_report=true|false`: filter by last report error status.
+	- `tag=key:value`: filter by tag.
+	- Repeat `tag` multiple times to require all tags with `AND` semantics, for example: `/api/v1/agents?tag=env:prod&tag=role:web`.
+- Response objects may include `tags`, returned as a map of tag keys to arrays of values.
 
 ### POST `/api/v1/agents/preenroll`
 - Pre-enroll an agent.
 
 ### GET `/api/v1/agents/{id}`
 - Get agent details.
+- Response may include `tags`, returned as a map of tag keys to arrays of values.
 
 ### GET `/api/v1/agents/{id}/configs`
 - List configs assigned to the agent.

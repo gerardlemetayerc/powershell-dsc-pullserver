@@ -14,5 +14,6 @@ type Agent struct {
 	LastCommunication      string   `json:"last_communication"`
 	HasErrorLastReport     bool     `json:"has_error_last_report"`
 	Configurations         []string `json:"configurations,omitempty"`
+	Tags                   map[string][]string `json:"tags,omitempty"`
 	State                  *string  `json:"state,omitempty"`
 }
