@@ -2,7 +2,9 @@ package auth
 
 import (
 	"database/sql"
+	"fmt"
 	"go-dsc-pull/internal/db"
+	"go-dsc-pull/internal/global"
 	"net/http"
 	"strings"
 	"github.com/golang-jwt/jwt/v5"
@@ -34,8 +36,19 @@ func IsAdmin(r *http.Request, dbConn *sql.DB) bool {
 		   }
 	   }
 
-	   token, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
-	   if err != nil {
+	appCfg := global.AppConfig
+	if appCfg == nil {
+		return false
+	}
+	secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
+
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return secret, nil
+	})
+	if err != nil || !token.Valid {
 		   return false
 	   }
 	   claims, ok := token.Claims.(jwt.MapClaims)

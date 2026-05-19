@@ -5,11 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"strings"
-	"fmt"
 )
 
 // ValidateDSCRegistrationKey vérifie la signature DSC Authorization selon la spec
-// Retourne true si la signature est valide, false sinon, et un message de log détaillé
+// Retourne true si la signature est valide, false sinon, et un motif d'erreur non sensible
 func ValidateDSCRegistrationKey(body []byte, xmsDate, authHeader, registrationKeyPlain string) (bool, string) {
 	registrationKey := []byte(registrationKeyPlain)
 	// Step 1: SHA256 hash of body
@@ -23,16 +22,7 @@ func ValidateDSCRegistrationKey(body []byte, xmsDate, authHeader, registrationKe
 	expectedSig := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	receivedSig := strings.TrimPrefix(authHeader, "Shared ")
 	if !hmac.Equal([]byte(receivedSig), []byte(expectedSig)) {
-		logMsg := fmt.Sprintf("[REGISTER][AUTH] Contrôle signature (DSC formula):\n  RegistrationKey (plain): %s\n  RegistrationKey (base64): %s\n  x-ms-date: %s\n  Body hash (base64): %s\n  StringToSign: %s\n  Signature attendue: %s\n  Signature reçue:   %s",
-			registrationKeyPlain,
-			base64.StdEncoding.EncodeToString([]byte(registrationKeyPlain)),
-			xmsDate,
-			bodyHashB64,
-			stringToSign,
-			expectedSig,
-			authHeader,
-		)
-		return false, logMsg
+		return false, "[REGISTER][AUTH] invalid DSC registration signature"
 	}
 	return true, ""
 }
