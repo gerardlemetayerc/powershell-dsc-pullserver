@@ -11,6 +11,7 @@ import (
 	"time"
 	"strconv"
 	"github.com/golang-jwt/jwt/v5"
+	samlsp "github.com/crewjam/saml/samlsp"
 	internaldb "go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/schema"
 )
@@ -416,9 +417,14 @@ func ChangeUserPasswordHandler(db *sql.DB) http.HandlerFunc {
 }
 
 // Handler de logout : supprime le cookie JWT côté serveur
-func LogoutHandler() http.HandlerFunc {
+func LogoutHandler(samlMiddleware *samlsp.Middleware) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		clearJWTCookie(w)
+		if samlMiddleware != nil && samlMiddleware.Session != nil {
+			if err := samlMiddleware.Session.DeleteSession(w, r); err != nil {
+				log.Printf("[LOGOUT] Failed to delete SAML session: %v", err)
+			}
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

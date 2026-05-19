@@ -3,7 +3,6 @@ package handlers
 import (
 	"net/http"
 	"log"
-	"fmt"
 	"time"
 	"database/sql"
 	"go-dsc-pull/internal/db"
@@ -123,16 +122,7 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 		http.Error(w, "Erreur JWT", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(w, `<!DOCTYPE html><html lang='fr'><head><meta charset='UTF-8'><title>Connexion SAML...</title></head><body>Connexion en cours...<script>
-try {
-  localStorage.setItem('jwt_token', %q);
-  localStorage.setItem('jwt_exp', %q);
-  document.cookie = 'jwt_token=' + %q + '; path=/; SameSite=Lax';
-  window.location.replace('/web');
-} catch(e) {
-  window.location.replace('/web/login');
-}
-</script></body></html>`, signed, fmt.Sprintf("%d", expiresAt), signed)
+	setJWTCookie(w, signed, time.Unix(expiresAt, 0))
+	http.Redirect(w, r, "/web", http.StatusFound)
 	}
 }

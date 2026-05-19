@@ -60,6 +60,11 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 		panic("Failed to get executable path: " + err.Error())
 	}
 	baseDir := filepath.Dir(exeDir)
+	var samlSPMiddleware *samlsp.Middleware
+	if smw, ok := samlMiddleware.(*samlsp.Middleware); ok {
+		samlSPMiddleware = smw
+	}
+	mux.Handle("GET /api/v1/about", jwtAuthMiddleware(http.HandlerFunc(handlers.AboutAPIHandler(dbConn))))
 	mux.Handle("GET /api/v1/my", jwtAuthMiddleware(http.HandlerFunc(handlers.MyUserInfoHandler(dbConn))))
 	mux.Handle("/web/profile", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.ProfileHandler)))
 	// API tokens utilisateur
@@ -103,7 +108,7 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("PUT /api/v1/configuration_models/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.UpdateConfigurationModelHandler)))
 	mux.Handle("DELETE /api/v1/configuration_models", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteConfigurationModelHandler)))
 	mux.Handle("POST /api/v1/login", handlers.LoginHandler(dbConn))
-	mux.Handle("POST /api/v1/logout", handlers.LogoutHandler())
+	mux.Handle("POST /api/v1/logout", handlers.LogoutHandler(samlSPMiddleware))
 	mux.HandleFunc("/web/login", WebLoginHandler)
 	if smw, ok := samlMiddleware.(*samlsp.Middleware); ok {
 		mux.Handle("/web/login/saml", smw.RequireAccount(handlers.SAMLLoginHandler(dbConn)))
