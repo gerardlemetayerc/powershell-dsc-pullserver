@@ -41,7 +41,7 @@ $(document).ready(function() {
         });
 
         $(document).on('click', '.delete-btn', function() {
-            if(confirm('Supprimer cette propriété ?')) {
+            if(confirm('Delete this property?')) {
                 var id = $(this).data('id');
                 $.ajax({
                     url: '/api/v1/properties/' + id,

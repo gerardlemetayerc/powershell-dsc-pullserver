@@ -31,7 +31,7 @@ $(function() {
 
     // Actions
     $('#users-table').on('click', '.delete-user', function() {
-        if(confirm('Supprimer cet utilisateur ?')) {
+        if(confirm('Delete this user ?')) {
             $.ajax({
                 url: '/api/v1/users/' + $(this).data('id'),
                 type: 'DELETE',
