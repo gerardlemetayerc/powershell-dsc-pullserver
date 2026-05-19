@@ -6,12 +6,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"go-dsc-pull/internal/global"
 	"fmt"
-	"os"
 )
-
-func StatFile(path string) (os.FileInfo, error) {
-	return os.Stat(path)
-}
 
 
 // WebJWTAuthMiddleware protège les routes web en vérifiant le cookie 'token' (JWT)

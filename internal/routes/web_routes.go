@@ -2,11 +2,14 @@ package routes
 
 import (
 	"net/http"
+	"os"
 	"database/sql"
 	"go-dsc-pull/handlers"
 	"go-dsc-pull/internal/middleware"
 	"go-dsc-pull/internal/auth"
+	"path"
 	"path/filepath"
+	"strings"
 	"go-dsc-pull/utils"
 	samlsp "github.com/crewjam/saml/samlsp"
 	"html/template"
@@ -121,13 +124,25 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("/web", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)))
 	// Custom static file handler to prevent directory listing under /web/
 	mux.Handle("/web/", http.StripPrefix("/web/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		   path := r.URL.Path
-		   if path == "" || path == "/" {
+		   requestedPath := r.URL.Path
+		   if requestedPath == "" || requestedPath == "/" {
 			   handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)).ServeHTTP(w, r)
 			   return
 		   }
-		   fullPath := filepath.Join(baseDir, "web", path)
-		   info, err := handlers.StatFile(fullPath)
+		   webRoot := filepath.Join(baseDir, "web")
+		   cleanPath := path.Clean("/" + requestedPath)
+		   relativePath := strings.TrimPrefix(cleanPath, "/")
+		   if relativePath == "" || relativePath == "." {
+			   handlers.NotFoundHandler(w, r)
+			   return
+		   }
+		   fullPath := filepath.Join(webRoot, filepath.FromSlash(relativePath))
+		   relPath, err := filepath.Rel(webRoot, fullPath)
+		   if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || filepath.IsAbs(relPath) {
+			   handlers.NotFoundHandler(w, r)
+			   return
+		   }
+		   info, err := os.Stat(fullPath)
 		   if err != nil || info.IsDir() {
 			   handlers.NotFoundHandler(w, r)
 			   return
