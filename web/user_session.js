@@ -1,6 +1,13 @@
 // web/user_session.js
 // Gère l'affichage du menu utilisateur, la récupération du rôle, la déconnexion et l'activation du menu selon l'URL
 
+function clearLegacyBrowserAuthState() {
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('jwt_exp');
+    document.cookie = 'jwt_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+}
+
 // Affiche le nom d'utilisateur et le menu admin selon l'API /api/v1/my (JWT via cookie)
 document.addEventListener('DOMContentLoaded', function() {
     fetch('/api/v1/my', { credentials: 'same-origin' })
@@ -40,10 +47,40 @@ document.addEventListener('DOMContentLoaded', function() {
             // Appelle le backend pour supprimer le cookie JWT (HttpOnly)
             fetch('/api/v1/logout', { method: 'POST', credentials: 'same-origin' })
                 .finally(function() {
+                    clearLegacyBrowserAuthState();
                     window.location.href = '/web/login';
                 });
         };
     }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const aboutMenuItem = document.getElementById('aboutMenuItem');
+    if (!aboutMenuItem) {
+        return;
+    }
+
+    aboutMenuItem.addEventListener('click', function(event) {
+        event.preventDefault();
+
+        fetch('/api/v1/about', { credentials: 'same-origin' })
+            .then(function(resp) {
+                if (!resp.ok) {
+                    throw new Error('about fetch failed');
+                }
+                return resp.json();
+            })
+            .then(function(info) {
+                document.getElementById('aboutBuildVersion').textContent = info.build_version || '-';
+                document.getElementById('aboutDbVersion').textContent = info.db_version || '-';
+                $('#aboutModal').modal('show');
+            })
+            .catch(function() {
+                document.getElementById('aboutBuildVersion').textContent = 'Unavailable';
+                document.getElementById('aboutDbVersion').textContent = 'Unavailable';
+                $('#aboutModal').modal('show');
+            });
+    });
 });
 // Active dynamiquement le menu selon l'URL
 document.addEventListener('DOMContentLoaded', function() {

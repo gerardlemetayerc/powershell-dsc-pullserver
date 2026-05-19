@@ -79,16 +79,27 @@ $(function() {
     // Actions revoke/delete
     $('#apiTokensTable').on('click', '.revoke-token', function() {
         const id = $(this).data('id');
+        if (!window.confirm('Revoke this API token? It will stop working immediately.')) {
+            return;
+        }
         $.post('/api/v1/users/' + currentUserId + '/tokens/' + id + '/revoke', function() {
             loadTokens(currentUserId);
+        }).fail(function(xhr) {
+            alert(xhr.responseText || 'Error revoking token');
         });
     });
     $('#apiTokensTable').on('click', '.delete-token', function() {
         const id = $(this).data('id');
+        if (!window.confirm('Delete this API token permanently?')) {
+            return;
+        }
         $.ajax({
             url: '/api/v1/users/' + currentUserId + '/tokens/' + id,
             type: 'DELETE',
-            success: function() { loadTokens(currentUserId); }
+            success: function() { loadTokens(currentUserId); },
+            error: function(xhr) {
+                alert(xhr.responseText || 'Error deleting token');
+            }
         });
     });
 

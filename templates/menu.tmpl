@@ -6,6 +6,15 @@
         </li>
     </ul>
     <ul class="navbar-nav ml-auto">
+        <li class="nav-item dropdown mr-2">
+            <a class="nav-link d-flex align-items-center justify-content-center border rounded-circle" data-toggle="dropdown" href="#" id="aboutDropdown" style="width:34px;height:34px;padding:0;">
+                <i class="fas fa-question"></i>
+            </a>
+            <div class="dropdown-menu dropdown-menu-right">
+                <a class="dropdown-item" href="#" id="aboutMenuItem"><i class="fas fa-info-circle mr-2"></i>About</a>
+                <a class="dropdown-item" href="https://github.com/openinfraops/powershell-dsc-pullserver/issues" target="_blank" rel="noopener noreferrer"><i class="fas fa-life-ring mr-2"></i>Support</a>
+            </div>
+        </li>
         <li class="nav-item dropdown">
             <a class="nav-link" data-toggle="dropdown" href="#" id="userDropdown">
                 <i class="fas fa-user-circle"></i> <span id="userName">Utilisateur</span>
@@ -17,6 +26,27 @@
         </li>
     </ul>
 </nav>
+
+<div class="modal fade" id="aboutModal" tabindex="-1" role="dialog" aria-labelledby="aboutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="aboutModalLabel">About</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <dl class="mb-0">
+                    <dt>Build version</dt>
+                    <dd id="aboutBuildVersion">-</dd>
+                    <dt>DB version</dt>
+                    <dd id="aboutDbVersion">-</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
 <script src="/web/user_session.js"></script>
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
     <a href="/web" class="brand-link">
