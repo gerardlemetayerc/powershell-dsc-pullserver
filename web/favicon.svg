@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title>DSC Admin Console</title>
+  <desc>Favicon inspired by PowerShell DSC and an admin console.</desc>
+  <defs>
+    <linearGradient id="bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f4fa8"/>
+      <stop offset="1" stop-color="#06234c"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="18" y1="14" x2="46" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e8f3ff"/>
+      <stop offset="1" stop-color="#9fd0ff"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#bg)"/>
+  <rect x="12" y="12" width="40" height="30" rx="5" fill="#08172f" stroke="#7dc3ff" stroke-width="2"/>
+  <rect x="15" y="15" width="34" height="24" rx="3" fill="url(#screen)"/>
+
+  <path d="M22 20 L30 26 L22 32" fill="none" stroke="#0d3f7a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M32 32 H42" fill="none" stroke="#0d3f7a" stroke-width="3.2" stroke-linecap="round"/>
+
+  <circle cx="18" cy="48" r="4" fill="#9fd0ff" stroke="#e8f3ff" stroke-width="1.6"/>
+  <circle cx="32" cy="48" r="4" fill="#9fd0ff" stroke="#e8f3ff" stroke-width="1.6"/>
+  <circle cx="46" cy="48" r="4" fill="#9fd0ff" stroke="#e8f3ff" stroke-width="1.6"/>
+  <path d="M22 48 H28" stroke="#9fd0ff" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M36 48 H42" stroke="#9fd0ff" stroke-width="2.6" stroke-linecap="round"/>
+
+  <rect x="26" y="42" width="12" height="4" rx="1.5" fill="#7dc3ff" opacity="0.85"/>
+  <rect x="22" y="54" width="20" height="3" rx="1.5" fill="#7dc3ff" opacity="0.75"/>
+</svg>

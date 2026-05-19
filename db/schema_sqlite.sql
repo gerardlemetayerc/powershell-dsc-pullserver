@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS dsc_infra_info (
     db_version TEXT DEFAULT '0.0.4',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+INSERT OR IGNORE INTO dsc_infra_info (id, web_version, db_version, updated_at) VALUES (1, '0.0.1', '0.0.4', CURRENT_TIMESTAMP);
 UPDATE dsc_infra_info SET db_version = '0.0.4', updated_at = CURRENT_TIMESTAMP WHERE id = 1;
 -- Schéma pour la table agents
 
