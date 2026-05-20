@@ -7,7 +7,7 @@ require (
 	github.com/denisenkom/go-mssqldb v0.12.3
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	golang.org/x/crypto v0.47.0
-	golang.org/x/sys v0.40.0
+	golang.org/x/sys v0.44.0
 	modernc.org/sqlite v1.40.1
 )
 
