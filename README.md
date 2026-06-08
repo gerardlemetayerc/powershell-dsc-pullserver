@@ -48,3 +48,9 @@ Depuis un environnement non-Windows, vous pouvez aussi cibler Windows en definis
 ## License
 
 MIT License
+
+## Release Notes (v1.1.3)
+
+- Added scheduling controls for periodic GitHub latest-release checks (`enable_release_check`, `release_check_interval_mins`).
+- Added persistence of release-check results in infrastructure metadata (`latest_release`, `latest_release_url`, `update_available`, `release_check_ok`, `release_checked_at`).
+- Added API/UI support to configure and surface release-check state from the scheduler and about endpoints.
