@@ -9,6 +9,9 @@ type HTTPConfig struct {
 	BypassCAValidation bool `json:"bypass_ca_validation"`
 	RegistrationKey string `json:"registrationKey"`
 	SharedAccessSecret string `json:"shared_secret"`
+	EnableReportAutoCleanup bool `json:"enable_report_auto_cleanup"`
+	ReportRetentionDays int `json:"report_retention_days"`
+	ReportCleanupIntervalMins int `json:"report_cleanup_interval_mins"`
 }
 
 type AppConfig struct {
