@@ -106,44 +106,43 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 						  }
 				   }
 
-				   // Only proceed with configuration insertion if agent insert/update succeeded
+				   // Only replace config links when registration payload actually contains ConfigurationNames.
 				   if err == nil {
-					   // Supprimer toutes les configurations existantes pour cet agent
-					   _, err := database.Exec(`DELETE FROM agent_configurations WHERE agent_id = ?`, agentId)
-					   if err != nil {
-						   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur suppression configs existantes: %v", err))
-					   }
-					   // Insertion des nouveaux noms de configuration (compatible SQLite/MSSQL)
+					   extractedConfigNames := []string{}
 					   if configNames, ok := req["ConfigurationNames"]; ok {
 						   switch vv := configNames.(type) {
 						   case []interface{}:
 							   for _, n := range vv {
-								   if s, ok := n.(string); ok {
-									   if driver == "sqlite" {
-										  logs.WriteLogFile(fmt.Sprintf("[INFO][REGISTER][DB] Insertion config (SQLite): agentId=%s, config=%s", agentId, s))
-										   _, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, s)
-										   if err != nil {
-											   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config: %v (agentId=%s, config=%s)", err, agentId, s))
-										   }
-									   } else {
-										  logs.WriteLogFile(fmt.Sprintf("[INFO][REGISTER][DB] Insertion config (MSSQL): agentId=%s, config=%s", agentId, s))
-										   _, err := database.Exec(`IF NOT EXISTS (SELECT 1 FROM agent_configurations WHERE agent_id = ? AND configuration_name = ?) INSERT INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, s, agentId, s)
-										   if err != nil {
-											   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config: %v (agentId=%s, config=%s)", err, agentId, s))
-										   }
-									   }
+								   if s, ok := n.(string); ok && s != "" {
+									   extractedConfigNames = append(extractedConfigNames, s)
 								   }
 							   }
 						   case string:
+							   if vv != "" {
+								   extractedConfigNames = append(extractedConfigNames, vv)
+							   }
+						   }
+					   }
+
+					   if len(extractedConfigNames) == 0 {
+						   logs.WriteLogFile(fmt.Sprintf("[INFO][REGISTER][DB] Aucun ConfigurationNames fourni, conservation des liens existants pour agentId=%s", agentId))
+					   } else {
+						   _, err := database.Exec(`DELETE FROM agent_configurations WHERE agent_id = ?`, agentId)
+						   if err != nil {
+							   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur suppression configs existantes: %v", err))
+						   }
+						   for _, configName := range extractedConfigNames {
 							   if driver == "sqlite" {
-								   _, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, vv)
+								   logs.WriteLogFile(fmt.Sprintf("[INFO][REGISTER][DB] Insertion config (SQLite): agentId=%s, config=%s", agentId, configName))
+								   _, err := database.Exec(`INSERT OR REPLACE INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, configName)
 								   if err != nil {
-									   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config: %v (agentId=%s, config=%s)", err, agentId, vv))
+									   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config: %v (agentId=%s, config=%s)", err, agentId, configName))
 								   }
 							   } else {
-								   _, err := database.Exec(`IF NOT EXISTS (SELECT 1 FROM agent_configurations WHERE agent_id = ? AND configuration_name = ?) INSERT INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, vv, agentId, vv)
+								   logs.WriteLogFile(fmt.Sprintf("[INFO][REGISTER][DB] Insertion config (MSSQL): agentId=%s, config=%s", agentId, configName))
+								   _, err := database.Exec(`IF NOT EXISTS (SELECT 1 FROM agent_configurations WHERE agent_id = ? AND configuration_name = ?) INSERT INTO agent_configurations (agent_id, configuration_name) VALUES (?, ?)`, agentId, configName, agentId, configName)
 								   if err != nil {
-									   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config: %v (agentId=%s, config=%s)", err, agentId, vv))
+									   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion config: %v (agentId=%s, config=%s)", err, agentId, configName))
 								   }
 							   }
 						   }

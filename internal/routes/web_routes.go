@@ -82,8 +82,12 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("GET /api/v1/saml/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SAMLConfigAPIHandler))))
 	mux.Handle("PUT /api/v1/saml/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SAMLConfigAPIHandler))))
 	mux.Handle("POST /api/v1/saml/upload_sp_keycert", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SAMLUploadSPKeyCertHandler))))
+	mux.Handle("GET /api/v1/scheduler/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerConfigAPIHandler))))
+	mux.Handle("PUT /api/v1/scheduler/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerConfigAPIHandler))))
+	mux.Handle("POST /api/v1/scheduler/cleanup/run", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerRunCleanupAPIHandler))))
 	// Web UI for SAML config (admin only)
 	mux.Handle("GET /web/saml_config", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebSAMLConfigHandler))))
+	mux.Handle("GET /web/admin/scheduler", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebSchedulerConfigHandler))))
 	if samlMiddleware != nil {
 		mux.Handle("/saml/", samlMiddleware)
 	}
