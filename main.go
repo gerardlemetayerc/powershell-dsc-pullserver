@@ -108,6 +108,27 @@ func main() {
 			   }
 		   }
 
+		   if global.AppConfig.DSCPullServer.EnableReleaseCheck {
+			   intervalMins := global.AppConfig.DSCPullServer.ReleaseCheckIntervalMins
+			   if intervalMins <= 0 {
+				   intervalMins = 1440
+			   }
+			   logs.WriteLogFile(fmt.Sprintf("INFO [RELEASE CHECK] Enabled: interval=%d minute(s)", intervalMins))
+			   service.StartReleaseCheckWorker(buildinfo.Version, time.Duration(intervalMins)*time.Minute, func(result service.ReleaseCheckResult, checkErr error) {
+				   if checkErr != nil {
+					   logs.WriteLogFile(fmt.Sprintf("WARN [RELEASE CHECK] %v", checkErr))
+					   _ = db.PersistReleaseCheckFailure(dbConn, global.AppConfig.Database.Driver)
+					   return
+				   }
+				   _ = db.PersistReleaseCheckSuccess(dbConn, global.AppConfig.Database.Driver, result.LatestRelease, result.LatestReleaseURL, result.UpdateAvailable)
+				   if result.UpdateAvailable {
+					   logs.WriteLogFile(fmt.Sprintf("INFO [RELEASE CHECK] Update available: current=%s latest=%s", result.CurrentVersion, result.LatestRelease))
+				   } else {
+					   logs.WriteLogFile(fmt.Sprintf("INFO [RELEASE CHECK] Up to date: current=%s", result.CurrentVersion))
+				   }
+			   })
+		   }
+
 		   if global.AppConfig.SAML.Enabled {
 			   logs.WriteLogFile(fmt.Sprintf("INFO [SAML] SAML Authentication activated (EntityID: %s)", global.AppConfig.SAML.EntityID))
 		   } else {

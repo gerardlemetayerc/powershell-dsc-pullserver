@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"go-dsc-pull/internal/buildinfo"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/global"
 	"go-dsc-pull/internal/logs"
 	"go-dsc-pull/internal/schema"
+	"go-dsc-pull/internal/service"
 	"go-dsc-pull/utils"
 )
 
@@ -17,6 +19,8 @@ type SchedulerConfigDTO struct {
 	EnableReportAutoCleanup bool `json:"enable_report_auto_cleanup"`
 	ReportRetentionDays     int  `json:"report_retention_days"`
 	ReportCleanupIntervalMins int `json:"report_cleanup_interval_mins"`
+	EnableReleaseCheck bool `json:"enable_release_check"`
+	ReleaseCheckIntervalMins int `json:"release_check_interval_mins"`
 }
 
 func resolveConfigPath() (string, error) {
@@ -42,6 +46,8 @@ func SchedulerConfigAPIHandler(w http.ResponseWriter, r *http.Request) {
 			EnableReportAutoCleanup:  cfg.DSCPullServer.EnableReportAutoCleanup,
 			ReportRetentionDays:      cfg.DSCPullServer.ReportRetentionDays,
 			ReportCleanupIntervalMins: cfg.DSCPullServer.ReportCleanupIntervalMins,
+			EnableReleaseCheck: cfg.DSCPullServer.EnableReleaseCheck,
+			ReleaseCheckIntervalMins: cfg.DSCPullServer.ReleaseCheckIntervalMins,
 		})
 
 	case http.MethodPut:
@@ -59,6 +65,11 @@ func SchedulerConfigAPIHandler(w http.ResponseWriter, r *http.Request) {
 		if req.ReportCleanupIntervalMins <= 0 {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "report_cleanup_interval_mins must be > 0"})
+			return
+		}
+		if req.ReleaseCheckIntervalMins <= 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "release_check_interval_mins must be > 0"})
 			return
 		}
 
@@ -90,6 +101,8 @@ func SchedulerConfigAPIHandler(w http.ResponseWriter, r *http.Request) {
 		dscPullRaw["enable_report_auto_cleanup"] = req.EnableReportAutoCleanup
 		dscPullRaw["report_retention_days"] = req.ReportRetentionDays
 		dscPullRaw["report_cleanup_interval_mins"] = req.ReportCleanupIntervalMins
+		dscPullRaw["enable_release_check"] = req.EnableReleaseCheck
+		dscPullRaw["release_check_interval_mins"] = req.ReleaseCheckIntervalMins
 		fullConfig["dsc_pullserver"] = dscPullRaw
 
 		data, err := json.MarshalIndent(fullConfig, "", "  ")
@@ -108,6 +121,8 @@ func SchedulerConfigAPIHandler(w http.ResponseWriter, r *http.Request) {
 		global.AppConfig.DSCPullServer.EnableReportAutoCleanup = req.EnableReportAutoCleanup
 		global.AppConfig.DSCPullServer.ReportRetentionDays = req.ReportRetentionDays
 		global.AppConfig.DSCPullServer.ReportCleanupIntervalMins = req.ReportCleanupIntervalMins
+		global.AppConfig.DSCPullServer.EnableReleaseCheck = req.EnableReleaseCheck
+		global.AppConfig.DSCPullServer.ReleaseCheckIntervalMins = req.ReleaseCheckIntervalMins
 
 		w.WriteHeader(http.StatusNoContent)
 
@@ -151,5 +166,49 @@ func SchedulerConfigFromApp(cfg *schema.AppConfig) SchedulerConfigDTO {
 		EnableReportAutoCleanup:  cfg.DSCPullServer.EnableReportAutoCleanup,
 		ReportRetentionDays:      cfg.DSCPullServer.ReportRetentionDays,
 		ReportCleanupIntervalMins: cfg.DSCPullServer.ReportCleanupIntervalMins,
+		EnableReleaseCheck: cfg.DSCPullServer.EnableReleaseCheck,
+		ReleaseCheckIntervalMins: cfg.DSCPullServer.ReleaseCheckIntervalMins,
 	}
+}
+
+func SchedulerRunReleaseCheckAPIHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	result, err := service.CheckLatestRelease(buildinfo.Version)
+	driverName := "sqlite"
+	if global.AppConfig != nil && global.AppConfig.Database.Driver != "" {
+		driverName = global.AppConfig.Database.Driver
+	}
+	if err != nil {
+		http.Error(w, "Release check failed", http.StatusInternalServerError)
+		logs.WriteLogFile("WARN [RELEASE CHECK] Manual release check failed: " + err.Error())
+		database, dbErr := db.OpenDB(&global.AppConfig.Database)
+		if dbErr == nil {
+			_ = db.PersistReleaseCheckFailure(database, driverName)
+			database.Close()
+		}
+		return
+	}
+	database, dbErr := db.OpenDB(&global.AppConfig.Database)
+	if dbErr == nil {
+		_ = db.PersistReleaseCheckSuccess(database, driverName, result.LatestRelease, result.LatestReleaseURL, result.UpdateAvailable)
+		database.Close()
+	}
+
+	if result.UpdateAvailable {
+		logs.WriteLogFile("INFO [RELEASE CHECK] Manual check: update available latest=" + result.LatestRelease + ", current=" + result.CurrentVersion)
+	} else {
+		logs.WriteLogFile("INFO [RELEASE CHECK] Manual check: already up to date current=" + result.CurrentVersion)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"current_version": result.CurrentVersion,
+		"latest_release": result.LatestRelease,
+		"latest_release_url": result.LatestReleaseURL,
+		"update_available": result.UpdateAvailable,
+	})
 }

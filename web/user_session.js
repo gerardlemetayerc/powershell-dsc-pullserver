@@ -73,11 +73,25 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(function(info) {
                 document.getElementById('aboutBuildVersion').textContent = info.build_version || '-';
                 document.getElementById('aboutDbVersion').textContent = info.db_version || '-';
+                var latest = document.getElementById('aboutLatestRelease');
+                if (info.release_check_ok && info.latest_release) {
+                    if (info.latest_release_url) {
+                        latest.innerHTML = '<a href="' + info.latest_release_url + '" target="_blank" rel="noopener noreferrer">' + info.latest_release + '</a>';
+                    } else {
+                        latest.textContent = info.latest_release;
+                    }
+                    if (info.update_available) {
+                        latest.innerHTML += ' <span class="badge badge-warning ml-1">Update available</span>';
+                    }
+                } else {
+                    latest.textContent = 'Unavailable';
+                }
                 $('#aboutModal').modal('show');
             })
             .catch(function() {
                 document.getElementById('aboutBuildVersion').textContent = 'Unavailable';
                 document.getElementById('aboutDbVersion').textContent = 'Unavailable';
+                document.getElementById('aboutLatestRelease').textContent = 'Unavailable';
                 $('#aboutModal').modal('show');
             });
     });

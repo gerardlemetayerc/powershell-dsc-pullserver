@@ -13,9 +13,11 @@
     "enable_client_cert_validation": false,
     "bypass_ca_validation": true,
     "enable_report_auto_cleanup": false,
+    "enable_release_check": false,
     "key_file": "dsc-dev.local.key",
     "port": 8484,
     "registrationKey": "AnyString",
+    "release_check_interval_mins": 1440,
     "report_retention_days": 90,
     "report_cleanup_interval_mins": 1440
   },

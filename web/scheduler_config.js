@@ -12,6 +12,8 @@ $(function() {
                 $('#enable_report_auto_cleanup').prop('checked', !!cfg.enable_report_auto_cleanup);
                 $('#report_retention_days').val(cfg.report_retention_days || 90);
                 $('#report_cleanup_interval_mins').val(cfg.report_cleanup_interval_mins || 1440);
+                $('#enable_release_check').prop('checked', !!cfg.enable_release_check);
+                $('#release_check_interval_mins').val(cfg.release_check_interval_mins || 1440);
             })
             .fail(function() {
                 showStatus('Impossible de charger la configuration.', 'red');
@@ -23,7 +25,9 @@ $(function() {
         const payload = {
             enable_report_auto_cleanup: $('#enable_report_auto_cleanup').prop('checked'),
             report_retention_days: parseInt($('#report_retention_days').val(), 10),
-            report_cleanup_interval_mins: parseInt($('#report_cleanup_interval_mins').val(), 10)
+            report_cleanup_interval_mins: parseInt($('#report_cleanup_interval_mins').val(), 10),
+            enable_release_check: $('#enable_release_check').prop('checked'),
+            release_check_interval_mins: parseInt($('#release_check_interval_mins').val(), 10)
         };
 
         $.ajax({
@@ -51,6 +55,24 @@ $(function() {
             })
             .fail(function(xhr) {
                 const msg = xhr.responseText || 'Echec du nettoyage manuel.';
+                showStatus(msg, 'red');
+            });
+    });
+
+    $('#run-release-check-now').on('click', function() {
+        $.ajax({
+            url: '/api/v1/scheduler/release-check/run',
+            method: 'POST'
+        })
+            .done(function(resp) {
+                if (resp.update_available) {
+                    showStatus('Release disponible: ' + resp.latest_release + ' (current: ' + resp.current_version + ')', 'orange');
+                } else {
+                    showStatus('A jour: ' + (resp.current_version || '-'), 'green');
+                }
+            })
+            .fail(function(xhr) {
+                const msg = xhr.responseText || 'Echec de la verification de release.';
                 showStatus(msg, 'red');
             });
     });
