@@ -1,0 +1,47 @@
+{{define "content"}}
+<section class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1>Scheduler</h1>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="content">
+  <div class="container-fluid">
+    <div class="card">
+      <div class="card-body">
+        <form id="scheduler-config-form">
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="enable_report_auto_cleanup" name="enable_report_auto_cleanup">
+            <label class="form-check-label" for="enable_report_auto_cleanup">Activer le nettoyage automatique des rapports</label>
+          </div>
+          <div class="form-group">
+            <label for="report_retention_days">Conserver les rapports pendant (jours)</label>
+            <input type="number" min="1" class="form-control" id="report_retention_days" name="report_retention_days" required>
+          </div>
+          <div class="form-group">
+            <label for="report_cleanup_interval_mins">Intervalle d'execution (minutes)</label>
+            <input type="number" min="1" class="form-control" id="report_cleanup_interval_mins" name="report_cleanup_interval_mins" required>
+          </div>
+          <hr>
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="enable_release_check" name="enable_release_check">
+            <label class="form-check-label" for="enable_release_check">Activer la verification periodique de la derniere release GitHub</label>
+          </div>
+          <div class="form-group">
+            <label for="release_check_interval_mins">Intervalle verification release (minutes)</label>
+            <input type="number" min="1" class="form-control" id="release_check_interval_mins" name="release_check_interval_mins" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="button" class="btn btn-outline-secondary ml-2" id="run-cleanup-now">Start database log cleaning</button>
+          <button type="button" class="btn btn-outline-info ml-2" id="run-release-check-now">Check last update</button>
+          <span id="scheduler-config-status" class="ml-3"></span>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+<script src="/web/scheduler_config.js"></script>
+{{end}}

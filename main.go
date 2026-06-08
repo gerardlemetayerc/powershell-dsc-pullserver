@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"os"
 	"path/filepath"
+	"time"
 	"crypto/sha1"
 	"encoding/hex"
 	"crypto/tls"
@@ -85,6 +86,47 @@ func main() {
 		   if err != nil {
 			   logs.WriteLogFile(fmt.Sprintf("ERROR [INITDB] Failed to open DB: %v", err))
 			   os.Exit(1)
+		   }
+
+		   if global.AppConfig.DSCPullServer.EnableReportAutoCleanup {
+			   retentionDays := global.AppConfig.DSCPullServer.ReportRetentionDays
+			   intervalMins := global.AppConfig.DSCPullServer.ReportCleanupIntervalMins
+			   if retentionDays <= 0 {
+				   logs.WriteLogFile("WARN [REPORT CLEANUP] Disabled: report_retention_days must be > 0")
+			   } else {
+				   if intervalMins <= 0 {
+					   intervalMins = 1440
+				   }
+				   logs.WriteLogFile(fmt.Sprintf("INFO [REPORT CLEANUP] Enabled: retention=%d day(s), interval=%d minute(s)", retentionDays, intervalMins))
+				   db.StartReportCleanupWorker(dbConn, global.AppConfig.Database.Driver, retentionDays, time.Duration(intervalMins)*time.Minute, func(deleted int64, cleanupErr error) {
+					   if cleanupErr != nil {
+						   logs.WriteLogFile(fmt.Sprintf("ERROR [REPORT CLEANUP] %v", cleanupErr))
+						   return
+					   }
+					   logs.WriteLogFile(fmt.Sprintf("INFO [REPORT CLEANUP] Deleted %d old report(s)", deleted))
+				   })
+			   }
+		   }
+
+		   if global.AppConfig.DSCPullServer.EnableReleaseCheck {
+			   intervalMins := global.AppConfig.DSCPullServer.ReleaseCheckIntervalMins
+			   if intervalMins <= 0 {
+				   intervalMins = 1440
+			   }
+			   logs.WriteLogFile(fmt.Sprintf("INFO [RELEASE CHECK] Enabled: interval=%d minute(s)", intervalMins))
+			   service.StartReleaseCheckWorker(buildinfo.Version, time.Duration(intervalMins)*time.Minute, func(result service.ReleaseCheckResult, checkErr error) {
+				   if checkErr != nil {
+					   logs.WriteLogFile(fmt.Sprintf("WARN [RELEASE CHECK] %v", checkErr))
+					   _ = db.PersistReleaseCheckFailure(dbConn, global.AppConfig.Database.Driver)
+					   return
+				   }
+				   _ = db.PersistReleaseCheckSuccess(dbConn, global.AppConfig.Database.Driver, result.LatestRelease, result.LatestReleaseURL, result.UpdateAvailable)
+				   if result.UpdateAvailable {
+					   logs.WriteLogFile(fmt.Sprintf("INFO [RELEASE CHECK] Update available: current=%s latest=%s", result.CurrentVersion, result.LatestRelease))
+				   } else {
+					   logs.WriteLogFile(fmt.Sprintf("INFO [RELEASE CHECK] Up to date: current=%s", result.CurrentVersion))
+				   }
+			   })
 		   }
 
 		   if global.AppConfig.SAML.Enabled {

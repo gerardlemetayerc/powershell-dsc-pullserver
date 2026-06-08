@@ -5,6 +5,7 @@ $(function() {
         window.location.href = '/web/users';
         return;
     }
+    $('#changePasswordLink').attr('href', '/web/user_password?id=' + encodeURIComponent(userId));
     // Charger les infos utilisateur et la liste des rôles dynamiquement
     $.when(
         $.get('/api/v1/user_roles'),

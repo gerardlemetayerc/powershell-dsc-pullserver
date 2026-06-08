@@ -43,6 +43,11 @@ This page describes all configuration options available in `config.json` for the
 | port                       | int     | API server port                                     | `8484`                 |
 | registrationKey            | string  | Key for agent registration (DSC)                    | `"AnyString"`          |
 | jwt_secret                 | string  | Secret for signing JWT tokens                       | `"your-strong-secret"` |
+| enable_report_auto_cleanup | bool    | Enable periodic deletion of old reports             | `false`                |
+| report_retention_days      | int     | Keep reports for this number of days                | `90`                   |
+| report_cleanup_interval_mins | int   | Cleanup execution interval in minutes               | `1440`                 |
+| enable_release_check       | bool    | Enable periodic GitHub latest release check         | `false`                |
+| release_check_interval_mins| int     | Release check execution interval in minutes         | `1440`                 |
 
 ---
 
@@ -104,9 +109,14 @@ This page describes all configuration options available in `config.json` for the
     "enable_https": true,
     "enable_client_cert_validation": false,
     "bypass_ca_validation": true,
+    "enable_report_auto_cleanup": false,
+    "enable_release_check": false,
     "key_file": "dsc-dev.local.key",
     "port": 8484,
     "registrationKey": "AnyString",
+    "release_check_interval_mins": 1440,
+    "report_retention_days": 90,
+    "report_cleanup_interval_mins": 1440,
     "jwt_secret": "pQw8vZ3rT6sJkL2xQ9eBfG7hN1uVtX4yC5zR8aW0sD3mPqE6bH0jKfL9nS2tU7vY1"
   },
   "saml": {

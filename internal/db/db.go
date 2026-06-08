@@ -52,6 +52,23 @@ func UpdateLastLogon(db *sql.DB, userId interface{}) error {
 	return err
 }
 
+// TouchLastLogon updates last_logon_date without creating an audit entry.
+// Useful for token-based auth where this path may be called frequently.
+func TouchLastLogon(db *sql.DB, userId interface{}) error {
+	appCfg, err := internal.LoadAppConfig("config.json")
+	if err != nil {
+		log.Printf("[ERROR] Could not load app config: %v", err)
+		return err
+	}
+	driverName := appCfg.Database.Driver
+	if driverName == "mssql" || driverName == "sqlserver" {
+		_, err = db.Exec("UPDATE users SET last_logon_date=CURRENT_TIMESTAMP WHERE id=?", userId)
+	} else {
+		_, err = db.Exec("UPDATE users SET last_logon_date=? WHERE id=?", time.Now().Format("2006-01-02 15:04:05"), userId)
+	}
+	return err
+}
+
 // Récupère l'email de l'utilisateur par son id
 func getUserEmail(db *sql.DB, userId interface{}) string {
 	var email string

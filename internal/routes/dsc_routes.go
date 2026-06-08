@@ -11,12 +11,14 @@ import (
 
 // RegisterDSCRoutes sets up all DSC (.svc) endpoints on the provided mux
 func RegisterDSCRoutes(mux *http.ServeMux, dbConn *sql.DB) {
+	// Strict MS-DSCPM registration route: PUT only.
 	mux.HandleFunc("PUT /PSDSCPullServer.svc/{node}", handlers.RegisterHandler)
 	mux.HandleFunc("GET /PSDSCPullServer.svc/{node}/{config}/ConfigurationContent", handlers.ConfigurationContentHandler)
 	mux.HandleFunc("POST /PSDSCPullServer.svc/{node}/SendReport", handlers.SendReportHandler)
 	mux.HandleFunc("POST /PSDSCPullServer.svc/{id}/GetDscAction", func(w http.ResponseWriter, r *http.Request) {
 		raw := r.PathValue("id")
 		agentId := utils.ExtractAgentId(raw)
+		log.Printf("[GETDSCACTION-ROUTE] rawId=%q extractedAgentId=%q", raw, agentId)
 		handlers.GetDscActionNodeHandlerWithId(w, r, agentId)
 	})
 	mux.HandleFunc("GET /PSDSCPullServer.svc/{module}/ModuleContent", func(w http.ResponseWriter, r *http.Request) {

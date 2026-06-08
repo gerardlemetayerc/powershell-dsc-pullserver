@@ -76,11 +76,30 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='dsc_infra_info' AND xtype='U
 CREATE TABLE dsc_infra_info (
     id INT PRIMARY KEY CHECK (id = 1),
     web_version NVARCHAR(20) DEFAULT '0.0.1',
-    db_version NVARCHAR(20) DEFAULT '1.1.2p2',
+    db_version NVARCHAR(20) DEFAULT '1.1.3',
+    latest_release NVARCHAR(50) NULL,
+    latest_release_url NVARCHAR(255) NULL,
+    update_available BIT DEFAULT 0,
+    release_check_ok BIT DEFAULT 0,
+    release_checked_at DATETIME NULL,
     updated_at DATETIME DEFAULT GETDATE()
 );
 IF NOT EXISTS (SELECT 1 FROM dsc_infra_info WHERE id = 1)
-    INSERT INTO dsc_infra_info (id, web_version, db_version, updated_at) VALUES (1, '0.0.1', '1.1.2p2', GETDATE());
+    INSERT INTO dsc_infra_info (id, web_version, db_version, updated_at) VALUES (1, '0.0.1', '1.1.3', GETDATE());
+
+IF EXISTS (SELECT * FROM sysobjects WHERE name='dsc_infra_info' AND xtype='U')
+BEGIN
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'dsc_infra_info' AND COLUMN_NAME = 'latest_release')
+        ALTER TABLE dsc_infra_info ADD latest_release NVARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'dsc_infra_info' AND COLUMN_NAME = 'latest_release_url')
+        ALTER TABLE dsc_infra_info ADD latest_release_url NVARCHAR(255) NULL;
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'dsc_infra_info' AND COLUMN_NAME = 'update_available')
+        ALTER TABLE dsc_infra_info ADD update_available BIT DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'dsc_infra_info' AND COLUMN_NAME = 'release_check_ok')
+        ALTER TABLE dsc_infra_info ADD release_check_ok BIT DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'dsc_infra_info' AND COLUMN_NAME = 'release_checked_at')
+        ALTER TABLE dsc_infra_info ADD release_checked_at DATETIME NULL;
+END
 -- To update version:
 -- UPDATE dsc_infra_info SET db_version = '1.1.2p2', updated_at = GETDATE() WHERE id = 1;
 
