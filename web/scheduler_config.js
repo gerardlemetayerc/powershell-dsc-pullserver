@@ -16,7 +16,7 @@ $(function() {
                 $('#release_check_interval_mins').val(cfg.release_check_interval_mins || 1440);
             })
             .fail(function() {
-                showStatus('Impossible de charger la configuration.', 'red');
+                showStatus('Unable to load configuration.', 'red');
             });
     }
 
@@ -37,10 +37,10 @@ $(function() {
             data: JSON.stringify(payload)
         })
             .done(function() {
-                showStatus('Configuration sauvegardee.', 'green');
+                showStatus('Configuration saved.', 'green');
             })
             .fail(function(xhr) {
-                const msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : 'Echec de la sauvegarde.';
+                const msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : 'Failed to save configuration.';
                 showStatus(msg, 'red');
             });
     });
@@ -51,10 +51,10 @@ $(function() {
             method: 'POST'
         })
             .done(function(resp) {
-                showStatus('Nettoyage termine. Rapports supprimes: ' + (resp.deleted || 0), 'green');
+                showStatus('Cleanup completed. Deleted reports: ' + (resp.deleted || 0), 'green');
             })
             .fail(function(xhr) {
-                const msg = xhr.responseText || 'Echec du nettoyage manuel.';
+                const msg = xhr.responseText || 'Manual cleanup failed.';
                 showStatus(msg, 'red');
             });
     });
@@ -66,13 +66,13 @@ $(function() {
         })
             .done(function(resp) {
                 if (resp.update_available) {
-                    showStatus('Release disponible: ' + resp.latest_release + ' (current: ' + resp.current_version + ')', 'orange');
+                    showStatus('Update available: ' + resp.latest_release + ' (current: ' + resp.current_version + ')', 'orange');
                 } else {
-                    showStatus('A jour: ' + (resp.current_version || '-'), 'green');
+                    showStatus('Up to date: ' + (resp.current_version || '-'), 'green');
                 }
             })
             .fail(function(xhr) {
-                const msg = xhr.responseText || 'Echec de la verification de release.';
+                const msg = xhr.responseText || 'Release check failed.';
                 showStatus(msg, 'red');
             });
     });
