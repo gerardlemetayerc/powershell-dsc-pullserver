@@ -76,11 +76,11 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='dsc_infra_info' AND xtype='U
 CREATE TABLE dsc_infra_info (
     id INT PRIMARY KEY CHECK (id = 1),
     web_version NVARCHAR(20) DEFAULT '0.0.1',
-    db_version NVARCHAR(20) DEFAULT '1.1.2p2',
+    db_version NVARCHAR(20) DEFAULT '1.1.3',
     updated_at DATETIME DEFAULT GETDATE()
 );
 IF NOT EXISTS (SELECT 1 FROM dsc_infra_info WHERE id = 1)
-    INSERT INTO dsc_infra_info (id, web_version, db_version, updated_at) VALUES (1, '0.0.1', '1.1.2p2', GETDATE());
+    INSERT INTO dsc_infra_info (id, web_version, db_version, updated_at) VALUES (1, '0.0.1', '1.1.3', GETDATE());
 -- To update version:
 -- UPDATE dsc_infra_info SET db_version = '1.1.2p2', updated_at = GETDATE() WHERE id = 1;
 

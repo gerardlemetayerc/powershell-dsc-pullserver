@@ -16,6 +16,7 @@ import (
 // GetDscActionNodeHandlerWithId gère POST /PSDSCPullServer.svc/{id}/GetDscAction avec agentId déjà extrait
 func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agentId string) {
 	database, err := db.OpenDB(&global.AppConfig.Database)
+	log.Printf("[GETDSCACTION-NODE] Start for agentId=%q", agentId)
 	// Log du body et des headers reçus pour debug
 	body, _ := io.ReadAll(r.Body)
 	r.Body = io.NopCloser(strings.NewReader(string(body)))
@@ -45,11 +46,14 @@ func GetDscActionNodeHandlerWithId(w http.ResponseWriter, r *http.Request, agent
 	row := database.QueryRow("SELECT COUNT(*) FROM agent_configurations WHERE agent_id = ?", agentId)
 	var count int
 	if err := row.Scan(&count); err != nil {
+		log.Printf("[GETDSCACTION-NODE] COUNT query failed for agentId=%q err=%v", agentId, err)
 		http.Error(w, "Configuration not found", http.StatusNotFound)
 		return
 	}
+	log.Printf("[GETDSCACTION-NODE] agentId=%q has %d linked configuration(s)", agentId, count)
 	// S'il n'y a aucune config, on ajoute l'ID de l'agent comme nom de config par défaut
 	if count == 0 {
+		log.Printf("[GETDSCACTION-NODE] No linked configuration found for agentId=%q, using fallback configName=agentId", agentId)
 		configNames = append(configNames, agentId)
 	}
 
