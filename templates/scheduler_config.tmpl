@@ -1,0 +1,37 @@
+{{define "content"}}
+<section class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1>Scheduler</h1>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="content">
+  <div class="container-fluid">
+    <div class="card">
+      <div class="card-body">
+        <form id="scheduler-config-form">
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="enable_report_auto_cleanup" name="enable_report_auto_cleanup">
+            <label class="form-check-label" for="enable_report_auto_cleanup">Activer le nettoyage automatique des rapports</label>
+          </div>
+          <div class="form-group">
+            <label for="report_retention_days">Conserver les rapports pendant (jours)</label>
+            <input type="number" min="1" class="form-control" id="report_retention_days" name="report_retention_days" required>
+          </div>
+          <div class="form-group">
+            <label for="report_cleanup_interval_mins">Intervalle d'execution (minutes)</label>
+            <input type="number" min="1" class="form-control" id="report_cleanup_interval_mins" name="report_cleanup_interval_mins" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+          <button type="button" class="btn btn-outline-secondary ml-2" id="run-cleanup-now">Lancer maintenant</button>
+          <span id="scheduler-config-status" class="ml-3"></span>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+<script src="/web/scheduler_config.js"></script>
+{{end}}
