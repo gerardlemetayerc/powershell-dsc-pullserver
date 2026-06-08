@@ -66,6 +66,8 @@ func JwtOrAPITokenAuthMiddleware(dbConn *sql.DB) func(http.Handler) http.Handler
 						   http.Error(w, "User not found or inactive", http.StatusUnauthorized)
 						   return
 					   }
+					   // Keep last login date fresh for API-token based sessions.
+					   _ = db.TouchLastLogon(dbConn, userId)
 					   ctx := context.WithValue(r.Context(), "userId", userId)
 					   r = r.WithContext(ctx)
 					   next.ServeHTTP(w, r)
