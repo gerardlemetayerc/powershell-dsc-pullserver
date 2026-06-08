@@ -388,20 +388,25 @@ func ChangeUserPasswordHandler(db *sql.DB) http.HandlerFunc {
 		       http.Error(w, "Bad request", http.StatusBadRequest)
 		       return
 	       }
+	       // Resolve the target user email for a readable audit message.
+	       targetEmail := "?"
+	       {
+		       row := db.QueryRow("SELECT email FROM users WHERE id = ?", id)
+		       var email string
+		       if err := row.Scan(&email); err == nil {
+			       targetEmail = email
+		       }
+	       }
 	       hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	       if err != nil {
 		       http.Error(w, "Hash error", http.StatusInternalServerError)
 		       return
 	       }
-	       // Get email of the user performing the action (from context userId)
+	       // userId context contains JWT sub (email in this app).
 	       actorEmail := "?"
 	       if r.Context().Value("userId") != nil {
 		       if sub, ok := r.Context().Value("userId").(string); ok {
-			       row := db.QueryRow("SELECT email FROM users WHERE id = ?", sub)
-			       var email string
-			       if err := row.Scan(&email); err == nil {
-				       actorEmail = email
-			       }
+			       actorEmail = sub
 		       }
 	       }
 	       _, err = db.Exec("UPDATE users SET password_hash=? WHERE id=?", string(hash), id)
@@ -411,7 +416,7 @@ func ChangeUserPasswordHandler(db *sql.DB) http.HandlerFunc {
 	       }
 	       // Audit changement de mot de passe
 	       driverName := global.AppConfig.Database.Driver
-	       _ = internaldb.InsertAudit(db, driverName, actorEmail, "update", "user", "Changed password for user: "+id, "")
+	       _ = internaldb.InsertAudit(db, driverName, actorEmail, "update", "user", "Changed password for user: "+targetEmail+" (id="+id+")", "")
 	       w.WriteHeader(http.StatusNoContent)
        }
 }
