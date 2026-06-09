@@ -2,7 +2,6 @@ package routes
 
 import (
 	"net/http"
-	"os"
 	"database/sql"
 	"go-dsc-pull/handlers"
 	"go-dsc-pull/internal/middleware"
@@ -58,6 +57,9 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 			       }
 	// Endpoint pour la liste des profils utilisateurs disponibles
 	mux.Handle("GET /api/v1/user_roles", jwtAuthMiddleware(http.HandlerFunc(handlers.UserRolesHandler())))
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/web", http.StatusFound)
+	})
 	exeDir, err := utils.ExePath()
 	if err != nil {
 		panic("Failed to get executable path: " + err.Error())
@@ -128,34 +130,32 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 		mux.HandleFunc("/saml/metadata", func(w http.ResponseWriter, r *http.Request) {smw.ServeHTTP(w, r)})
 	}
 	
+	webStatic := http.FileServer(http.Dir(filepath.Join(baseDir, "web")))
+
 	// Web GUI endpoints (login, index, static, node, modules, configuration_model, properties, users, user_edit, user_password)
 	mux.Handle("/web", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)))
 	// Custom static file handler to prevent directory listing under /web/
 	mux.Handle("/web/", http.StripPrefix("/web/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		   requestedPath := r.URL.Path
-		   if requestedPath == "" || requestedPath == "/" {
-			   handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)).ServeHTTP(w, r)
-			   return
-		   }
-		   webRoot := filepath.Join(baseDir, "web")
-		   cleanPath := path.Clean("/" + requestedPath)
-		   relativePath := strings.TrimPrefix(cleanPath, "/")
-		   if relativePath == "" || relativePath == "." {
-			   handlers.NotFoundHandler(w, r)
-			   return
-		   }
-		   fullPath := filepath.Join(webRoot, filepath.FromSlash(relativePath))
-		   relPath, err := filepath.Rel(webRoot, fullPath)
-		   if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || filepath.IsAbs(relPath) {
-			   handlers.NotFoundHandler(w, r)
-			   return
-		   }
-		   info, err := os.Stat(fullPath)
-		   if err != nil || info.IsDir() {
-			   handlers.NotFoundHandler(w, r)
-			   return
-		   }
-		   http.ServeFile(w, r, fullPath)
+		requestedPath := strings.TrimSpace(r.URL.Path)
+		if requestedPath == "" || requestedPath == "/" {
+			handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)).ServeHTTP(w, r)
+			return
+		}
+
+		cleanPath := path.Clean("/" + requestedPath)
+		relativePath := strings.TrimPrefix(cleanPath, "/")
+		if relativePath == "" || relativePath == "." || strings.Contains(relativePath, "..") || strings.HasSuffix(relativePath, "/") {
+			handlers.NotFoundHandler(w, r)
+			return
+		}
+		// Static assets are file resources. Reject extension-less paths to avoid directory probing.
+		if path.Ext(relativePath) == "" {
+			handlers.NotFoundHandler(w, r)
+			return
+		}
+
+		r.URL.Path = "/" + relativePath
+		webStatic.ServeHTTP(w, r)
 	   })))
 	mux.Handle("/web/node/", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebNodeHandler)))
 	mux.Handle("/web/modules", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebModulesHandler)))
