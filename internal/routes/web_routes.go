@@ -57,8 +57,12 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 			       }
 	// Endpoint pour la liste des profils utilisateurs disponibles
 	mux.Handle("GET /api/v1/user_roles", jwtAuthMiddleware(http.HandlerFunc(handlers.UserRolesHandler())))
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/web", http.StatusFound)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/" {
+			http.Redirect(w, r, "/web", http.StatusFound)
+			return
+		}
+		handlers.NotFoundHandler(w, r)
 	})
 	exeDir, err := utils.ExePath()
 	if err != nil {
