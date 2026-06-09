@@ -21,32 +21,32 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
-	       // Support de l'option ?count=1
-	       if r.URL.Query().Get("count") == "1" {
-		       var count int
-		       err := database.QueryRow("SELECT COUNT(*) FROM agents").Scan(&count)
-		       if err != nil {
-			       http.Error(w, "DB count error", http.StatusInternalServerError)
-			       return
-		       }
-		       w.Header().Set("Content-Type", "application/json")
-		       _ = json.NewEncoder(w).Encode(map[string]int{"count": count})
-		       return
-	       }
-
-		       // Filtrage dynamique
-		       q := `SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report, state FROM agents WHERE 1=1`
+	       // Filtrage dynamique
+		       q := `SELECT agent_id, internal_dsc_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report, state FROM agents WHERE 1=1`
 		       args := []interface{}{}
+		       countQ := `SELECT COUNT(*) FROM agents WHERE 1=1`
+		       countArgs := []interface{}{}
 		       nodeName := r.URL.Query().Get("node_name")
 		       if nodeName != "" {
 			       q += " AND node_name = ?"
 			       args = append(args, nodeName)
+			       countQ += " AND node_name = ?"
+			       countArgs = append(countArgs, nodeName)
+		       }
+		       internalDSCId := r.URL.Query().Get("internal_dsc_id")
+		       if internalDSCId != "" {
+			       q += " AND internal_dsc_id = ?"
+			       args = append(args, internalDSCId)
+			       countQ += " AND internal_dsc_id = ?"
+			       countArgs = append(countArgs, internalDSCId)
 		       }
 		       hasError := r.URL.Query().Get("has_error_last_report")
 		       if hasError == "true" {
 			       q += " AND has_error_last_report = 1"
+			       countQ += " AND has_error_last_report = 1"
 		       } else if hasError == "false" {
 			       q += " AND has_error_last_report = 0"
+			       countQ += " AND has_error_last_report = 0"
 		       }
 		       for _, rawTag := range r.URL.Query()["tag"] {
 			       tagKey, tagValue, found := strings.Cut(rawTag, ":")
@@ -56,6 +56,21 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 			       }
 			       q += " AND EXISTS (SELECT 1 FROM agent_tags at WHERE at.agent_id = agents.agent_id AND at.tag_key = ? AND at.tag_value = ?)"
 			       args = append(args, tagKey, tagValue)
+			       countQ += " AND EXISTS (SELECT 1 FROM agent_tags at WHERE at.agent_id = agents.agent_id AND at.tag_key = ? AND at.tag_value = ?)"
+			       countArgs = append(countArgs, tagKey, tagValue)
+		       }
+
+	       // Support de l'option ?count=1
+	       if r.URL.Query().Get("count") == "1" {
+		       var count int
+		       err := database.QueryRow(countQ, countArgs...).Scan(&count)
+		       if err != nil {
+			       http.Error(w, "DB count error", http.StatusInternalServerError)
+			       return
+		       }
+		       w.Header().Set("Content-Type", "application/json")
+		       _ = json.NewEncoder(w).Encode(map[string]int{"count": count})
+		       return
 		       }
 		       rows, err := database.Query(q, args...)
 		       if err != nil {
@@ -69,7 +84,7 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 				   var a schema.Agent
 				   var lcmVersion, registrationType, certificateThumbprint, certificateSubject, certificateIssuer, certificateNotBefore, certificateNotAfter, registeredAt, lastCommunication, state *string
 				   var hasErrorBool bool
-				   if err := rows.Scan(&a.AgentId, &a.NodeName, &lcmVersion, &registrationType, &certificateThumbprint, &certificateSubject, &certificateIssuer, &certificateNotBefore, &certificateNotAfter, &registeredAt, &lastCommunication, &hasErrorBool, &state); err == nil {
+				   if err := rows.Scan(&a.AgentId, &a.InternalDSCId, &a.NodeName, &lcmVersion, &registrationType, &certificateThumbprint, &certificateSubject, &certificateIssuer, &certificateNotBefore, &certificateNotAfter, &registeredAt, &lastCommunication, &hasErrorBool, &state); err == nil {
 					   // Pour DataTables, renvoyer les champs attendus même vides
 					   empty := ""
 					   a.LCMVersion = lcmVersion

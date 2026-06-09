@@ -52,5 +52,10 @@ func InitDB(cfg *schema.DBConfig) {
 		os.Exit(1)
 	}
 
+    if err := EnsureAgentInternalDSCIdSchema(database, cfg.Driver); err != nil {
+        logs.WriteLogFile("ERROR [INITDB] Failed to ensure agents internal_dsc_id schema: " + err.Error())
+        os.Exit(1)
+    }
+
     logs.WriteLogFile("INFO [INITDB] DB schema checked/created.")
 }

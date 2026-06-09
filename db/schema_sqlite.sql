@@ -51,7 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_reports_agent_id ON reports(agent_id);
 CREATE TABLE IF NOT EXISTS dsc_infra_info (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     web_version TEXT DEFAULT '0.0.1',
-    db_version TEXT DEFAULT '1.1.3',
+    db_version TEXT DEFAULT '1.2.1',
     latest_release TEXT,
     latest_release_url TEXT,
     update_available INTEGER DEFAULT 0,
@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS dsc_infra_info (
     release_checked_at TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-INSERT OR IGNORE INTO dsc_infra_info (id, web_version, db_version, updated_at) VALUES (1, '0.0.1', '1.1.3', CURRENT_TIMESTAMP);
-UPDATE dsc_infra_info SET db_version = '1.1.3', updated_at = CURRENT_TIMESTAMP WHERE id = 1;
+INSERT OR IGNORE INTO dsc_infra_info (id, web_version, db_version, updated_at) VALUES (1, '0.0.1', '1.2.1', CURRENT_TIMESTAMP);
+UPDATE dsc_infra_info SET db_version = '1.2.1', updated_at = CURRENT_TIMESTAMP WHERE id = 1;
 
 CREATE TABLE IF NOT EXISTS scheduler_tasks (
     task_name TEXT PRIMARY KEY,
@@ -88,6 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_scheduler_runs_task_started ON scheduler_task_run
 
 CREATE TABLE IF NOT EXISTS agents (
     agent_id TEXT PRIMARY KEY,
+    internal_dsc_id TEXT,
     node_name TEXT,
     lcm_version TEXT,
     registration_type TEXT,
@@ -101,6 +102,7 @@ CREATE TABLE IF NOT EXISTS agents (
     has_error_last_report BOOLEAN DEFAULT 0,
     state TEXT
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_internal_dsc_id ON agents(internal_dsc_id);
 -- Migration : ajout de la colonne has_error_last_report si besoin
 -- N'exécuter que si la version de la db est antérieure à 0.0.3
 -- Si la version était < 0.0.3, alors on ajoute la colonne

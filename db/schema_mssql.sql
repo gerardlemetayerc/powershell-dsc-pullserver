@@ -76,7 +76,7 @@ IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='dsc_infra_info' AND xtype='U
 CREATE TABLE dsc_infra_info (
     id INT PRIMARY KEY CHECK (id = 1),
     web_version NVARCHAR(20) DEFAULT '0.0.1',
-    db_version NVARCHAR(20) DEFAULT '1.1.3',
+    db_version NVARCHAR(20) DEFAULT '1.2.1',
     latest_release NVARCHAR(50) NULL,
     latest_release_url NVARCHAR(255) NULL,
     update_available BIT DEFAULT 0,
@@ -85,7 +85,7 @@ CREATE TABLE dsc_infra_info (
     updated_at DATETIME DEFAULT GETDATE()
 );
 IF NOT EXISTS (SELECT 1 FROM dsc_infra_info WHERE id = 1)
-    INSERT INTO dsc_infra_info (id, web_version, db_version, updated_at) VALUES (1, '0.0.1', '1.1.3', GETDATE());
+    INSERT INTO dsc_infra_info (id, web_version, db_version, updated_at) VALUES (1, '0.0.1', '1.2.1', GETDATE());
 
 IF EXISTS (SELECT * FROM sysobjects WHERE name='dsc_infra_info' AND xtype='U')
 BEGIN
@@ -133,6 +133,7 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_scheduler_runs_task_s
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='agents' AND xtype='U')
 CREATE TABLE agents (
     agent_id NVARCHAR(128) PRIMARY KEY,
+    internal_dsc_id NVARCHAR(128) NULL,
     node_name NVARCHAR(128),
     lcm_version NVARCHAR(50) NULL,
     registration_type NVARCHAR(50) NULL,
@@ -146,6 +147,15 @@ CREATE TABLE agents (
     state NVARCHAR(50),
     has_error_last_report BIT DEFAULT 0
 );
+
+IF EXISTS (SELECT * FROM sysobjects WHERE name='agents' AND xtype='U')
+BEGIN
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'agents' AND COLUMN_NAME = 'internal_dsc_id')
+        ALTER TABLE agents ADD internal_dsc_id NVARCHAR(128) NULL;
+END
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_agents_internal_dsc_id' AND object_id = OBJECT_ID('agents'))
+    CREATE UNIQUE INDEX idx_agents_internal_dsc_id ON agents(internal_dsc_id);
 
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='agent_configurations' AND xtype='U')
 CREATE TABLE agent_configurations (

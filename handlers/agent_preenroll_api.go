@@ -33,6 +33,7 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 	h := sha1.New()
 	h.Write([]byte(req.NodeName + "TEMP"))
 	tempAgentId := fmt.Sprintf("TEMP-%x", h.Sum(nil)[:8])
+	internalDSCId := "IDSC-" + tempAgentId
 
 	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
@@ -45,13 +46,13 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 	       // Insert agent (ignore if already exists), compatible SQLite/MSSQL
 			       driver := global.AppConfig.Database.Driver
 				       if driver == "sqlite" {
-					       _, err = database.Exec(`INSERT OR IGNORE INTO agents (agent_id, node_name, last_communication, state) VALUES (?, ?, ?, ?)`, tempAgentId, req.NodeName, "0000-00-01 00:00:00", "waiting_for_registration")
+					       _, err = database.Exec(`INSERT OR IGNORE INTO agents (agent_id, internal_dsc_id, node_name, last_communication, state) VALUES (?, ?, ?, ?, ?)`, tempAgentId, internalDSCId, req.NodeName, "0000-00-01 00:00:00", "waiting_for_registration")
 				       } else if driver == "mssql" {
 					       // MSSQL : insérer avec la date minimale valide
-					       _, err = database.Exec(`IF NOT EXISTS (SELECT 1 FROM agents WHERE agent_id = ?) INSERT INTO agents (agent_id, node_name, last_communication, state) VALUES (?, ?, ?, ?)`, tempAgentId, tempAgentId, req.NodeName, "1753-01-01 00:00:00", "waiting_for_registration")
+					       _, err = database.Exec(`IF NOT EXISTS (SELECT 1 FROM agents WHERE agent_id = ?) INSERT INTO agents (agent_id, internal_dsc_id, node_name, last_communication, state) VALUES (?, ?, ?, ?, ?)`, tempAgentId, tempAgentId, internalDSCId, req.NodeName, "1753-01-01 00:00:00", "waiting_for_registration")
 				       } else {
 					       // fallback générique
-					       _, err = database.Exec(`INSERT INTO agents (agent_id, node_name) VALUES (?, ?)`, tempAgentId, req.NodeName)
+					       _, err = database.Exec(`INSERT INTO agents (agent_id, internal_dsc_id, node_name) VALUES (?, ?, ?)`, tempAgentId, internalDSCId, req.NodeName)
 				       }
 		if err != nil {
 			log.Printf("[API][DB] Erreur insertion agent: %v", err)
@@ -74,6 +75,7 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 
 	agent := schema.Agent{
 		AgentId:           tempAgentId,
+		InternalDSCId:     ptr(internalDSCId),
 		NodeName:          req.NodeName,
 		LastCommunication: "0000-00-01 00:00:00",
 		State:             ptr("waiting_for_registration"),

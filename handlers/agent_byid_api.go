@@ -28,11 +28,11 @@ func AgentByIdAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
-	       row := database.QueryRow(`SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report, state FROM agents WHERE agent_id = ?`, agentId)
+	       row := database.QueryRow(`SELECT agent_id, internal_dsc_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report, state FROM agents WHERE agent_id = ?`, agentId)
 	       var a schema.Agent
 	       var hasErrorBool bool
 	       var state *string
-	       err = row.Scan(&a.AgentId, &a.NodeName, &a.LCMVersion, &a.RegistrationType, &a.CertificateThumbprint, &a.CertificateSubject, &a.CertificateIssuer, &a.CertificateNotBefore, &a.CertificateNotAfter, &a.RegisteredAt, &a.LastCommunication, &hasErrorBool, &state)
+	       err = row.Scan(&a.AgentId, &a.InternalDSCId, &a.NodeName, &a.LCMVersion, &a.RegistrationType, &a.CertificateThumbprint, &a.CertificateSubject, &a.CertificateIssuer, &a.CertificateNotBefore, &a.CertificateNotAfter, &a.RegisteredAt, &a.LastCommunication, &hasErrorBool, &state)
 	       a.HasErrorLastReport = hasErrorBool
 	       a.State = state
 	       if err != nil {

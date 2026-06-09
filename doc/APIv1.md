@@ -83,6 +83,7 @@ Both JWT and API tokens grant access to the API according to the user's permissi
 - Query params supported:
 	- `count=1`: return only the total count.
 	- `node_name=<name>`: filter by exact node name.
+	- `internal_dsc_id=<id>`: filter by stable internal DSC identity (recommended for IaC/provider workflows).
 	- `has_error_last_report=true|false`: filter by last report error status.
 	- `tag=key:value`: filter by tag.
 	- Repeat `tag` multiple times to require all tags with `AND` semantics, for example: `/api/v1/agents?tag=env:prod&tag=role:web`.

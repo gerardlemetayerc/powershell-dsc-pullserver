@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 	"fmt"
+	"strings"
 	utils "go-dsc-pull/utils"
 	internalutils "go-dsc-pull/internal/utils"
 	"go-dsc-pull/internal/db"
@@ -79,11 +80,15 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 				   // Vérifie si NodeName existe avec un AgentId TEMP
 				   var tempAgentId string
-				   err = database.QueryRow(`SELECT agent_id FROM agents WHERE node_name = ? AND agent_id LIKE 'TEMP-%'`, nodeName).Scan(&tempAgentId)
+				   var internalDSCId string
+				   err = database.QueryRow(`SELECT agent_id, internal_dsc_id FROM agents WHERE node_name = ? AND agent_id LIKE 'TEMP-%'`, nodeName).Scan(&tempAgentId, &internalDSCId)
 				   if err == nil && tempAgentId != "" {
+					   if strings.TrimSpace(internalDSCId) == "" {
+						   internalDSCId = generateInternalDSCId(agentId)
+					   }
 					   // Mise à jour : change l'agent_id et les infos
-					   _, err = database.Exec(`UPDATE agents SET agent_id = ?, lcm_version = ?, registration_type = ?, certificate_thumbprint = ?, certificate_subject = ?, certificate_issuer = ?, certificate_notbefore = ?, certificate_notafter = ? WHERE agent_id = ?`,
-						   agentId, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, tempAgentId)
+					   _, err = database.Exec(`UPDATE agents SET agent_id = ?, internal_dsc_id = ?, lcm_version = ?, registration_type = ?, certificate_thumbprint = ?, certificate_subject = ?, certificate_issuer = ?, certificate_notbefore = ?, certificate_notafter = ? WHERE agent_id = ?`,
+						   agentId, internalDSCId, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, tempAgentId)
 					   if err != nil {
 						   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur update agent TEMP: %v", err))
 					   }
@@ -93,13 +98,14 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 						   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur update agent_tags TEMP: %v", err))
 					   }
 				   } else {
+						  internalDSCId = generateInternalDSCId(agentId)
 						  // Insertion normale, compatible SQLite/MSSQL
 						  if driver == "sqlite" {
-							  _, err = database.Exec(`INSERT OR REPLACE INTO agents (agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-								  agentId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, "pending_apply")
+							  _, err = database.Exec(`INSERT OR REPLACE INTO agents (agent_id, internal_dsc_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+								  agentId, internalDSCId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, "pending_apply")
 						  } else {
-							  _, err = database.Exec(`IF NOT EXISTS (SELECT 1 FROM agents WHERE agent_id = ?) INSERT INTO agents (agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-								  agentId, agentId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, nil, nil, 0)
+							  _, err = database.Exec(`IF NOT EXISTS (SELECT 1 FROM agents WHERE agent_id = ?) INSERT INTO agents (agent_id, internal_dsc_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+								  agentId, agentId, internalDSCId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, nil, nil, 0)
 						  }
 						  if err != nil {
 							  logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion agent: %v", err))
@@ -169,4 +175,12 @@ func randomHex(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func generateInternalDSCId(seed string) string {
+	h := rand.New(rand.NewSource(time.Now().UnixNano()))
+	if seed == "" {
+		seed = randomHex(8)
+	}
+	return fmt.Sprintf("IDSC-%s-%06X", strings.ToUpper(seed), h.Intn(0xFFFFFF))
 }
