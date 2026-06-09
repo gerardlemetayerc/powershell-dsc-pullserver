@@ -7,6 +7,7 @@ import (
 	"strings"
 	"golang.org/x/crypto/bcrypt"
 	"log"
+	"go-dsc-pull/internal/auth"
 	"go-dsc-pull/internal/global"
 	"time"
 	"strconv"
@@ -178,7 +179,12 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
 			return
 		}
-		secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
+		secretValue := auth.ResolveJWTSecret(appCfg)
+		if secretValue == "" {
+			http.Error(w, "Server configuration error: missing shared_secret", http.StatusInternalServerError)
+			return
+		}
+		secret := []byte(secretValue)
 		expiresAt := time.Now().Add(60 * time.Minute).Unix()
 		   claims := jwt.MapClaims{
 			   "sub": req.Username,

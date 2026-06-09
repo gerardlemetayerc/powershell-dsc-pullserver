@@ -43,7 +43,7 @@ func IsAdmin(r *http.Request, dbConn *sql.DB) bool {
 	}
 	secretValue := os.Getenv("JWT_SECRET")
 	if secretValue == "" {
-		secretValue = appCfg.DSCPullServer.SharedAccessSecret
+		secretValue = ResolveJWTSecret(appCfg)
 	}
 	if secretValue == "" {
 		return false

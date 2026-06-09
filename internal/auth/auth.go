@@ -33,7 +33,12 @@ func JwtOrAPITokenAuthMiddleware(dbConn *sql.DB) func(http.Handler) http.Handler
 					   http.Error(w, "Server configuration error: unable to load config", http.StatusInternalServerError)
 					   return
 				   }
-				   secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
+				   secretValue := ResolveJWTSecret(appCfg)
+				   if secretValue == "" {
+					   http.Error(w, "Server configuration error: missing shared_secret", http.StatusInternalServerError)
+					   return
+				   }
+				   secret := []byte(secretValue)
 				   jwtToken, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 					   if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 						   return nil, fmt.Errorf("Unexpected signing method")
