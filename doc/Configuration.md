@@ -48,6 +48,10 @@ This page describes all configuration options available in `config.json` for the
 | report_cleanup_interval_mins | int   | Cleanup execution interval in minutes               | `1440`                 |
 | enable_release_check       | bool    | Enable periodic GitHub latest release check         | `false`                |
 | release_check_interval_mins| int     | Release check execution interval in minutes         | `1440`                 |
+| enable_log_rotation        | bool    | Enable log file rotation                            | `true`                 |
+| log_rotate_max_size_mb     | int     | Rotate log file when size reaches this value (MB)   | `10`                   |
+| log_rotate_max_backups     | int     | Number of rotated log backups to keep               | `5`                    |
+| log_rotate_max_age_days    | int     | Delete rotated log backups older than this age       | `30`                   |
 
 ---
 
@@ -115,6 +119,10 @@ This page describes all configuration options available in `config.json` for the
     "port": 8484,
     "registrationKey": "AnyString",
     "release_check_interval_mins": 1440,
+    "enable_log_rotation": true,
+    "log_rotate_max_size_mb": 10,
+    "log_rotate_max_backups": 5,
+    "log_rotate_max_age_days": 30,
     "report_retention_days": 90,
     "report_cleanup_interval_mins": 1440,
     "jwt_secret": "pQw8vZ3rT6sJkL2xQ9eBfG7hN1uVtX4yC5zR8aW0sD3mPqE6bH0jKfL9nS2tU7vY1"

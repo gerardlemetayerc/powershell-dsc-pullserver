@@ -61,6 +61,29 @@ CREATE TABLE IF NOT EXISTS dsc_infra_info (
 );
 INSERT OR IGNORE INTO dsc_infra_info (id, web_version, db_version, updated_at) VALUES (1, '0.0.1', '1.1.3', CURRENT_TIMESTAMP);
 UPDATE dsc_infra_info SET db_version = '1.1.3', updated_at = CURRENT_TIMESTAMP WHERE id = 1;
+
+CREATE TABLE IF NOT EXISTS scheduler_tasks (
+    task_name TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    next_run_at TIMESTAMP NULL,
+    last_run_at TIMESTAMP NULL,
+    last_status TEXT NOT NULL DEFAULT 'idle',
+    last_message TEXT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS scheduler_task_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_name TEXT NOT NULL,
+    started_at TIMESTAMP NOT NULL,
+    finished_at TIMESTAMP NULL,
+    status TEXT NOT NULL,
+    message TEXT NULL,
+    trigger_source TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_scheduler_runs_task_started ON scheduler_task_runs(task_name, started_at DESC);
+
 -- Schéma pour la table agents
 
 CREATE TABLE IF NOT EXISTS agents (

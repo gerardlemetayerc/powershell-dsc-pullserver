@@ -18,6 +18,10 @@
     "port": 8484,
     "registrationKey": "AnyString",
     "release_check_interval_mins": 1440,
+    "enable_log_rotation": true,
+    "log_rotate_max_size_mb": 10,
+    "log_rotate_max_backups": 5,
+    "log_rotate_max_age_days": 30,
     "report_retention_days": 90,
     "report_cleanup_interval_mins": 1440
   },

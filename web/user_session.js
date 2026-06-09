@@ -82,6 +82,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     if (info.update_available) {
                         latest.innerHTML += ' <span class="badge badge-warning ml-1">Update available</span>';
+                    } else {
+                        latest.innerHTML += ' <span class="badge badge-success ml-1">OK</span>';
                     }
                 } else {
                     latest.textContent = 'Unavailable';

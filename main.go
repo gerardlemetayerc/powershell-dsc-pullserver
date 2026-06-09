@@ -87,6 +87,52 @@ func main() {
 			   logs.WriteLogFile(fmt.Sprintf("ERROR [INITDB] Failed to open DB: %v", err))
 			   os.Exit(1)
 		   }
+		   if cancelledRuns, cancelErr := db.CancelRunningSchedulerTasks(dbConn, global.AppConfig.Database.Driver, time.Now().UTC(), "Cancelled on application startup"); cancelErr != nil {
+			   logs.WriteLogFile(fmt.Sprintf("WARN [SCHEDULER] Failed to cancel stale running tasks on startup: %v", cancelErr))
+		   } else if cancelledRuns > 0 {
+			   logs.WriteLogFile(fmt.Sprintf("INFO [SCHEDULER] Cancelled %d stale running task execution(s) on startup", cancelledRuns))
+		   }
+
+		   const (
+			   taskReportCleanup = "report_cleanup"
+			   taskReleaseCheck  = "release_check"
+			   taskLogCleanup    = "log_cleanup"
+		   )
+
+		   const logMaintenanceInterval = time.Hour
+
+		   reportDisplay := "Report cleanup"
+		   releaseDisplay := "Release check"
+		   logDisplay := "Log rotate"
+
+		   var reportNext *time.Time
+		   if global.AppConfig.DSCPullServer.EnableReportAutoCleanup {
+			   intervalMins := global.AppConfig.DSCPullServer.ReportCleanupIntervalMins
+			   if intervalMins <= 0 {
+				   intervalMins = 1440
+			   }
+			   n := time.Now().UTC().Add(time.Duration(intervalMins) * time.Minute)
+			   reportNext = &n
+		   }
+		   _ = db.UpsertSchedulerTask(dbConn, global.AppConfig.Database.Driver, taskReportCleanup, reportDisplay, reportNext)
+
+		   var releaseNext *time.Time
+		   if global.AppConfig.DSCPullServer.EnableReleaseCheck {
+			   intervalMins := global.AppConfig.DSCPullServer.ReleaseCheckIntervalMins
+			   if intervalMins <= 0 {
+				   intervalMins = 1440
+			   }
+			   n := time.Now().UTC().Add(time.Duration(intervalMins) * time.Minute)
+			   releaseNext = &n
+		   }
+		   _ = db.UpsertSchedulerTask(dbConn, global.AppConfig.Database.Driver, taskReleaseCheck, releaseDisplay, releaseNext)
+
+		   var logNext *time.Time
+		   if global.AppConfig.DSCPullServer.EnableLogRotation {
+			   n := time.Now().UTC().Add(logMaintenanceInterval)
+			   logNext = &n
+		   }
+		   _ = db.UpsertSchedulerTask(dbConn, global.AppConfig.Database.Driver, taskLogCleanup, logDisplay, logNext)
 
 		   if global.AppConfig.DSCPullServer.EnableReportAutoCleanup {
 			   retentionDays := global.AppConfig.DSCPullServer.ReportRetentionDays
@@ -98,13 +144,27 @@ func main() {
 					   intervalMins = 1440
 				   }
 				   logs.WriteLogFile(fmt.Sprintf("INFO [REPORT CLEANUP] Enabled: retention=%d day(s), interval=%d minute(s)", retentionDays, intervalMins))
-				   db.StartReportCleanupWorker(dbConn, global.AppConfig.Database.Driver, retentionDays, time.Duration(intervalMins)*time.Minute, func(deleted int64, cleanupErr error) {
+				   db.StartReportCleanupWorker(
+					   dbConn,
+					   global.AppConfig.Database.Driver,
+					   retentionDays,
+					   time.Duration(intervalMins)*time.Minute,
+					   func(startedAt time.Time, nextRunAt *time.Time) {
+						   _ = db.BeginSchedulerTaskRun(dbConn, global.AppConfig.Database.Driver, taskReportCleanup, reportDisplay, "automatic", startedAt, nextRunAt)
+					   },
+					   func(startedAt time.Time, deleted int64, cleanupErr error) {
 					   if cleanupErr != nil {
 						   logs.WriteLogFile(fmt.Sprintf("ERROR [REPORT CLEANUP] %v", cleanupErr))
+						   msg := cleanupErr.Error()
+						   _ = db.CompleteSchedulerTaskRun(dbConn, global.AppConfig.Database.Driver, taskReportCleanup, "error", msg, time.Now().UTC(), nil)
 						   return
 					   }
 					   logs.WriteLogFile(fmt.Sprintf("INFO [REPORT CLEANUP] Deleted %d old report(s)", deleted))
-				   })
+					   next := startedAt.Add(time.Duration(intervalMins) * time.Minute)
+					   msg := fmt.Sprintf("Deleted %d old report(s)", deleted)
+					   _ = db.CompleteSchedulerTaskRun(dbConn, global.AppConfig.Database.Driver, taskReportCleanup, "success", msg, time.Now().UTC(), &next)
+					 },
+				   )
 			   }
 		   }
 
@@ -114,19 +174,52 @@ func main() {
 				   intervalMins = 1440
 			   }
 			   logs.WriteLogFile(fmt.Sprintf("INFO [RELEASE CHECK] Enabled: interval=%d minute(s)", intervalMins))
-			   service.StartReleaseCheckWorker(buildinfo.Version, time.Duration(intervalMins)*time.Minute, func(result service.ReleaseCheckResult, checkErr error) {
+			   service.StartReleaseCheckWorker(
+				   buildinfo.Version,
+				   time.Duration(intervalMins)*time.Minute,
+				   func(startedAt time.Time, nextRunAt *time.Time) {
+					   _ = db.BeginSchedulerTaskRun(dbConn, global.AppConfig.Database.Driver, taskReleaseCheck, releaseDisplay, "automatic", startedAt, nextRunAt)
+				   },
+				   func(startedAt time.Time, result service.ReleaseCheckResult, checkErr error) {
 				   if checkErr != nil {
 					   logs.WriteLogFile(fmt.Sprintf("WARN [RELEASE CHECK] %v", checkErr))
 					   _ = db.PersistReleaseCheckFailure(dbConn, global.AppConfig.Database.Driver)
+					   next := startedAt.Add(time.Duration(intervalMins) * time.Minute)
+					   _ = db.CompleteSchedulerTaskRun(dbConn, global.AppConfig.Database.Driver, taskReleaseCheck, "error", checkErr.Error(), time.Now().UTC(), &next)
 					   return
 				   }
 				   _ = db.PersistReleaseCheckSuccess(dbConn, global.AppConfig.Database.Driver, result.LatestRelease, result.LatestReleaseURL, result.UpdateAvailable)
 				   if result.UpdateAvailable {
 					   logs.WriteLogFile(fmt.Sprintf("INFO [RELEASE CHECK] Update available: current=%s latest=%s", result.CurrentVersion, result.LatestRelease))
+					   next := startedAt.Add(time.Duration(intervalMins) * time.Minute)
+					   _ = db.CompleteSchedulerTaskRun(dbConn, global.AppConfig.Database.Driver, taskReleaseCheck, "success", fmt.Sprintf("Update available: %s", result.LatestRelease), time.Now().UTC(), &next)
 				   } else {
 					   logs.WriteLogFile(fmt.Sprintf("INFO [RELEASE CHECK] Up to date: current=%s", result.CurrentVersion))
+					   next := startedAt.Add(time.Duration(intervalMins) * time.Minute)
+					   _ = db.CompleteSchedulerTaskRun(dbConn, global.AppConfig.Database.Driver, taskReleaseCheck, "success", "Already up to date", time.Now().UTC(), &next)
 				   }
-			   })
+				   },
+			   )
+		   }
+
+		   if global.AppConfig.DSCPullServer.EnableLogRotation {
+			   logs.WriteLogFile(fmt.Sprintf("INFO [LOG ROTATION] Enabled: maintenance interval=%s", logMaintenanceInterval))
+			   logs.StartLogMaintenanceWorker(
+				   logMaintenanceInterval,
+				   func(startedAt time.Time, nextRunAt *time.Time) {
+					   _ = db.BeginSchedulerTaskRun(dbConn, global.AppConfig.Database.Driver, taskLogCleanup, logDisplay, "automatic", startedAt, nextRunAt)
+				   },
+				   func(startedAt time.Time, deleted int, runErr error) {
+					   next := startedAt.Add(logMaintenanceInterval)
+					   if runErr != nil {
+						   logs.WriteLogFile(fmt.Sprintf("ERROR [LOG ROTATION] %v", runErr))
+						   _ = db.CompleteSchedulerTaskRun(dbConn, global.AppConfig.Database.Driver, taskLogCleanup, "error", runErr.Error(), time.Now().UTC(), &next)
+						   return
+					   }
+					   msg := fmt.Sprintf("Deleted %d backup(s)", deleted)
+					   _ = db.CompleteSchedulerTaskRun(dbConn, global.AppConfig.Database.Driver, taskLogCleanup, "success", msg, time.Now().UTC(), &next)
+				   },
+			   )
 		   }
 
 		   if global.AppConfig.SAML.Enabled {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -17,6 +18,21 @@ type ReleaseCheckResult struct {
 	LatestRelease    string
 	LatestReleaseURL string
 	UpdateAvailable  bool
+}
+
+func normalizeVersionTag(version string) string {
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return ""
+	}
+	if version[0] == 'v' || version[0] == 'V' {
+		return version[1:]
+	}
+	return version
+}
+
+func versionsEqualIgnoringVPrefix(a, b string) bool {
+	return normalizeVersionTag(a) == normalizeVersionTag(b)
 }
 
 func CheckLatestRelease(currentVersion string) (ReleaseCheckResult, error) {
@@ -47,16 +63,25 @@ func CheckLatestRelease(currentVersion string) (ReleaseCheckResult, error) {
 		CurrentVersion:   currentVersion,
 		LatestRelease:    rel.TagName,
 		LatestReleaseURL: rel.HTMLURL,
-		UpdateAvailable:  rel.TagName != "" && rel.TagName != currentVersion,
+		UpdateAvailable:  rel.TagName != "" && !versionsEqualIgnoringVPrefix(rel.TagName, currentVersion),
 	}
 	return result, nil
 }
 
-func StartReleaseCheckWorker(currentVersion string, interval time.Duration, onResult func(ReleaseCheckResult, error)) {
+func StartReleaseCheckWorker(currentVersion string, interval time.Duration, onRunStart func(startedAt time.Time, nextRunAt *time.Time), onResult func(startedAt time.Time, result ReleaseCheckResult, err error)) {
 	run := func() {
+		startedAt := time.Now().UTC()
+		var nextRunAt *time.Time
+		if interval > 0 {
+			n := startedAt.Add(interval)
+			nextRunAt = &n
+		}
+		if onRunStart != nil {
+			onRunStart(startedAt, nextRunAt)
+		}
 		result, err := CheckLatestRelease(currentVersion)
 		if onResult != nil {
-			onResult(result, err)
+			onResult(startedAt, result, err)
 		}
 	}
 

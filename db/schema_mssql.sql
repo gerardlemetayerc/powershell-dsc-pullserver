@@ -100,6 +100,33 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'dsc_infra_info' AND COLUMN_NAME = 'release_checked_at')
         ALTER TABLE dsc_infra_info ADD release_checked_at DATETIME NULL;
 END
+
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='scheduler_tasks' AND xtype='U')
+CREATE TABLE scheduler_tasks (
+    task_name NVARCHAR(64) PRIMARY KEY,
+    display_name NVARCHAR(128) NOT NULL,
+    next_run_at DATETIME NULL,
+    last_run_at DATETIME NULL,
+    last_status NVARCHAR(32) NOT NULL DEFAULT 'idle',
+    last_message NVARCHAR(512) NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='scheduler_task_runs' AND xtype='U')
+CREATE TABLE scheduler_task_runs (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    task_name NVARCHAR(64) NOT NULL,
+    started_at DATETIME NOT NULL,
+    finished_at DATETIME NULL,
+    status NVARCHAR(32) NOT NULL,
+    message NVARCHAR(512) NULL,
+    trigger_source NVARCHAR(32) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_scheduler_runs_task_started' AND object_id = OBJECT_ID('scheduler_task_runs'))
+    CREATE INDEX idx_scheduler_runs_task_started ON scheduler_task_runs(task_name, started_at DESC);
+
 -- To update version:
 -- UPDATE dsc_infra_info SET db_version = '1.1.2p2', updated_at = GETDATE() WHERE id = 1;
 

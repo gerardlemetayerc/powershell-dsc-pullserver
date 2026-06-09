@@ -2,6 +2,7 @@
 *.checksum
 *.exe
 *.log
+dsc-pull-server.log*
 *.db
 *.crt
 *.pem

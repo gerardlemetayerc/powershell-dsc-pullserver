@@ -6,6 +6,7 @@ import (
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/global"
 	"net/http"
+	"os"
 	"strings"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -40,7 +41,14 @@ func IsAdmin(r *http.Request, dbConn *sql.DB) bool {
 	if appCfg == nil {
 		return false
 	}
-	secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
+	secretValue := os.Getenv("JWT_SECRET")
+	if secretValue == "" {
+		secretValue = ResolveJWTSecret(appCfg)
+	}
+	if secretValue == "" {
+		return false
+	}
+	secret := []byte(secretValue)
 
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

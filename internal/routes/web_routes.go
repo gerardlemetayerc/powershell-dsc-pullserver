@@ -2,7 +2,6 @@ package routes
 
 import (
 	"net/http"
-	"os"
 	"database/sql"
 	"go-dsc-pull/handlers"
 	"go-dsc-pull/internal/middleware"
@@ -58,6 +57,13 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 			       }
 	// Endpoint pour la liste des profils utilisateurs disponibles
 	mux.Handle("GET /api/v1/user_roles", jwtAuthMiddleware(http.HandlerFunc(handlers.UserRolesHandler())))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/" {
+			http.Redirect(w, r, "/web", http.StatusFound)
+			return
+		}
+		handlers.NotFoundHandler(w, r)
+	})
 	exeDir, err := utils.ExePath()
 	if err != nil {
 		panic("Failed to get executable path: " + err.Error())
@@ -84,8 +90,11 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("POST /api/v1/saml/upload_sp_keycert", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SAMLUploadSPKeyCertHandler))))
 	mux.Handle("GET /api/v1/scheduler/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerConfigAPIHandler))))
 	mux.Handle("PUT /api/v1/scheduler/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerConfigAPIHandler))))
+	mux.Handle("GET /api/v1/scheduler/tasks", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerTasksAPIHandler))))
+	mux.Handle("GET /api/v1/scheduler/tasks/{task}/history", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerTaskHistoryAPIHandler))))
 	mux.Handle("POST /api/v1/scheduler/cleanup/run", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerRunCleanupAPIHandler))))
 	mux.Handle("POST /api/v1/scheduler/release-check/run", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerRunReleaseCheckAPIHandler))))
+	mux.Handle("POST /api/v1/scheduler/logs/cleanup/run", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerRunLogCleanupAPIHandler))))
 	// Web UI for SAML config (admin only)
 	mux.Handle("GET /web/saml_config", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebSAMLConfigHandler))))
 	mux.Handle("GET /web/admin/scheduler", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebSchedulerConfigHandler))))
@@ -125,34 +134,32 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 		mux.HandleFunc("/saml/metadata", func(w http.ResponseWriter, r *http.Request) {smw.ServeHTTP(w, r)})
 	}
 	
+	webStatic := http.FileServer(http.Dir(filepath.Join(baseDir, "web")))
+
 	// Web GUI endpoints (login, index, static, node, modules, configuration_model, properties, users, user_edit, user_password)
 	mux.Handle("/web", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)))
 	// Custom static file handler to prevent directory listing under /web/
 	mux.Handle("/web/", http.StripPrefix("/web/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		   requestedPath := r.URL.Path
-		   if requestedPath == "" || requestedPath == "/" {
-			   handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)).ServeHTTP(w, r)
-			   return
-		   }
-		   webRoot := filepath.Join(baseDir, "web")
-		   cleanPath := path.Clean("/" + requestedPath)
-		   relativePath := strings.TrimPrefix(cleanPath, "/")
-		   if relativePath == "" || relativePath == "." {
-			   handlers.NotFoundHandler(w, r)
-			   return
-		   }
-		   fullPath := filepath.Join(webRoot, filepath.FromSlash(relativePath))
-		   relPath, err := filepath.Rel(webRoot, fullPath)
-		   if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || filepath.IsAbs(relPath) {
-			   handlers.NotFoundHandler(w, r)
-			   return
-		   }
-		   info, err := os.Stat(fullPath)
-		   if err != nil || info.IsDir() {
-			   handlers.NotFoundHandler(w, r)
-			   return
-		   }
-		   http.ServeFile(w, r, fullPath)
+		requestedPath := strings.TrimSpace(r.URL.Path)
+		if requestedPath == "" || requestedPath == "/" {
+			handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebIndexHandler)).ServeHTTP(w, r)
+			return
+		}
+
+		cleanPath := path.Clean("/" + requestedPath)
+		relativePath := strings.TrimPrefix(cleanPath, "/")
+		if relativePath == "" || relativePath == "." || strings.Contains(relativePath, "..") || strings.HasSuffix(relativePath, "/") {
+			handlers.NotFoundHandler(w, r)
+			return
+		}
+		// Static assets are file resources. Reject extension-less paths to avoid directory probing.
+		if path.Ext(relativePath) == "" {
+			handlers.NotFoundHandler(w, r)
+			return
+		}
+
+		r.URL.Path = "/" + relativePath
+		webStatic.ServeHTTP(w, r)
 	   })))
 	mux.Handle("/web/node/", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebNodeHandler)))
 	mux.Handle("/web/modules", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebModulesHandler)))
@@ -180,4 +187,5 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("DELETE /api/v1/agents/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteNodeHandler)))
 	mux.Handle("/web/admin/audit",handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebAuditHandler))))
 	mux.Handle("GET /api/v1/audit", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AuditListHandler))))
+	mux.Handle("GET /api/v1/audit/export", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AuditExportCSVHandler))))
 }

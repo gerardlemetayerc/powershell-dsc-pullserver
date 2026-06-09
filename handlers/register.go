@@ -33,9 +33,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	xmsDate := r.Header.Get("x-ms-date")
-	valid, logMsg := internalutils.ValidateDSCRegistrationKey(body, xmsDate, authHeader, registrationKeyPlain)
+	valid, _ := internalutils.ValidateDSCRegistrationKey(body, xmsDate, authHeader, registrationKeyPlain)
 	if !valid {
-		log.Print(logMsg)
+		log.Print("[REGISTER][AUTH] invalid DSC registration signature")
 		http.Error(w, "Unauthorized: invalid signature", http.StatusUnauthorized)
 		return
 	}

@@ -88,9 +88,15 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 			if sub, ok := r.Context().Value("userId").(string); ok {
 				uploadedBy = sub
 			}
-		} else if auth := r.Header.Get("Authorization"); len(auth) > 7 {
-			tokenStr := auth[7:]
-			secret := []byte(global.AppConfig.DSCPullServer.SharedAccessSecret)
+		} else if authHeader := r.Header.Get("Authorization"); len(authHeader) > 7 {
+			tokenStr := authHeader[7:]
+			secretValue := auth.ResolveJWTSecret(global.AppConfig)
+			if secretValue == "" {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Missing shared_secret"))
+				return
+			}
+			secret := []byte(secretValue)
 			token, _ := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) { return secret, nil })
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 				if sub, ok := claims["sub"].(string); ok {

@@ -38,11 +38,20 @@ func CleanupOldReports(database *sql.DB, driver string, retentionDays int) (int6
 }
 
 // StartReportCleanupWorker runs cleanup immediately and then at a fixed interval.
-func StartReportCleanupWorker(database *sql.DB, driver string, retentionDays int, interval time.Duration, onResult func(deleted int64, err error)) {
+func StartReportCleanupWorker(database *sql.DB, driver string, retentionDays int, interval time.Duration, onRunStart func(startedAt time.Time, nextRunAt *time.Time), onResult func(startedAt time.Time, deleted int64, err error)) {
 	run := func() {
+		startedAt := time.Now().UTC()
+		var nextRunAt *time.Time
+		if interval > 0 {
+			n := startedAt.Add(interval)
+			nextRunAt = &n
+		}
+		if onRunStart != nil {
+			onRunStart(startedAt, nextRunAt)
+		}
 		deleted, err := CleanupOldReports(database, driver, retentionDays)
 		if onResult != nil {
-			onResult(deleted, err)
+			onResult(startedAt, deleted, err)
 		}
 	}
 

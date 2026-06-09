@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 	"database/sql"
+	"go-dsc-pull/internal/auth"
 	"go-dsc-pull/internal/db"
 	"go-dsc-pull/internal/global"
 	samlsp "github.com/crewjam/saml/samlsp"
@@ -108,7 +109,13 @@ func SAMLLoginHandler(dbConn *sql.DB) http.HandlerFunc {
 		}
 		
 
-	secret := []byte(appCfg.DSCPullServer.SharedAccessSecret)
+	secretValue := auth.ResolveJWTSecret(appCfg)
+	if secretValue == "" {
+		log.Printf("[SAML] Missing shared_secret in config")
+		http.Error(w, "Server configuration error: missing shared_secret", http.StatusInternalServerError)
+		return
+	}
+	secret := []byte(secretValue)
 	expiresAt := time.Now().Add(60 * time.Minute).Unix()
 		claims := jwt.MapClaims{
 			"sub": email,
