@@ -68,11 +68,20 @@ func CheckLatestRelease(currentVersion string) (ReleaseCheckResult, error) {
 	return result, nil
 }
 
-func StartReleaseCheckWorker(currentVersion string, interval time.Duration, onResult func(ReleaseCheckResult, error)) {
+func StartReleaseCheckWorker(currentVersion string, interval time.Duration, onRunStart func(startedAt time.Time, nextRunAt *time.Time), onResult func(startedAt time.Time, result ReleaseCheckResult, err error)) {
 	run := func() {
+		startedAt := time.Now().UTC()
+		var nextRunAt *time.Time
+		if interval > 0 {
+			n := startedAt.Add(interval)
+			nextRunAt = &n
+		}
+		if onRunStart != nil {
+			onRunStart(startedAt, nextRunAt)
+		}
 		result, err := CheckLatestRelease(currentVersion)
 		if onResult != nil {
-			onResult(result, err)
+			onResult(startedAt, result, err)
 		}
 	}
 

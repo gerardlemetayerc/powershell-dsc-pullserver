@@ -14,6 +14,10 @@ type HTTPConfig struct {
 	ReportCleanupIntervalMins int `json:"report_cleanup_interval_mins"`
 	EnableReleaseCheck bool `json:"enable_release_check"`
 	ReleaseCheckIntervalMins int `json:"release_check_interval_mins"`
+	EnableLogRotation bool `json:"enable_log_rotation"`
+	LogRotateMaxSizeMB int `json:"log_rotate_max_size_mb"`
+	LogRotateMaxBackups int `json:"log_rotate_max_backups"`
+	LogRotateMaxAgeDays int `json:"log_rotate_max_age_days"`
 }
 
 type AppConfig struct {
