@@ -133,6 +133,18 @@ $(function() {
             .replace(/>/g, '&gt;');
     }
 
+    function safeAttr(v) {
+        if (v === null || v === undefined || v === '') {
+            return '-';
+        }
+        return String(v)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     function formatDateWithTimezone(value) {
         if (!value) {
             return '-';
@@ -178,9 +190,9 @@ $(function() {
                         '<td>' + formatDateWithTimezone(task.last_run_at) + '</td>' +
                         '<td>' + statusBadge(task.last_status) + note + '</td>' +
                         '<td>' +
-                            '<button type="button" class="btn btn-sm btn-outline-primary js-task-history" data-task="' + safe(task.task_name) + '">History</button> ' +
-                            '<button type="button" class="btn btn-sm btn-outline-secondary js-task-configure" data-task="' + safe(task.task_name) + '">Configure</button> ' +
-                            '<button type="button" class="btn btn-sm btn-outline-success js-task-run" data-task="' + safe(task.task_name) + '" ' + runBtnDisabled + '>Run</button>' +
+                            '<button type="button" class="btn btn-sm btn-outline-primary js-task-history" data-task="' + safeAttr(task.task_name) + '">History</button> ' +
+                            '<button type="button" class="btn btn-sm btn-outline-secondary js-task-configure" data-task="' + safeAttr(task.task_name) + '">Configure</button> ' +
+                            '<button type="button" class="btn btn-sm btn-outline-success js-task-run" data-task="' + safeAttr(task.task_name) + '" ' + runBtnDisabled + '>Run</button>' +
                         '</td>' +
                     '</tr>';
                 }).join('');
