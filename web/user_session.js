@@ -100,13 +100,43 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 // Active dynamiquement le menu selon l'URL
 document.addEventListener('DOMContentLoaded', function() {
-    var path = window.location.pathname;
+    var normalizePath = function(value) {
+        if (!value) {
+            return '/';
+        }
+        if (value.length > 1 && value.endsWith('/')) {
+            return value.slice(0, -1);
+        }
+        return value;
+    };
+
+    var path = normalizePath(window.location.pathname);
+
+    document.querySelectorAll('.main-sidebar .nav-item.has-treeview').forEach(function(item) {
+        item.classList.remove('menu-open');
+    });
+
     document.querySelectorAll('.main-sidebar .nav-link').forEach(function(link) {
-        // Retire la classe active de tous
         link.classList.remove('active');
-        // Active si correspond à l'URL courante
-        if (link.getAttribute('href') === path) {
-            link.classList.add('active');
+    });
+
+    var links = document.querySelectorAll('.main-sidebar .nav-link[href]');
+    links.forEach(function(link) {
+        var href = link.getAttribute('href');
+        if (!href || href === '#') {
+            return;
+        }
+
+        var linkPath = normalizePath(href.split('?')[0].split('#')[0]);
+        if (linkPath !== path) {
+            return;
+        }
+
+        link.classList.add('active');
+
+        var parentTree = link.closest('.nav-item.has-treeview');
+        if (parentTree) {
+            parentTree.classList.add('menu-open');
         }
     });
 });
