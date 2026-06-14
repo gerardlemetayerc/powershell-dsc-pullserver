@@ -13,7 +13,7 @@ input[type=text] { padding: 0.3em; margin-right: 0.5em; }
 	--sb-bg-top: #0f172a;
 	--sb-bg-bottom: #1e293b;
 	--sb-item-hover: rgba(148, 163, 184, 0.09);
-	--sb-item-active: rgba(148, 163, 184, 0.14);
+	--sb-item-active: #FFFFFF1A;
 	--sb-item-text: #dbeafe;
 	--sb-item-muted: #94a3b8;
 	background: linear-gradient(180deg, var(--sb-bg-top) 0%, var(--sb-bg-bottom) 100%);
@@ -48,8 +48,11 @@ input[type=text] { padding: 0.3em; margin-right: 0.5em; }
 	color: #f8fafc;
 }
 
-.sidebar-modern .nav-sidebar .nav-link.active {
+.sidebar-modern .nav-sidebar .nav-link.active,
+.sidebar-modern .menu-open > .nav-link,
+.sidebar-modern .nav-sidebar > .nav-item > .nav-link.active {
 	background: var(--sb-item-active);
+	background-color: var(--sb-item-active) !important;
 	color: #ffffff;
 	box-shadow: none;
 	border-left: 3px solid rgba(125, 211, 252, 0.6);

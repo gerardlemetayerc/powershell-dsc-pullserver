@@ -82,6 +82,11 @@ Both JWT and API tokens grant access to the API according to the user's permissi
 - List all agents.
 - Query params supported:
 	- `count=1`: return only the total count.
+	- `stats` (ex: `/api/v1/agents?stats`): return agent counts by status buckets:
+		- `compliant` (`state` in `success|ok`)
+		- `failed` (`state=failure`)
+		- `pending_enroll` (`state=waiting_for_registration`)
+		- `pending_apply` (`state=pending_apply`)
 	- `node_name=<name>`: filter by exact node name.
 	- `has_error_last_report=true|false`: filter by last report error status.
 	- `tag=key:value`: filter by tag.
