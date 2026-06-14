@@ -13,6 +13,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$AppwizUninstallKeyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\DSC-Admin-Console"
 
 function Assert-Admin {
     $currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -159,6 +160,41 @@ function Update-RegistryMetadata {
     }
 }
 
+function Ensure-AppwizUninstallEntry {
+    param(
+        [Parameter(Mandatory = $true)][string]$KeyPath,
+        [Parameter(Mandatory = $true)][string]$InstallPathValue,
+        [Parameter(Mandatory = $true)][string]$ExePath,
+        [Parameter(Mandatory = $true)][string]$ServiceNameValue,
+        [string]$VersionValue
+    )
+
+    if (-not (Test-Path -Path $KeyPath)) {
+        New-Item -Path $KeyPath -Force | Out-Null
+    }
+
+    $displayVersion = if ([string]::IsNullOrWhiteSpace($VersionValue)) { "Unknown" } else { $VersionValue }
+    $uninstallScriptPath = Join-Path $InstallPathValue "scripts\uninstall-windows.ps1"
+    $uninstallCmd = "powershell.exe -ExecutionPolicy Bypass -File `"$uninstallScriptPath`" -InstallPath `"$InstallPathValue`" -ServiceName `"$ServiceNameValue`""
+    $quietUninstallCmd = $uninstallCmd + " -Force"
+
+    $estimatedSizeKb = 0
+    if (Test-Path -Path $InstallPathValue -PathType Container) {
+        $estimatedSizeKb = [int]([Math]::Round(((Get-ChildItem -Path $InstallPathValue -Recurse -Force -File | Measure-Object -Property Length -Sum).Sum / 1KB), 0))
+    }
+
+    New-ItemProperty -Path $KeyPath -Name "DisplayName" -PropertyType String -Value "DSC Admin Console" -Force | Out-Null
+    New-ItemProperty -Path $KeyPath -Name "DisplayVersion" -PropertyType String -Value $displayVersion -Force | Out-Null
+    New-ItemProperty -Path $KeyPath -Name "Publisher" -PropertyType String -Value "go-dsc-pull" -Force | Out-Null
+    New-ItemProperty -Path $KeyPath -Name "InstallLocation" -PropertyType String -Value $InstallPathValue -Force | Out-Null
+    New-ItemProperty -Path $KeyPath -Name "DisplayIcon" -PropertyType String -Value $ExePath -Force | Out-Null
+    New-ItemProperty -Path $KeyPath -Name "UninstallString" -PropertyType String -Value $uninstallCmd -Force | Out-Null
+    New-ItemProperty -Path $KeyPath -Name "QuietUninstallString" -PropertyType String -Value $quietUninstallCmd -Force | Out-Null
+    New-ItemProperty -Path $KeyPath -Name "NoModify" -PropertyType DWord -Value 1 -Force | Out-Null
+    New-ItemProperty -Path $KeyPath -Name "NoRepair" -PropertyType DWord -Value 1 -Force | Out-Null
+    New-ItemProperty -Path $KeyPath -Name "EstimatedSize" -PropertyType DWord -Value $estimatedSizeKb -Force | Out-Null
+}
+
 Assert-Admin
 
 $source = Resolve-AbsolutePath -Path $SourcePath
@@ -213,10 +249,12 @@ try {
         $version = (Get-Item -Path $installedExePath).VersionInfo.ProductVersion
     }
     Update-RegistryMetadata -KeyPath $RegistryKeyPath -PathValue $resolvedInstallPath -VersionValue $version -ServiceNameValue $ServiceName
+    Ensure-AppwizUninstallEntry -KeyPath $AppwizUninstallKeyPath -InstallPathValue $resolvedInstallPath -ExePath $installedExePath -ServiceNameValue $ServiceName -VersionValue $version
 
     Write-Host "Mise a jour terminee."
     Write-Host "InstallPath registre: $resolvedInstallPath"
     Write-Host "ServiceName registre: $ServiceName"
+    Write-Host "Entree Appwiz mise a jour: $AppwizUninstallKeyPath"
     if ($skipConfig) {
         Write-Host "config.json existant conserve (utiliser -OverwriteConfig pour l ecraser)."
     }
