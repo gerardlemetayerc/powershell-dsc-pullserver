@@ -82,6 +82,11 @@ Both JWT and API tokens grant access to the API according to the user's permissi
 - List all agents.
 - Query params supported:
 	- `count=1`: return only the total count.
+	- `stats` (ex: `/api/v1/agents?stats`): return agent counts by status buckets:
+		- `compliant` (`state` in `success|ok`)
+		- `failed` (`state=failure`)
+		- `pending_enroll` (`state=waiting_for_registration`)
+		- `pending_apply` (`state=pending_apply`)
 	- `node_name=<name>`: filter by exact node name.
 	- `has_error_last_report=true|false`: filter by last report error status.
 	- `tag=key:value`: filter by tag.
@@ -121,6 +126,28 @@ Both JWT and API tokens grant access to the API according to the user's permissi
 
 ### DELETE `/api/v1/agents/{id}/tags`
 - Remove all agent's tags.
+
+---
+
+## Audit
+
+### GET `/api/v1/audit`
+- List audit rows (paginated, DataTables compatible).
+- Query params supported (combinable):
+	- `users=user1,user2` (emails)
+	- `actions=login,delete`
+	- `date_from=YYYY-MM-DDTHH:mm` (or `YYYY-MM-DD HH:mm:ss`)
+	- `date_to=YYYY-MM-DDTHH:mm` (or `YYYY-MM-DD HH:mm:ss`)
+	- DataTables params: `draw`, `start`, `length`, `search[value]`, `order[0][column]`, `order[0][dir]`
+
+### GET `/api/v1/audit/filters`
+- Returns available values for audit filter dropdowns.
+- Response shape:
+	- `users`: string[]
+	- `actions`: string[]
+
+### GET `/api/v1/audit/export`
+- Export audit rows as CSV.
 
 ---
 

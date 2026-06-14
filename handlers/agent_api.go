@@ -21,6 +21,31 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
+	// Support de l'option ?stats (avec ou sans valeur), ex: /api/v1/agents?stats
+	if _, statsRequested := r.URL.Query()["stats"]; statsRequested {
+		var compliant, failed, pendingEnroll, pendingApply int
+		err := database.QueryRow(`
+			SELECT
+				SUM(CASE WHEN LOWER(COALESCE(state, '')) IN ('success', 'ok') THEN 1 ELSE 0 END) AS compliant,
+				SUM(CASE WHEN LOWER(COALESCE(state, '')) = 'failure' THEN 1 ELSE 0 END) AS failed,
+				SUM(CASE WHEN LOWER(COALESCE(state, '')) = 'waiting_for_registration' THEN 1 ELSE 0 END) AS pending_enroll,
+				SUM(CASE WHEN LOWER(COALESCE(state, '')) = 'pending_apply' THEN 1 ELSE 0 END) AS pending_apply
+			FROM agents`).Scan(&compliant, &failed, &pendingEnroll, &pendingApply)
+		if err != nil {
+			http.Error(w, "DB stats error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]int{
+			"compliant":      compliant,
+			"failed":         failed,
+			"pending_enroll": pendingEnroll,
+			"pending_apply":  pendingApply,
+		})
+		return
+	}
+
 	       // Support de l'option ?count=1
 	       if r.URL.Query().Get("count") == "1" {
 		       var count int

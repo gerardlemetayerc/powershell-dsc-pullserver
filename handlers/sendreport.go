@@ -112,18 +112,7 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 				log.Printf("[SENDREPORT] Erreur update last_communication: %v", err)
 			}
 
-			hasReportErrors := false
-			for _, reportErr := range report.Errors {
-				errText := strings.TrimSpace(reportErr)
-				if errText != "" && errText != "[]" && errText != "{}" && strings.ToLower(errText) != "null" {
-					hasReportErrors = true
-					break
-				}
-			}
 
-			// Regle metier:
-			// - MOF: success => OK, tout autre statut => KO
-			// - Sans MOF: erreurs explicites => KO, sinon ne pas modifier l etat
 			if mofApplied == 1 {
 				hasError := 1
 				state := "Failure"
@@ -134,11 +123,6 @@ func SendReportHandler(w http.ResponseWriter, r *http.Request) {
 				_, err = database.Exec("UPDATE agents SET has_error_last_report = ?, state = ? WHERE agent_id = ?", hasError, state, agentId)
 				if err != nil {
 					log.Printf("[SENDREPORT] Erreur update has_error_last_report/state: %v", err)
-				}
-			} else if hasReportErrors {
-				_, err = database.Exec("UPDATE agents SET has_error_last_report = ?, state = ? WHERE agent_id = ?", 1, "Failure", agentId)
-				if err != nil {
-					log.Printf("[SENDREPORT] Erreur update has_error_last_report/state (no MOF + errors): %v", err)
 				}
 			} else {
 				log.Printf("[SENDREPORT] Rapport ignore pour l etat web (mof_applied=0): agent_id=%s, job_id=%s, operation_type=%s", agentId, report.JobId, report.OperationType)

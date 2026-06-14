@@ -51,40 +51,24 @@ $(document).ready(function() {
     $(window).on('resize', function() {
         $('#agents-table').DataTable().columns.adjust().responsive.recalc();
     });
-    $.getJSON('/api/v1/agents', function(agents) {
-        // Affiche le nombre total d'agents
-        $('#total-agents').text(agents.length);
-        // Calcule le nombre d'agents par état principal
-        let ok = 0, err = 0, pendingEnroll = 0, pendingApply = 0;
-        agents.forEach(a => {
-            if (!a.state) return;
-            switch (a.state.toLowerCase()) {
-                case 'success':
-                    ok++;
-                    break;
-                case 'ok':
-                    ok++;
-                    break;
-                case 'failure':
-                    err++;
-                    break;
-                case 'waiting_for_registration':
-                    pendingEnroll++;
-                    break;
-                case 'pending_apply':
-                    pendingApply++;
-                    break;
-                default:
-                    // ignore or handle as needed
-                    break;
-            }
-        });
+    $.getJSON('/api/v1/agents?count=1', function(data) {
+        if (data && typeof data.count !== 'undefined') {
+            $('#total-agents').text(data.count);
+        }
+    });
+
+    $.getJSON('/api/v1/agents?stats', function(stats) {
+        let ok = (stats && typeof stats.compliant !== 'undefined') ? stats.compliant : 0;
+        let err = (stats && typeof stats.failed !== 'undefined') ? stats.failed : 0;
+        let pendingEnroll = (stats && typeof stats.pending_enroll !== 'undefined') ? stats.pending_enroll : 0;
+        let pendingApply = (stats && typeof stats.pending_apply !== 'undefined') ? stats.pending_apply : 0;
+
         // Affiche le camembert avec 4 catégories
         const ctx = document.getElementById('agents-pie').getContext('2d');
         const chart = new Chart(ctx, {
             type: 'pie',
             data: {
-                labels: ['success', 'Failed', 'Pending Enroll', 'Pending Apply'],
+                labels: ['Compliant', 'Failed', 'Pending Enroll', 'Pending Apply'],
                 datasets: [{
                     data: [ok, err, pendingEnroll, pendingApply],
                     backgroundColor: ['#28a745', '#dc3545', '#6c757d', '#ffc107'],

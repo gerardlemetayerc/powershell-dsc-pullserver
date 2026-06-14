@@ -264,6 +264,7 @@ func CancelRunningSchedulerTasks(db *sql.DB, driver string, cancelledAt time.Tim
 	}
 
 	finished := formatTS(cancelledAt)
+	finishedMSSQL := cancelledAt.UTC()
 	driver = strings.ToLower(driver)
 
 	var result sql.Result
@@ -273,7 +274,7 @@ func CancelRunningSchedulerTasks(db *sql.DB, driver string, cancelledAt time.Tim
 UPDATE scheduler_task_runs
 SET finished_at = ?, status = 'cancelled', message = CASE WHEN message IS NULL OR LTRIM(RTRIM(message)) = '' THEN ? ELSE message END
 WHERE status = 'running'
-`, finished, message)
+`, finishedMSSQL, message)
 	} else {
 		result, err = db.Exec(`
 UPDATE scheduler_task_runs
