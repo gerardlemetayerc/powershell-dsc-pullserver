@@ -187,5 +187,6 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("DELETE /api/v1/agents/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteNodeHandler)))
 	mux.Handle("/web/admin/audit",handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebAuditHandler))))
 	mux.Handle("GET /api/v1/audit", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AuditListHandler))))
+	mux.Handle("GET /api/v1/audit/filters", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AuditFilterOptionsHandler))))
 	mux.Handle("GET /api/v1/audit/export", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AuditExportCSVHandler))))
 }

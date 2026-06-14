@@ -129,6 +129,28 @@ Both JWT and API tokens grant access to the API according to the user's permissi
 
 ---
 
+## Audit
+
+### GET `/api/v1/audit`
+- List audit rows (paginated, DataTables compatible).
+- Query params supported (combinable):
+	- `users=user1,user2` (emails)
+	- `actions=login,delete`
+	- `date_from=YYYY-MM-DDTHH:mm` (or `YYYY-MM-DD HH:mm:ss`)
+	- `date_to=YYYY-MM-DDTHH:mm` (or `YYYY-MM-DD HH:mm:ss`)
+	- DataTables params: `draw`, `start`, `length`, `search[value]`, `order[0][column]`, `order[0][dir]`
+
+### GET `/api/v1/audit/filters`
+- Returns available values for audit filter dropdowns.
+- Response shape:
+	- `users`: string[]
+	- `actions`: string[]
+
+### GET `/api/v1/audit/export`
+- Export audit rows as CSV.
+
+---
+
 ## Modules
 
 ### POST `/api/v1/modules/upload`
