@@ -5,7 +5,7 @@ go 1.25.5
 require (
 	github.com/crewjam/saml v0.5.1
 	github.com/denisenkom/go-mssqldb v0.12.3
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	golang.org/x/crypto v0.47.0
 	golang.org/x/sys v0.40.0
 	modernc.org/sqlite v1.40.1
