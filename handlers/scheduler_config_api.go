@@ -93,8 +93,19 @@ func resolveConfigPath() (string, error) {
 
 func schedulerActorEmail(r *http.Request) string {
 	if r.Context().Value("userId") != nil {
-		if sub, ok := r.Context().Value("userId").(string); ok && sub != "" {
-			return sub
+		switch v := r.Context().Value("userId").(type) {
+		case string:
+			if v != "" {
+				return v
+			}
+		case int64:
+			if v > 0 {
+				return fmt.Sprintf("%d", v)
+			}
+		case int:
+			if v > 0 {
+				return fmt.Sprintf("%d", v)
+			}
 		}
 	}
 	return "?"

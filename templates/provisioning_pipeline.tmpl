@@ -1,0 +1,69 @@
+{{define "content"}}
+<section class="content-header">
+  <div class="container-fluid">
+    <div class="row mb-2">
+      <div class="col-sm-6">
+        <h1>Provisioning Pipeline</h1>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="content">
+  <div class="container-fluid">
+    <div class="card">
+      <div class="card-body">
+        <form id="provisioning-config-form">
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="enabled" name="enabled">
+            <label class="form-check-label" for="enabled">Enable provisioning pipeline trigger</label>
+          </div>
+
+          <div class="form-group">
+            <label for="provider">Provider</label>
+            <select id="provider" class="form-control">
+              <option value="github">GitHub</option>
+              <option value="gitlab">GitLab</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="api_base_url">API base URL</label>
+            <input type="text" class="form-control" id="api_base_url" placeholder="https://api.github.com">
+          </div>
+
+          <div class="form-group">
+            <label for="project_path">Project path</label>
+            <input type="text" class="form-control" id="project_path" placeholder="org/repo or group/project">
+          </div>
+
+          <div class="form-group">
+            <label for="workflow_id">Workflow ID / file name</label>
+            <input type="text" class="form-control" id="workflow_id" placeholder="provision-node.yml">
+            <small class="form-text text-muted">For GitLab this can stay empty.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="pipeline_ref">Ref (branch/tag)</label>
+            <input type="text" class="form-control" id="pipeline_ref" placeholder="main">
+          </div>
+
+          <div class="form-group">
+            <label for="timeout_seconds">Timeout (seconds)</label>
+            <input type="number" min="5" class="form-control" id="timeout_seconds" placeholder="30">
+          </div>
+
+          <div class="form-group">
+            <label for="secret_token">Secret token</label>
+            <input type="password" class="form-control" id="secret_token" placeholder="Leave empty to keep existing secret">
+            <small class="form-text text-muted" id="secret-presence-text"></small>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Save</button>
+          <span id="provisioning-config-status" class="ml-3"></span>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+<script src="/web/provisioning_pipeline.js"></script>
+{{end}}

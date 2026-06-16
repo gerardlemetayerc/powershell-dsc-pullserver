@@ -64,14 +64,9 @@ func SAMLConfigAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 			   // Audit modification SAML config (ouvre une connexion DB temporaire)
 			   driverName := global.AppConfig.Database.Driver
-			   user := "?"
-			   if r.Context().Value("userId") != nil {
-				   if sub, ok := r.Context().Value("userId").(string); ok {
-					   user = sub
-				   }
-			   }
 			   dbConn, err := internaldb.OpenDB(&global.AppConfig.Database)
 			   if err == nil {
+				   user := resolveAuditActor(dbConn, r)
 				   _ = internaldb.InsertAudit(dbConn, driverName, user, "update", "saml_config", "Updated SAML configuration", "")
 				   dbConn.Close()
 			   }

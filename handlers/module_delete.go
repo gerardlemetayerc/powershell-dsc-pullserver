@@ -40,13 +40,8 @@ func ModuleDeleteHandler(db *sql.DB) http.HandlerFunc {
 		   }
 		   // Audit suppression
 		   driverName := global.AppConfig.Database.Driver
-		   user := "?"
-		   if r.Context().Value("userId") != nil {
-			   if sub, ok := r.Context().Value("userId").(string); ok {
-				   user = sub
-			   }
-			   _ = internaldb.InsertAudit(db, driverName, user, "delete", "module", fmt.Sprintf("Deleted module: %s v%s", modName, modVersion), "")
-		   }
+		   user := resolveAuditActor(db, r)
+		   _ = internaldb.InsertAudit(db, driverName, user, "delete", "module", fmt.Sprintf("Deleted module: %s v%s", modName, modVersion), "")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Module deleted"))
 	}

@@ -33,6 +33,7 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 	h := sha1.New()
 	h.Write([]byte(req.NodeName + "TEMP"))
 	tempAgentId := fmt.Sprintf("TEMP-%x", h.Sum(nil)[:8])
+	internalDSCId := generateInternalDSCID()
 
 	database, err := db.OpenDB(&global.AppConfig.Database)
 	if err != nil {
@@ -42,17 +43,17 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
-	       // Insert agent (ignore if already exists), compatible SQLite/MSSQL
-			       driver := global.AppConfig.Database.Driver
-				       if driver == "sqlite" {
-					       _, err = database.Exec(`INSERT OR IGNORE INTO agents (agent_id, node_name, last_communication, state) VALUES (?, ?, ?, ?)`, tempAgentId, req.NodeName, "0000-00-01 00:00:00", "waiting_for_registration")
-				       } else if driver == "mssql" {
-					       // MSSQL : insérer avec la date minimale valide
-					       _, err = database.Exec(`IF NOT EXISTS (SELECT 1 FROM agents WHERE agent_id = ?) INSERT INTO agents (agent_id, node_name, last_communication, state) VALUES (?, ?, ?, ?)`, tempAgentId, tempAgentId, req.NodeName, "1753-01-01 00:00:00", "waiting_for_registration")
-				       } else {
-					       // fallback générique
-					       _, err = database.Exec(`INSERT INTO agents (agent_id, node_name) VALUES (?, ?)`, tempAgentId, req.NodeName)
-				       }
+	// Insert agent (ignore if already exists), compatible SQLite/MSSQL
+	driver := global.AppConfig.Database.Driver
+	if driver == "sqlite" {
+		_, err = database.Exec(`INSERT OR IGNORE INTO agents (agent_id, internal_dsc_id, node_name, last_communication, state) VALUES (?, ?, ?, ?, ?)`, tempAgentId, internalDSCId, req.NodeName, "0000-00-01 00:00:00", "waiting_for_registration")
+	} else if driver == "mssql" {
+		// MSSQL: insert with minimum valid date and always set internal_dsc_id.
+		_, err = database.Exec(`IF NOT EXISTS (SELECT 1 FROM agents WHERE agent_id = ?) INSERT INTO agents (agent_id, internal_dsc_id, node_name, last_communication, state) VALUES (?, ?, ?, ?, ?)`, tempAgentId, tempAgentId, internalDSCId, req.NodeName, "1753-01-01 00:00:00", "waiting_for_registration")
+	} else {
+		// Generic fallback
+		_, err = database.Exec(`INSERT INTO agents (agent_id, internal_dsc_id, node_name) VALUES (?, ?, ?)`, tempAgentId, internalDSCId, req.NodeName)
+	}
 		if err != nil {
 			log.Printf("[API][DB] Erreur insertion agent: %v", err)
 			_ = logs.WriteLogFile(fmt.Sprintf("ERROR [API][PRE-ENROLL] Erreur insertion agent: %v (NodeName=%s)", err, req.NodeName))
@@ -64,16 +65,12 @@ func PreEnrollAgentHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Audit pre-enroll
 		driverName := global.AppConfig.Database.Driver
-		user := "?"
-		if r.Context().Value("userId") != nil {
-			if sub, ok := r.Context().Value("userId").(string); ok {
-				user = sub
-			}
-		}
+		user := resolveAuditActor(database, r)
 		_ = db.InsertAudit(database, driverName, user, "preenroll", "agent", "Pre-enrolled agent: "+tempAgentId+" ("+req.NodeName+")", "")
 
 	agent := schema.Agent{
 		AgentId:           tempAgentId,
+		InternalDSCId:     ptr(internalDSCId),
 		NodeName:          req.NodeName,
 		LastCommunication: "0000-00-01 00:00:00",
 		State:             ptr("waiting_for_registration"),

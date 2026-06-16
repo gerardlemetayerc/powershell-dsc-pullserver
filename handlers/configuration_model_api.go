@@ -15,7 +15,6 @@ import (
 	"go-dsc-pull/internal/global"
 	"go-dsc-pull/internal/schema"
 	"go-dsc-pull/internal/logs"
-	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 // POST /api/v1/configuration_models
@@ -83,27 +82,7 @@ func CreateConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 2. Tenter la création de la configuration, et indiquer si besoin l'ID de la précédente configuration (celle modifiée précédemment) si besoin dans le champ prévu à cet effet
-		uploadedBy := "?"
-		if r.Context().Value("userId") != nil {
-			if sub, ok := r.Context().Value("userId").(string); ok {
-				uploadedBy = sub
-			}
-		} else if authHeader := r.Header.Get("Authorization"); len(authHeader) > 7 {
-			tokenStr := authHeader[7:]
-			secretValue := auth.ResolveJWTSecret(global.AppConfig)
-			if secretValue == "" {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Missing shared_secret"))
-				return
-			}
-			secret := []byte(secretValue)
-			token, _ := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) { return secret, nil })
-			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-				if sub, ok := claims["sub"].(string); ok {
-					uploadedBy = sub
-				}
-			}
-		}
+		uploadedBy := resolveAuditActor(dbConn, r)
 
 		cm := &schema.ConfigurationModel{
 			Name: name,
@@ -343,13 +322,7 @@ func DeleteConfigurationModelHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// Audit suppression
 	driverName := global.AppConfig.Database.Driver
-	// Récupère l'utilisateur
-	user := "?"
-	if r.Context().Value("userId") != nil {
-		if sub, ok := r.Context().Value("userId").(string); ok {
-			user = sub
-		}
-	}
+	user := resolveAuditActor(dbConn, r)
 	_ = db.InsertAudit(dbConn, driverName, user, "delete", "configuration_model", "Deleted configuration: "+configName, "")
 	w.WriteHeader(http.StatusOK)
 }

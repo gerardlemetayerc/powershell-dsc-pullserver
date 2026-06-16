@@ -181,4 +181,39 @@ function Get-DSCPullServerReport {
     Invoke-RestMethod -Uri $uri -Method GET -Headers @{ Authorization = "$authType $($script:DSCPullServerSession.Token)" }
 }
 
-    Export-ModuleMember -Function Get-DSCPullServerAgent,Get-DSCPullServerReport,Connect-DSCPullServer,Add-DSCPullServerModule,Get-DSCPullServerModule,Remove-DSCPullServerModule,Get-DSCPullServerConfiguration,Add-DSCPullServerConfiguration,Remove-DSCPullServerConfiguration
+function Start-DSCPullServerProvisioningRun {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$AgentId,
+        [hashtable]$Input
+    )
+    if (-not $script:DSCPullServerSession.Token) {
+        throw "Vous devez d'abord appeler Connect-DSCPullServer."
+    }
+    if ([string]::IsNullOrWhiteSpace($AgentId)) {
+        throw "Le parametre -AgentId est requis."
+    }
+
+    $payload = @{ inputs = @{} }
+    if ($Input) {
+        foreach ($k in $Input.Keys) {
+            if ($null -eq $k) {
+                continue
+            }
+            $key = [string]$k
+            if ([string]::IsNullOrWhiteSpace($key)) {
+                continue
+            }
+            $payload.inputs[$key] = [string]$Input[$k]
+        }
+    }
+
+    $uri = "$($script:DSCPullServerSession.ServerUrl)/api/v1/agents/$([System.Uri]::EscapeDataString($AgentId))/provisioning/run"
+    $authType = $script:DSCPullServerSession.AuthType
+    $headers = @{ Authorization = "$authType $($script:DSCPullServerSession.Token)" }
+    $json = $payload | ConvertTo-Json -Depth 5
+    Invoke-RestMethod -Uri $uri -Method POST -Headers $headers -Body $json -ContentType 'application/json'
+}
+
+    Export-ModuleMember -Function Get-DSCPullServerAgent,Get-DSCPullServerReport,Connect-DSCPullServer,Add-DSCPullServerModule,Get-DSCPullServerModule,Remove-DSCPullServerModule,Get-DSCPullServerConfiguration,Add-DSCPullServerConfiguration,Remove-DSCPullServerConfiguration,Start-DSCPullServerProvisioningRun

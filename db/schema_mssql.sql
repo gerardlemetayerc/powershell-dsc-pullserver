@@ -127,6 +127,63 @@ CREATE TABLE scheduler_task_runs (
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_scheduler_runs_task_started' AND object_id = OBJECT_ID('scheduler_task_runs'))
     CREATE INDEX idx_scheduler_runs_task_started ON scheduler_task_runs(task_name, started_at DESC);
 
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='provisioning_pipeline_config' AND xtype='U')
+CREATE TABLE provisioning_pipeline_config (
+    id INT PRIMARY KEY CHECK (id = 1),
+    enabled BIT NOT NULL DEFAULT 0,
+    provider NVARCHAR(32) NOT NULL DEFAULT 'github',
+    api_base_url NVARCHAR(255) NOT NULL DEFAULT '',
+    project_path NVARCHAR(255) NOT NULL DEFAULT '',
+    workflow_id NVARCHAR(255) NOT NULL DEFAULT '',
+    pipeline_ref NVARCHAR(128) NOT NULL DEFAULT 'main',
+    secret_token NVARCHAR(1024) NOT NULL DEFAULT '',
+    timeout_seconds INT NOT NULL DEFAULT 30,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+IF NOT EXISTS (SELECT 1 FROM provisioning_pipeline_config WHERE id = 1)
+INSERT INTO provisioning_pipeline_config (
+    id,
+    enabled,
+    provider,
+    api_base_url,
+    project_path,
+    workflow_id,
+    pipeline_ref,
+    secret_token,
+    timeout_seconds,
+    updated_at
+) VALUES (
+    1,
+    0,
+    'github',
+    '',
+    '',
+    '',
+    'main',
+    '',
+    30,
+    CURRENT_TIMESTAMP
+);
+
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='provisioning_pipeline_runs' AND xtype='U')
+CREATE TABLE provisioning_pipeline_runs (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    agent_id NVARCHAR(128) NOT NULL,
+    internal_dsc_id NVARCHAR(128) NULL,
+    node_name NVARCHAR(255) NULL,
+    provider NVARCHAR(32) NOT NULL,
+    status NVARCHAR(32) NOT NULL,
+    message NVARCHAR(MAX) NULL,
+    remote_run_id NVARCHAR(128) NULL,
+    remote_url NVARCHAR(512) NULL,
+    triggered_by NVARCHAR(255) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'idx_provisioning_pipeline_runs_agent_created' AND object_id = OBJECT_ID('provisioning_pipeline_runs'))
+    CREATE INDEX idx_provisioning_pipeline_runs_agent_created ON provisioning_pipeline_runs(agent_id, created_at DESC);
+
 -- To update version:
 -- UPDATE dsc_infra_info SET db_version = '1.1.3p2', updated_at = GETDATE() WHERE id = 1;
 

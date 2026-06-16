@@ -44,7 +44,52 @@ const state = {
     reports: [],
     error: null,
     tags: {},
+    provisioningEnabled: false,
 };
+
+function isCurrentUserAdmin() {
+    return !!(window.currentUser && window.currentUser.role === 'admin');
+}
+
+function setProvisioningButtonState() {
+    const $btn = $('#run-provisioning-btn');
+    if (state.provisioningEnabled && isCurrentUserAdmin()) {
+        $btn.show();
+    } else {
+        $btn.hide();
+    }
+}
+
+function loadProvisioningConfigIfAdmin(onDone) {
+    if (!isCurrentUserAdmin()) {
+        state.provisioningEnabled = false;
+        renderAll();
+        if (onDone) {
+            onDone();
+        }
+        return;
+    }
+
+    $.ajax({
+        url: '/api/v1/provisioning/pipeline/config',
+        method: 'GET',
+        dataType: 'json',
+        success: function(cfg) {
+            state.provisioningEnabled = !!(cfg && cfg.enabled);
+            renderAll();
+            if (onDone) {
+                onDone();
+            }
+        },
+        error: function() {
+            state.provisioningEnabled = false;
+            renderAll();
+            if (onDone) {
+                onDone();
+            }
+        }
+    });
+}
 function renderAgentTags() {
     let html = '';
     if (!state.tags || Object.keys(state.tags).length === 0) {
@@ -322,6 +367,7 @@ function renderAll() {
     $('#reports-dropdown-block').html(renderReportsDropdown());
     $('#last-report-block').html(renderSelectedReport());
     $('#node-action-block').html(renderNodeActionBlock());
+    setProvisioningButtonState();
 }
 
 $(document).ready(function() {
@@ -360,6 +406,76 @@ $(document).ready(function() {
             state.tags = {};
             renderAll();
         }
+    });
+
+    loadProvisioningConfigIfAdmin();
+
+    window.addEventListener('userReady', function() {
+        loadProvisioningConfigIfAdmin();
+    });
+
+    $(document).on('click', '#run-provisioning-btn', function() {
+        if (!state.provisioningEnabled || !isCurrentUserAdmin()) {
+            return;
+        }
+
+        const defaultInputs = {
+            nodename: (state.agent && state.agent.node_name) ? state.agent.node_name : ''
+        };
+        const rawInputs = window.prompt(
+            'Optional inputs JSON to send to pipeline (example: {"configuration":"Baseline","environment":"prod"})',
+            JSON.stringify(defaultInputs)
+        );
+        if (rawInputs === null) {
+            return;
+        }
+
+        let customInputs = {};
+        const trimmedInputs = rawInputs.trim();
+        if (trimmedInputs !== '') {
+            try {
+                const parsed = JSON.parse(trimmedInputs);
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    customInputs = parsed;
+                } else {
+                    $('#provisioning-run-status').text('Inputs must be a JSON object.').css('color', '#721c24');
+                    return;
+                }
+            } catch (e) {
+                $('#provisioning-run-status').text('Invalid JSON for inputs.').css('color', '#721c24');
+                return;
+            }
+        }
+
+        const $btn = $('#run-provisioning-btn');
+        const $status = $('#provisioning-run-status');
+        $btn.prop('disabled', true);
+        $status.text('Dispatching provisioning pipeline...').css('color', '#6c757d');
+
+        $.ajax({
+            url: `/api/v1/agents/${agentId}/provisioning/run`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ inputs: customInputs }),
+            dataType: 'json',
+            success: function(resp) {
+                let msg = 'Provisioning pipeline dispatched.';
+                if (resp && resp.remote_url) {
+                    msg += ` ${resp.remote_url}`;
+                }
+                $status.text(msg).css('color', '#155724');
+            },
+            error: function(xhr) {
+                let msg = 'Failed to dispatch provisioning pipeline.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    msg = xhr.responseJSON.error;
+                }
+                $status.text(msg).css('color', '#721c24');
+            },
+            complete: function() {
+                $btn.prop('disabled', false);
+            }
+        });
     });
         // Ajout d'un tag
         $(document).on('submit', '#add-tag-form', function(e) {

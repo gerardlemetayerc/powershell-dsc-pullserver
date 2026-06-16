@@ -84,12 +84,7 @@ func ModuleUploadHandler(db *sql.DB) http.HandlerFunc {
 			   		_, err := db.Exec(`INSERT INTO modules (name, version, checksum, zip_blob) VALUES (?, ?, ?, ?)`, name, version, checksum, nupkgBytes)
 				   // Audit log for zip upload
 				  if( err == nil) {
-					user := "?"
-					if r.Context().Value("userId") != nil {
-						if sub, ok := r.Context().Value("userId").(string); ok {
-							user = sub
-						}
-					}
+						user := resolveAuditActor(db, r)
 					// Try to load driver name for audit
 					driverName := global.AppConfig.Database.Driver
 					if driverName != "" {
@@ -192,12 +187,7 @@ func ModuleUploadHandler(db *sql.DB) http.HandlerFunc {
 		_, err = db.Exec(`INSERT INTO modules (name, version, checksum, zip_blob) VALUES (?, ?, ?, ?)`, name, version, checksum, zipBytes)
 		   fmt.Fprintf(w, "Module %s v%s uploaded and processed.\n", name, version)
 		   // Audit log for nupkg upload
-		   user := "?"
-		   if r.Context().Value("userId") != nil {
-			   if sub, ok := r.Context().Value("userId").(string); ok {
-				   user = sub
-			   }
-		   }
+		   user := resolveAuditActor(db, r)
 		   // Try to load driver name for audit
 		driverName := global.AppConfig.Database.Driver
 		if driverName != "" {

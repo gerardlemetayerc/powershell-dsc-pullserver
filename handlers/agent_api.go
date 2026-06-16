@@ -60,7 +60,7 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 	       }
 
 		       // Filtrage dynamique
-		       q := `SELECT agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report, state FROM agents WHERE 1=1`
+		       q := `SELECT agent_id, internal_dsc_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report, state FROM agents WHERE 1=1`
 		       args := []interface{}{}
 		       nodeName := r.URL.Query().Get("node_name")
 		       if nodeName != "" {
@@ -92,9 +92,9 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 			   agents := []schema.Agent{}
 			   for rows.Next() {
 				   var a schema.Agent
-				   var lcmVersion, registrationType, certificateThumbprint, certificateSubject, certificateIssuer, certificateNotBefore, certificateNotAfter, registeredAt, lastCommunication, state *string
+				   var internalDSCId, lcmVersion, registrationType, certificateThumbprint, certificateSubject, certificateIssuer, certificateNotBefore, certificateNotAfter, registeredAt, lastCommunication, state *string
 				   var hasErrorBool bool
-				   if err := rows.Scan(&a.AgentId, &a.NodeName, &lcmVersion, &registrationType, &certificateThumbprint, &certificateSubject, &certificateIssuer, &certificateNotBefore, &certificateNotAfter, &registeredAt, &lastCommunication, &hasErrorBool, &state); err == nil {
+				   if err := rows.Scan(&a.AgentId, &internalDSCId, &a.NodeName, &lcmVersion, &registrationType, &certificateThumbprint, &certificateSubject, &certificateIssuer, &certificateNotBefore, &certificateNotAfter, &registeredAt, &lastCommunication, &hasErrorBool, &state); err == nil {
 					   // Pour DataTables, renvoyer les champs attendus même vides
 					   empty := ""
 					   a.LCMVersion = lcmVersion
@@ -113,6 +113,7 @@ func GetAgentsHandler(w http.ResponseWriter, r *http.Request) {
 					   if a.CertificateNotAfter == nil { a.CertificateNotAfter = &empty }
 					   a.RegisteredAt = registeredAt
 					   if a.RegisteredAt == nil { a.RegisteredAt = &empty }
+					   a.InternalDSCId = internalDSCId
 					   // Correction pour last_communication
 					   if lastCommunication != nil {
 						   a.LastCommunication = *lastCommunication
@@ -194,12 +195,7 @@ func DeleteNodeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Audit suppression
 	driverName := global.AppConfig.Database.Driver
-	user := "?"
-	if r.Context().Value("userId") != nil {
-		if sub, ok := r.Context().Value("userId").(string); ok {
-			user = sub
-		}
-	}
+	user := resolveAuditActor(dbConn, r)
 	_ = db.InsertAudit(dbConn, driverName, user, "delete", "agent", "Deleted agent: "+id, "")
 	w.WriteHeader(http.StatusOK)
 }

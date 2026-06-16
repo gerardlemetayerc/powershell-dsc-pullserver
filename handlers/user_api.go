@@ -321,12 +321,7 @@ func DeleteUserHandler(db *sql.DB) http.HandlerFunc {
 	       return func(w http.ResponseWriter, r *http.Request) {
 		       id := r.PathValue("id")
 		       // actorEmail = userId/sub from context
-		       actorEmail := "?"
-		       if r.Context().Value("userId") != nil {
-			       if sub, ok := r.Context().Value("userId").(string); ok {
-				       actorEmail = sub
-			       }
-		       }
+		       actorEmail := resolveAuditActor(db, r)
 		       // Get email of the user being deleted
 		       deletedEmail := "?"
 		       row := db.QueryRow("SELECT email FROM users WHERE id = ?", id)
@@ -356,12 +351,7 @@ func SetUserActiveHandler(db *sql.DB) http.HandlerFunc {
 			       isActive = 1
 		       }
 		       // actorEmail = userId/sub from context
-		       actorEmail := "?"
-		       if r.Context().Value("userId") != nil {
-			       if sub, ok := r.Context().Value("userId").(string); ok {
-				       actorEmail = sub
-			       }
-		       }
+		       actorEmail := resolveAuditActor(db, r)
 		       // Get email of the user being activated/deactivated
 		       targetEmail := "?"
 		       row := db.QueryRow("SELECT email FROM users WHERE id = ?", id)
@@ -409,12 +399,7 @@ func ChangeUserPasswordHandler(db *sql.DB) http.HandlerFunc {
 		       return
 	       }
 	       // userId context contains JWT sub (email in this app).
-	       actorEmail := "?"
-	       if r.Context().Value("userId") != nil {
-		       if sub, ok := r.Context().Value("userId").(string); ok {
-			       actorEmail = sub
-		       }
-	       }
+	       actorEmail := resolveAuditActor(db, r)
 	       _, err = db.Exec("UPDATE users SET password_hash=? WHERE id=?", string(hash), id)
 	       if err != nil {
 		       http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -2,6 +2,7 @@ package schema
 
 type Agent struct {
 	AgentId                string   `json:"agent_id"`
+	InternalDSCId          *string  `json:"internal_dsc_id,omitempty"`
 	NodeName               string   `json:"node_name"`
 	LCMVersion             *string  `json:"lcm_version,omitempty"`
 	RegistrationType       *string  `json:"registration_type,omitempty"`

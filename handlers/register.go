@@ -51,6 +51,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if agentId == "" {
 		agentId = generateAgentId()
 	}
+	internalDSCId := generateInternalDSCID()
 
 	// --- Insertion en base ---
 	// Charger la config DB
@@ -82,8 +83,8 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 				   err = database.QueryRow(`SELECT agent_id FROM agents WHERE node_name = ? AND agent_id LIKE 'TEMP-%'`, nodeName).Scan(&tempAgentId)
 				   if err == nil && tempAgentId != "" {
 					   // Mise à jour : change l'agent_id et les infos
-					   _, err = database.Exec(`UPDATE agents SET agent_id = ?, lcm_version = ?, registration_type = ?, certificate_thumbprint = ?, certificate_subject = ?, certificate_issuer = ?, certificate_notbefore = ?, certificate_notafter = ? WHERE agent_id = ?`,
-						   agentId, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, tempAgentId)
+					   _, err = database.Exec(`UPDATE agents SET agent_id = ?, internal_dsc_id = COALESCE(internal_dsc_id, ?), lcm_version = ?, registration_type = ?, certificate_thumbprint = ?, certificate_subject = ?, certificate_issuer = ?, certificate_notbefore = ?, certificate_notafter = ? WHERE agent_id = ?`,
+						   agentId, internalDSCId, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, tempAgentId)
 					   if err != nil {
 						   logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur update agent TEMP: %v", err))
 					   }
@@ -95,11 +96,11 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 				   } else {
 						  // Insertion normale, compatible SQLite/MSSQL
 						  if driver == "sqlite" {
-							  _, err = database.Exec(`INSERT OR REPLACE INTO agents (agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-								  agentId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, "pending_apply")
+							  _, err = database.Exec(`INSERT OR REPLACE INTO agents (agent_id, internal_dsc_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+								  agentId, internalDSCId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, "pending_apply")
 						  } else {
-							  _, err = database.Exec(`IF NOT EXISTS (SELECT 1 FROM agents WHERE agent_id = ?) INSERT INTO agents (agent_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-								  agentId, agentId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, nil, nil, 0)
+							  _, err = database.Exec(`IF NOT EXISTS (SELECT 1 FROM agents WHERE agent_id = ?) INSERT INTO agents (agent_id, internal_dsc_id, node_name, lcm_version, registration_type, certificate_thumbprint, certificate_subject, certificate_issuer, certificate_notbefore, certificate_notafter, registered_at, last_communication, has_error_last_report) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+								  agentId, agentId, internalDSCId, nodeName, lcmVersion, registrationType, thumbprint, subject, issuer, notbefore, notafter, nil, nil, 0)
 						  }
 						  if err != nil {
 							  logs.WriteLogFile(fmt.Sprintf("[ERROR][REGISTER][DB] Erreur insertion agent: %v", err))
@@ -160,6 +161,11 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 func generateAgentId() string {
 	rand.Seed(time.Now().UnixNano())
 	return randomHex(8) + "-" + randomHex(4) + "-" + randomHex(4) + "-" + randomHex(4) + "-" + randomHex(12)
+}
+
+func generateInternalDSCID() string {
+	rand.Seed(time.Now().UnixNano())
+	return "IDSC-" + randomHex(32)
 }
 
 func randomHex(n int) string {

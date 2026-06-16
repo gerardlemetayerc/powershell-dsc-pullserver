@@ -84,6 +84,59 @@ CREATE TABLE IF NOT EXISTS scheduler_task_runs (
 );
 CREATE INDEX IF NOT EXISTS idx_scheduler_runs_task_started ON scheduler_task_runs(task_name, started_at DESC);
 
+CREATE TABLE IF NOT EXISTS provisioning_pipeline_config (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled BOOLEAN NOT NULL DEFAULT 0,
+    provider TEXT NOT NULL DEFAULT 'github',
+    api_base_url TEXT NOT NULL DEFAULT '',
+    project_path TEXT NOT NULL DEFAULT '',
+    workflow_id TEXT NOT NULL DEFAULT '',
+    pipeline_ref TEXT NOT NULL DEFAULT 'main',
+    secret_token TEXT NOT NULL DEFAULT '',
+    timeout_seconds INTEGER NOT NULL DEFAULT 30,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT OR IGNORE INTO provisioning_pipeline_config (
+    id,
+    enabled,
+    provider,
+    api_base_url,
+    project_path,
+    workflow_id,
+    pipeline_ref,
+    secret_token,
+    timeout_seconds,
+    updated_at
+) VALUES (
+    1,
+    0,
+    'github',
+    '',
+    '',
+    '',
+    'main',
+    '',
+    30,
+    CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS provisioning_pipeline_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL,
+    internal_dsc_id TEXT,
+    node_name TEXT,
+    provider TEXT NOT NULL,
+    status TEXT NOT NULL,
+    message TEXT,
+    remote_run_id TEXT,
+    remote_url TEXT,
+    triggered_by TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_provisioning_pipeline_runs_agent_created ON provisioning_pipeline_runs(agent_id, created_at DESC);
+
 -- Schéma pour la table agents
 
 CREATE TABLE IF NOT EXISTS agents (

@@ -90,6 +90,8 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("POST /api/v1/saml/upload_sp_keycert", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SAMLUploadSPKeyCertHandler))))
 	mux.Handle("GET /api/v1/scheduler/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerConfigAPIHandler))))
 	mux.Handle("PUT /api/v1/scheduler/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerConfigAPIHandler))))
+	mux.Handle("GET /api/v1/provisioning/pipeline/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.ProvisioningPipelineConfigAPIHandler(dbConn)))))
+	mux.Handle("PUT /api/v1/provisioning/pipeline/config", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.ProvisioningPipelineConfigAPIHandler(dbConn)))))
 	mux.Handle("GET /api/v1/scheduler/tasks", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerTasksAPIHandler))))
 	mux.Handle("GET /api/v1/scheduler/tasks/{task}/history", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerTaskHistoryAPIHandler))))
 	mux.Handle("POST /api/v1/scheduler/cleanup/run", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.SchedulerRunCleanupAPIHandler))))
@@ -98,6 +100,7 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	// Web UI for SAML config (admin only)
 	mux.Handle("GET /web/saml_config", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebSAMLConfigHandler))))
 	mux.Handle("GET /web/admin/scheduler", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebSchedulerConfigHandler))))
+	mux.Handle("GET /web/admin/provisioning", handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebProvisioningPipelineHandler))))
 	if samlMiddleware != nil {
 		mux.Handle("/saml/", samlMiddleware)
 	}
@@ -185,6 +188,7 @@ func RegisterWebRoutes(mux *http.ServeMux, dbConn *sql.DB, jwtAuthMiddleware fun
 	mux.Handle("/web/configuration_model/", handlers.WebJWTAuthMiddleware(http.HandlerFunc(handlers.WebConfigurationModelDetailHandler)))
 	mux.Handle("GET /api/v1/modules/{name}", jwtAuthMiddleware(http.HandlerFunc(handlers.GetModuleVersionHandler)))
 	mux.Handle("DELETE /api/v1/agents/{id}", jwtAuthMiddleware(http.HandlerFunc(handlers.DeleteNodeHandler)))
+	mux.Handle("POST /api/v1/agents/{id}/provisioning/run", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.ProvisioningPipelineRunHandler(dbConn)))))
 	mux.Handle("/web/admin/audit",handlers.WebJWTAuthMiddleware(middleware.WebAdminOnly(dbConn, renderDenied)(http.HandlerFunc(handlers.WebAuditHandler))))
 	mux.Handle("GET /api/v1/audit", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AuditListHandler))))
 	mux.Handle("GET /api/v1/audit/filters", jwtAuthMiddleware(adminOnly(http.HandlerFunc(handlers.AuditFilterOptionsHandler))))

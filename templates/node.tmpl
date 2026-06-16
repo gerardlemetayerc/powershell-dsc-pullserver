@@ -14,8 +14,12 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <h3>LCM Agent information</h3>
-                    <button id="delete-node-btn" class="btn btn-danger btn-sm">Delete this node</button>
+                    <div>
+                        <button id="run-provisioning-btn" class="btn btn-primary btn-sm mr-2" style="display:none;">Run provisioning pipeline</button>
+                        <button id="delete-node-btn" class="btn btn-danger btn-sm">Delete this node</button>
+                    </div>
                 </div>
+                <div id="provisioning-run-status" class="small text-muted mb-2"></div>
                 <div id="agent-info-block">
                     <div><strong>Name:</strong> <span id="agent-name"></span></div>
                     <div><strong>Certificate expiration:</strong> <span id="agent-thumbprint"></span></div>
